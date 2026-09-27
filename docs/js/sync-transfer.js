@@ -1,0 +1,69 @@
+window.MW=window.MW||{};
+(function(){
+  'use strict';
+  const FORMAT='myweek-transfer-v2',LEGACY_FORMAT='myweek-transfer-v1';
+  const enc=new TextEncoder(),dec=new TextDecoder();
+  const clone=x=>JSON.parse(JSON.stringify(x));
+  function checksum(text){
+    let h=2166136261;
+    for(let i=0;i<text.length;i++){h^=text.charCodeAt(i);h=Math.imul(h,16777619);}
+    return (h>>>0).toString(36).padStart(7,'0');
+  }
+  function toB64(bytes){
+    let out='';for(let i=0;i<bytes.length;i+=0x8000)out+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+    return btoa(out).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+  }
+  function fromB64(text){
+    text=String(text).replace(/-/g,'+').replace(/_/g,'/');while(text.length%4)text+='=';
+    const raw=atob(text),bytes=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return bytes;
+  }
+  async function compress(bytes){
+    if(window.fflate&&typeof window.fflate.gzipSync==='function')return window.fflate.gzipSync(bytes,{level:6});
+    if(typeof CompressionStream==='function'){const stream=new Blob([bytes]).stream().pipeThrough(new CompressionStream('gzip'));return new Uint8Array(await new Response(stream).arrayBuffer());}
+    return null;
+  }
+  async function decompress(bytes){
+    if(window.fflate&&typeof window.fflate.gunzipSync==='function')return window.fflate.gunzipSync(bytes);
+    if(typeof DecompressionStream==='function'){const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));return new Uint8Array(await new Response(stream).arrayBuffer());}
+    throw new Error('This device cannot read compressed transfer codes. Use a My Week transfer file instead.');
+  }
+  function wrapper(state){
+    const clean=clone(state),localRecipes=MW.onlineRecipes&&MW.onlineRecipes.exportData?MW.onlineRecipes.exportData():{recipes:[],syncedAt:null};const raw=JSON.stringify({state:clean,localRecipes});return {format:FORMAT,exportedAt:new Date().toISOString(),checksum:checksum(raw),state:clean,localRecipes};
+  }
+  function validate(packet){
+    if(!packet||![FORMAT,LEGACY_FORMAT].includes(packet.format)||!packet.state||packet.state.schema!==1)throw new Error('This is not a valid My Week transfer.');
+    const raw=packet.format===LEGACY_FORMAT?JSON.stringify(packet.state):JSON.stringify({state:packet.state,localRecipes:packet.localRecipes||{recipes:[],syncedAt:null}});if(checksum(raw)!==packet.checksum)throw new Error('The transfer code is incomplete or corrupted.');
+    return packet;
+  }
+  async function createCode(){
+    const packet=wrapper(MW.state.get()),bytes=enc.encode(JSON.stringify(packet)),gz=await compress(bytes);
+    return gz?'MWG1.'+toB64(gz):'MWJ1.'+toB64(bytes);
+  }
+  async function readCode(code){
+    code=String(code||'').trim();const i=code.indexOf('.');if(i<0)throw new Error('Transfer code is incomplete.');
+    const prefix=code.slice(0,i),payload=fromB64(code.slice(i+1));
+    const bytes=prefix==='MWG1'?await decompress(payload):prefix==='MWJ1'?payload:null;if(!bytes)throw new Error('Unsupported My Week transfer code.');
+    return validate(JSON.parse(dec.decode(bytes)));
+  }
+  function createFile(){
+    const packet=wrapper(MW.state.get()),stamp=packet.exportedAt.slice(0,10);
+    return new File([JSON.stringify(packet,null,2)],'my-week-'+stamp+'.myweek',{type:'application/json'});
+  }
+  async function readFile(file){
+    const text=await file.text();
+    try{const parsed=JSON.parse(text);if(parsed&&parsed.schema===1)return wrapper(parsed);return validate(parsed);}catch(e){return readCode(text);}
+  }
+  function apply(packet){packet=validate(packet);const result=MW.state.replace(packet.state);if(MW.onlineRecipes&&MW.onlineRecipes.replaceData)MW.onlineRecipes.replaceData(packet.localRecipes||{recipes:[],syncedAt:null});return result;}
+  async function shareFile(){
+    const file=createFile(),plugins=window.Capacitor&&window.Capacitor.Plugins||{},fs=plugins.Filesystem,share=plugins.Share;
+    if(fs&&share&&typeof fs.writeFile==='function'&&typeof share.share==='function'){
+      const bytes=enc.encode(await file.text()),data=toB64(bytes).replace(/-/g,'+').replace(/_/g,'/');
+      const result=await fs.writeFile({path:file.name,data,directory:'CACHE'});
+      try{await share.share({title:'My Week transfer',text:'My Week device transfer',url:result.uri,dialogTitle:'Send My Week to another device'});}finally{try{await fs.deleteFile({path:file.name,directory:'CACHE'});}catch{}}
+      return 'shared-native';
+    }
+    if(navigator.canShare&&navigator.share&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'My Week transfer'});return 'shared';}
+    const url=URL.createObjectURL(file),a=document.createElement('a');a.href=url;a.download=file.name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);return 'downloaded';
+  }
+  MW.syncTransfer={format:FORMAT,createCode,readCode,createFile,readFile,apply,shareFile};
+})();

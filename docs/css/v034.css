@@ -1,0 +1,329 @@
+﻿/* v0.34: featured dinner, truthful basket-saving states, and deliberate loading feedback. */
+.home-featured-meal{
+  margin:0 0 12px;
+  overflow:hidden;
+  border:1px solid #dfeae5;
+  border-radius:26px;
+  background:#fff;
+  box-shadow:0 12px 34px rgba(30,62,50,.08);
+}
+.home-featured-photo{
+  position:relative;
+  min-height:210px;
+  aspect-ratio:16/10;
+  overflow:hidden;
+  background:#eef4f1;
+}
+.home-featured-photo img{width:100%;height:100%;object-fit:cover;display:block}
+.home-featured-photo .eyebrow{
+  position:absolute;
+  top:14px;
+  left:14px;
+  z-index:1;
+  margin:0;
+  padding:7px 10px;
+  border-radius:999px;
+  background:rgba(20,43,34,.84);
+  color:#fff;
+  box-shadow:0 4px 14px rgba(0,0,0,.12);
+}
+.home-featured-body{padding:17px 17px 16px}
+.home-featured-body h3{margin:0;font-size:clamp(21px,5.4vw,27px);line-height:1.08;letter-spacing:-.025em;color:var(--ink)}
+.home-featured-body>p{margin:7px 0 0;color:var(--muted);font-size:13px;line-height:1.45}
+.home-featured-meta{display:flex;flex-wrap:wrap;gap:7px;margin:13px 0 15px}
+.home-featured-meta span{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:#f3f7f5;color:#365448;font-size:12px;font-weight:750}
+.home-featured-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+.home-featured-actions button{min-height:44px;border-radius:14px;font-weight:850}
+.home-featured-actions .featured-open{border:0;background:var(--green-deep);color:#fff;padding:0 16px}
+.home-featured-actions .featured-swap{border:1px solid #d7e4de;background:#fff;color:var(--green-deep);padding:0 14px}
+
+.saving-toggle.is-loading,.saving-prompt.is-loading,.saving-summary.is-loading{opacity:.72;pointer-events:none}
+.saving-toggle.is-loading .saving-icon i,.saving-prompt.is-loading .mw-loading-icon,.saving-summary.is-loading .mw-loading-icon,
+.btn.is-loading .mw-loading-icon,.onboard-actions .is-loading .mw-loading-icon{animation:mwSpin .72s linear infinite;transform-origin:50% 50%}
+.btn.is-loading{pointer-events:none;opacity:.76;display:inline-flex;align-items:center;justify-content:center;gap:9px}
+.saving-prompt.is-loading{display:flex;align-items:center;gap:11px}
+.saving-toggle small{max-width:44ch}
+
+@media (min-width:700px){
+  .home-featured-meal{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(280px,.8fr);min-height:272px}
+  .home-featured-photo{min-height:272px;aspect-ratio:auto}
+  .home-featured-body{display:flex;flex-direction:column;justify-content:center;padding:24px}
+  .home-featured-body h3{font-size:28px}
+  .home-featured-actions{margin-top:auto;padding-top:4px}
+}
+@media (min-width:1050px){
+  .home-featured-meal{grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);min-height:300px}
+  .home-featured-photo{min-height:300px}
+  .home-featured-body{padding:28px}
+  .home-featured-body h3{font-size:30px}
+}
+@media (prefers-reduced-motion:reduce){
+  .saving-toggle.is-loading .saving-icon i,.saving-prompt.is-loading .mw-loading-icon,.saving-summary.is-loading .mw-loading-icon,
+  .btn.is-loading .mw-loading-icon,.onboard-actions .is-loading .mw-loading-icon{animation:none!important}
+}
+
+/* QA accessibility and honest image-absence states; retain the existing design. */
+.text-action,.onboard-chips button,.food-choice button,.day-toggle-row button,.numeric-choice-row button,.equipment-grid button,.stock-state button,.cat-tab,.cook-close,.back-on-photo{min-height:44px;min-width:44px}
+.recipe-hero.text-only{height:auto;min-height:240px}
+.recipe-hero.text-only:after{display:none}
+.recipe-hero.text-only .recipe-hero-overlay{position:relative;color:var(--ink);gap:28px}
+.recipe-hero.text-only .recipe-hero-overlay p,.recipe-hero.text-only .eyebrow.light{color:var(--muted)}
+.recipe-hero.text-only .hero-meta span{color:var(--ink);background:#fff}
+.preparation-note{margin:16px 0;padding:18px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--ink)}
+.preparation-note p{margin-top:10px;line-height:1.55}
+.preparation-note label{display:block;margin-bottom:8px}
+.preparation-note select{min-height:44px;min-width:90px;padding:8px}
+body:not(.cooking-active) .lunch-feature.no-photo{grid-template-columns:minmax(0,1fr);min-height:0}
+.lunch-body .text-action{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;margin:8px 8px 0 0;white-space:normal}
+.alternative-card:has(.alternative-photo){grid-template-columns:88px minmax(0,1fr) auto}
+.alternative-card:not(:has(.alternative-photo)){grid-template-columns:minmax(0,1fr) auto}
+.operation-error{padding:12px;color:#7f2424;background:#fff1f1;border-radius:12px;line-height:1.5}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #0b7a59;outline-offset:3px}
+.cook-title,.cook-instruction,.cook-prep-list>div>span,.alternative-card>span{min-width:0;overflow-wrap:anywhere}
+@media(max-width:480px){.cupboard-row{flex-wrap:wrap;gap:10px}.stock-state{flex-wrap:wrap}.recipe-hero-overlay h1{font-size:clamp(25px,7vw,38px)}}
+
+/* Recovery is a blocking data-protection state, not a reset-on-error route. */
+.storage-recovery{max-width:42rem;margin:0 auto;padding:calc(1.5rem + env(safe-area-inset-top)) max(1rem,env(safe-area-inset-right)) calc(1.5rem + env(safe-area-inset-bottom)) max(1rem,env(safe-area-inset-left))}
+.storage-recovery h1{font-size:1.6rem;line-height:1.3}
+.storage-recovery p{font-size:1rem;line-height:1.5;margin-top:1rem}
+.storage-recovery-actions{display:grid;gap:.75rem;margin-top:1.5rem}
+.storage-recovery-actions .btn{min-height:48px;white-space:normal}
+
+/* QA.4: give the named weekday its own space above the featured title. */
+.home-featured-body>.eyebrow{display:block;margin:0 0 9px;text-transform:uppercase}
+.home-featured-meta span,.meal-meta span{white-space:normal}
+
+/* Keep duration intact when the clearer price label needs its own line. */
+.meal-meta{flex-wrap:wrap;row-gap:4px}
+.meal-meta>span{flex-shrink:0;max-width:100%}
+.meal-meta>span:first-child{white-space:nowrap}
+
+/* QA.6: lunch prep is derived from the weekly plan; no manual portion dropdown. */
+.lunch-plan-note .eyebrow{display:block;margin-bottom:6px}
+.lunch-plan-note h2{margin:0 0 10px;font-size:20px;line-height:1.2}
+.lunch-plan-equation{display:inline-flex;align-items:center;min-height:38px;padding:8px 12px;border:1px solid #dce8e2;border-radius:12px;background:#f4f8f6;color:var(--green-deep);font-size:13px;font-weight:850;letter-spacing:.01em}
+.lunch-plan-progress{font-weight:750;color:#496258}
+@media(min-width:700px){.lunch-plan-note{padding:20px 22px}.lunch-plan-note h2{font-size:22px}}
+
+/* QA.7: lunch recipe, prep and swapping use one compact My Week visual language. */
+.lunch-recipe-hero.text-only{min-height:0;background:#eef8f3}
+.lunch-recipe-hero.text-only .recipe-hero-overlay{padding:18px 20px 22px;gap:20px;justify-content:flex-start}
+.lunch-recipe-hero.text-only .recipe-hero-overlay>div:last-child{margin-top:4px}
+.lunch-recipe-hero.text-only .hero-meta{gap:5px 14px;flex-wrap:wrap;margin-top:14px;color:#314a41}
+.lunch-recipe-hero.text-only .hero-meta span{background:transparent;padding:0;color:#314a41;font-size:12px;font-weight:800}
+.lunch-plan-compact{padding:17px 18px;margin:14px 0}
+.lunch-plan-compact h2{font-size:22px;margin-bottom:9px}
+.lunch-plan-compact .lunch-plan-equation{min-height:0;padding:7px 10px;border-radius:999px;font-size:12px}
+.lunch-plan-summary{margin:9px 0 0!important;color:#5f7169;font-size:13px;line-height:1.4!important}
+.lunch-storage-note{margin-top:11px;border-top:1px solid var(--line);padding-top:10px}
+.lunch-storage-note summary{cursor:pointer;color:var(--green-deep);font-size:13px;font-weight:850}
+.lunch-storage-note p{font-size:13px;color:#5f7169;line-height:1.45!important}
+.lunch-swap-head{margin-bottom:14px!important}
+.lunch-swap-head p{margin-top:4px!important;font-size:13px!important}
+.lunch-random{margin-bottom:18px;background:#eef7f2;border-color:#c9ddd2}
+.lunch-swap-filters{margin:0 0 20px}
+.lunch-swap-filters>.eyebrow{display:block;margin:0 2px 8px}
+.lunch-swap-filters .food-choice{flex-wrap:nowrap;overflow-x:auto;padding:2px 1px 5px;scrollbar-width:none}
+.lunch-swap-filters .food-choice::-webkit-scrollbar{display:none}
+.lunch-swap-filters .food-choice button{flex:0 0 auto;border-radius:999px;padding:9px 13px;background:#fff}
+.lunch-swap-list-title{align-items:center;margin-bottom:10px}
+.lunch-swap-list-title h2{font-size:21px;margin-top:3px}
+.lunch-swap-list{gap:9px}
+.lunch-swap-card{grid-template-columns:76px minmax(0,1fr) 20px!important;padding:14px 15px;border-radius:18px;gap:12px;box-shadow:0 5px 18px rgba(31,65,52,.045)}
+.lunch-swap-card.selected{background:#f1f7f3;border-color:#a9cbb8;box-shadow:0 0 0 1px rgba(11,122,89,.08)}
+.lunch-alt-top{display:flex!important;align-items:center;gap:8px;justify-content:space-between}
+.lunch-alt-top strong{font-size:15px;line-height:1.25}
+.current-lunch-badge{flex:none;border-radius:999px;background:#dff0e7;color:#0b7455;padding:4px 7px;font-size:9px;line-height:1;font-weight:900;letter-spacing:.08em}
+.lunch-swap-card small{font-size:12px;line-height:1.35;margin-top:4px}
+.lunch-swap-card em{font-size:11px;margin-top:7px;color:#708079}
+@media(max-width:480px){.lunch-recipe-hero.text-only .recipe-hero-overlay{padding:16px 18px 20px}.lunch-plan-compact{padding:16px}.lunch-swap-card{padding:13px 14px}}
+
+/* Lunch recipe heroes stay compact on phone and tablet while retaining the real final-dish photo. */
+body:not(.cooking-active) .lunch-recipe-hero{height:340px!important;min-height:0!important}
+body:not(.cooking-active) .lunch-recipe-hero.text-only{height:auto!important}
+@media(min-width:900px) and (orientation:landscape){.shell:has(.lunch-recipe-hero)>.lunch-recipe-hero{height:340px!important}.shell:has(.lunch-recipe-hero.text-only)>.lunch-recipe-hero.text-only{height:auto!important;min-height:0!important;position:relative!important;top:auto!important;grid-row:2!important}}
+
+@media(min-width:900px) and (orientation:landscape){.shell:has(.lunch-recipe-hero.text-only){display:block!important;width:min(920px,100%)!important;margin-left:auto!important;margin-right:auto!important}.shell:has(.lunch-recipe-hero.text-only)>.lunch-recipe-hero.text-only{margin-bottom:14px!important}.shell:has(.lunch-recipe-hero.text-only)>.start-cooking{margin-bottom:12px!important}}
+
+/* QA.7 active lunch-style chip must retain the approved selected state. */
+.lunch-swap-filters .food-choice button.active{background:var(--green-deep);color:#fff;border-color:var(--green-deep)}
+
+/* QA.9 settings and cupboard input polish. */
+.prefix-input>span{user-select:none;-webkit-user-select:none;pointer-events:none;flex:none}
+.prefix-input>input{min-width:0;caret-color:var(--green-deep)}
+.setting-title label,.setting-title small{display:block}
+.setting-title label{font-weight:900;font-size:16px;line-height:1.2}
+.setting-title small{margin-top:6px;line-height:1.4}
+.day-toggle-row{gap:10px}
+.day-toggle-row button{height:44px}
+.cupboard-add{grid-template-columns:minmax(0,1fr) 48px!important;gap:9px!important}
+.cupboard-add #stockName{grid-column:1/-1}
+.stock-quantity{display:grid;grid-template-columns:minmax(76px,1fr) minmax(92px,auto);gap:8px;min-width:0}
+.stock-quantity input{min-width:0}
+.stock-unit-control{position:relative;min-width:112px;height:50px;border:1px solid #cfdcd5;border-radius:15px;background:#f8fbf9;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 1px 2px rgba(27,64,49,.04)}
+.stock-unit-control select{appearance:none;-webkit-appearance:none;width:100%;height:100%;min-height:0!important;border:0!important;border-radius:15px!important;background:transparent!important;padding:0 36px 0 14px!important;color:var(--ink);font:inherit;font-size:14px;font-weight:850;line-height:1.2;text-align:center;text-align-last:center;cursor:pointer;outline:0}
+.stock-unit-control>i{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:#6f7f77;font-size:11px;pointer-events:none}
+@media(min-width:620px){.cupboard-add{grid-template-columns:minmax(0,1fr) minmax(210px,260px) 50px!important}.cupboard-add #stockName{grid-column:auto}}
+/* QA.9 recipe-library filters and persistent search input. */
+.library-cats{display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;gap:8px!important;margin:12px 0 14px!important;padding:1px 1px 5px!important;scrollbar-width:none}
+.library-cats::-webkit-scrollbar{display:none}
+.library-cats .cat-tab{flex:0 0 auto!important;min-height:38px!important;padding:8px 12px!important;border-radius:999px!important;font-size:13px!important;line-height:1!important;font-weight:850!important;background:#fff!important;color:#66776f!important;border:1px solid #dce8e2!important;box-shadow:none!important}
+.library-cats .cat-tab.active{background:var(--green-deep)!important;color:#fff!important;border-color:var(--green-deep)!important;box-shadow:0 4px 12px rgba(17,77,59,.14)!important}
+.library-search{margin:0 0 10px!important}
+.library-search input{font-size:16px!important;line-height:1.2}
+
+/* QA.9 saved recipe-library preferences and filter controls. */
+.library-filter-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:12px 1px 7px}
+.library-filter-head>.eyebrow{margin:0}
+.saved-filter-reset{border:0;background:transparent;color:#6f7f77;font:inherit;font-size:12px;font-weight:800;padding:5px 2px;display:inline-flex;align-items:center;gap:6px}
+.saved-filter-reset.is-default{color:var(--green-deep)}
+.library-cats .cat-tab.active:disabled,.library-cats .cat-tab.locked{opacity:1!important;cursor:default}
+.library-cats .cat-tab.locked::after{content:'\2713';margin-left:5px;font-size:10px;font-weight:900}
+@media(max-width:480px){.library-filter-head{margin-top:10px}.saved-filter-reset{font-size:11px}.library-cats{gap:7px!important}}
+
+.lunch-swap-card .alternative-photo{width:76px;height:70px;border-radius:12px;object-fit:cover}
+
+/* Human-initiated ingredient alternatives: nothing is substituted automatically. */
+.ingredient-row{display:grid!important;grid-template-columns:minmax(0,1fr) auto 34px!important;align-items:center;gap:10px!important}
+.ingredient-more{width:34px;height:34px;border:0;border-radius:10px;background:transparent;color:#64756d;display:inline-grid;place-items:center;font-size:16px;flex:none}
+.ingredient-more:active{background:#eef5f1}
+.shop-item-shell{display:grid;grid-template-columns:minmax(0,1fr) 40px;align-items:stretch;border-bottom:1px solid var(--line)}
+.shop-item-shell .shop-item{border-bottom:0!important;min-width:0}
+.shop-item-more{align-self:center;justify-self:center}
+.ingredient-action-backdrop{position:fixed;inset:0;z-index:10000;background:rgba(12,28,22,.38);display:flex;align-items:flex-end;justify-content:center;padding:14px}
+.ingredient-action-sheet{width:min(560px,100%);background:#fff;border-radius:22px;padding:10px 16px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -12px 40px rgba(18,45,35,.2)}
+.ingredient-action-handle{width:40px;height:4px;border-radius:999px;background:#d3ddd8;margin:2px auto 13px}
+.ingredient-action-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:0 2px 12px}
+.ingredient-action-head h2{font-size:20px;line-height:1.2;margin:3px 0 0}
+.ingredient-action-close{width:36px;height:36px;border:0;border-radius:50%;background:#f2f6f4;color:var(--green-deep)}
+.ingredient-online-alternative{width:100%;border:1px solid #d8e7df;background:#eef7f2;border-radius:16px;padding:14px;display:grid;grid-template-columns:30px minmax(0,1fr) 18px;align-items:center;gap:10px;text-align:left;color:var(--green-deep)}
+.ingredient-online-alternative span{display:block}.ingredient-online-alternative strong{display:block;font-size:14px}.ingredient-online-alternative small{display:block;color:#63746c;font-size:12px;line-height:1.4;margin-top:3px}
+.ingredient-action-cancel{width:100%;margin-top:8px;border:0;background:transparent;padding:12px;color:#66776f;font-weight:800}
+@media(min-width:700px){.ingredient-action-backdrop{align-items:center}.ingredient-action-sheet{border-radius:24px;padding-bottom:18px}}
+
+
+@media(max-width:480px){.day-toggle-row{gap:10px}.day-toggle-row button{min-width:0;width:auto}}
+
+@media(max-width:900px){.day-toggle-row{gap:10px}.day-toggle-row button{min-width:0;width:auto}}
+
+/* QA.10 actual shop quantities and local receipt reference. */
+.receipt-reference{margin:0 0 14px;padding:14px 15px;border:1px solid #dce8e2;border-radius:18px;background:#fff;display:grid;gap:11px}
+.receipt-reference>div:first-child{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:start;color:#21483a}
+.receipt-reference>div:first-child>i{width:34px;height:34px;border-radius:11px;background:#eef7f2;display:grid;place-items:center;color:var(--green-deep)}
+.receipt-reference strong{display:block;font-size:13.5px}.receipt-reference small{display:block;margin-top:3px;color:#6d7d75;font-size:11.5px;line-height:1.4}
+.receipt-picker{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:9px 13px;border:1px solid #cdded5;border-radius:13px;background:#f4f8f6;color:var(--green-deep);font-size:12.5px;font-weight:850;cursor:pointer}.receipt-picker input{position:absolute;opacity:0;pointer-events:none}
+#receiptPreview{display:grid;gap:8px}#receiptPreview:empty{display:none}#receiptPreview p{margin:0;color:#65766e;font-size:11.5px}#receiptPreview img{width:min(100%,420px);max-height:360px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#fafcfa}
+.quantity-delivery-list{gap:10px}.delivery-item{border:1px solid #e1e9e5;border-radius:17px;background:#fff;overflow:hidden}.delivery-item.missing{background:#fff8f2;border-color:#f1d3bd}
+.delivery-status{width:100%;min-height:62px;padding:10px 12px;border:0;background:transparent;display:grid;grid-template-columns:34px minmax(0,1fr) auto;gap:11px;align-items:center;text-align:left;color:#263f35}
+.delivery-status>span:nth-child(2){min-width:0;display:flex;flex-direction:column;gap:3px}.delivery-status strong{font-size:13.5px;line-height:1.25}.delivery-status small{font-size:10.8px;line-height:1.3;color:#77857f}.delivery-status em{font-style:normal;font-size:11px;font-weight:850;color:#237458}
+.delivery-item.missing .delivery-status em{color:#ad4f22}.delivery-item.missing .delivery-state{background:#fde6d7;color:#b85620}.delivery-status .delivery-state{width:34px;height:34px;border-radius:11px;background:#e3f3ea;color:#197555;display:grid;place-items:center}
+.delivery-qty{border-top:1px solid #edf2ef;padding:9px 12px 11px;display:flex;align-items:center;justify-content:space-between;gap:12px}.delivery-qty>span:first-child{font-size:11px;font-weight:800;color:#64756d}.delivery-qty-control{display:grid;grid-template-columns:minmax(68px,92px) auto;align-items:center;gap:7px}.delivery-qty-control input{width:100%;height:38px;border:1px solid #d6e2dc;border-radius:11px;padding:7px 9px;background:#fff;font:inherit;font-size:14px}.delivery-qty-control b{font-size:11.5px;color:#6a7b73;min-width:26px}
+.delivery-item.missing .delivery-qty{opacity:.45}.delivery-item.missing .delivery-qty-control input{background:#f6f2ef}
+.delivery-item.receipt-match-direct{border-color:#a8d9c2;box-shadow:0 0 0 1px rgba(32,133,91,.06)}
+.delivery-item.receipt-match-review{border-color:#e1c77e;background:#fffdf7;box-shadow:0 0 0 1px rgba(171,126,26,.05)}
+.receipt-match-note{display:none!important;font-size:10.5px!important;font-weight:800!important;margin-top:5px!important}
+.receipt-match-note[data-kind="direct"],.receipt-match-note[data-kind="review"]{display:block!important}
+.receipt-match-note[data-kind="direct"]{color:#237458!important}.receipt-match-note[data-kind="review"]{color:#9a6a10!important}
+.delivery-item.receipt-match-direct .delivery-status em{color:#237458}.delivery-item.receipt-match-review .delivery-status em{color:#9a6a10}
+@media(min-width:700px){.quantity-delivery-list{grid-template-columns:repeat(2,minmax(0,1fr))}.receipt-reference{grid-template-columns:minmax(0,1fr) auto;align-items:center}.receipt-reference>#receiptPreview{grid-column:1/-1}}
+
+/* QA.10 serverless device transfer. */
+.sync-explainer{margin:0 0 16px;padding:15px;border-radius:18px;background:#eef7f2;color:#21483a;display:grid;grid-template-columns:38px minmax(0,1fr);gap:11px;align-items:start}
+.sync-explainer>i{width:38px;height:38px;border-radius:13px;background:#dff0e7;display:grid;place-items:center;color:var(--green-deep)}
+.sync-explainer strong{display:block;font-size:14px}.sync-explainer small{display:block;margin-top:4px;color:#65776e;font-size:11.5px;line-height:1.45}
+.sync-section{display:grid;gap:11px}.sync-section h2{margin:0;font-size:20px}.sync-section>p{margin:0;color:#66776f;font-size:12.5px;line-height:1.45}.sync-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.sync-actions .btn{width:100%;min-height:44px}
+.sync-code-card,.sync-preview-card{display:grid;gap:9px;padding:13px;border:1px solid #dce8e2;border-radius:15px;background:#f8fbf9}.sync-code-card>div,.sync-preview-card{color:#21483a}.sync-code-card strong,.sync-preview-card strong{display:block}.sync-code-card small,.sync-preview-card small{display:block;margin-top:3px;color:#6b7d74;font-size:11px;line-height:1.4}
+.sync-section textarea{width:100%;resize:vertical;min-height:108px;border:1px solid #d7e3dd;border-radius:13px;padding:11px 12px;background:#fff;font:inherit;font-size:12px;line-height:1.45;word-break:break-all}.sync-code-card textarea{min-height:122px}
+.sync-file-picker{position:relative;overflow:hidden;display:grid!important;place-items:center!important;width:100%;min-height:44px;text-align:center!important;padding-left:14px!important;padding-right:14px!important;line-height:1.2!important}.sync-file-picker input{position:absolute;inset:0;opacity:0;cursor:pointer}.single-action{grid-template-columns:1fr!important}
+#syncImportPreview{display:grid;gap:10px}
+@media(max-width:520px){.sync-actions{grid-template-columns:1fr}}
+
+/* Receipt scan feedback stays local to the delivery check. */
+.receipt-scan-status{display:flex;align-items:flex-start;gap:10px;padding:10px 11px;border-radius:12px;background:#f2f7f4;color:#24463a;font-size:12px;line-height:1.4}.receipt-scan-status>i{margin-top:2px;color:var(--green-deep)}.receipt-scan-status strong,.receipt-scan-status small{display:block}.receipt-scan-status small{margin-top:2px;color:#607269}.receipt-scan-status .loading-spinner{width:16px;height:16px;flex:none;border:2px solid #c8d9d0;border-top-color:var(--green-deep);border-radius:50%;animation:mw-spin .8s linear infinite}@keyframes mw-spin{to{transform:rotate(360deg)}}
+
+.budget-over-note{display:grid;grid-template-columns:38px minmax(0,1fr);gap:11px;align-items:start;margin:0 0 14px;padding:14px 15px;border:1px solid #ead2a6;border-radius:17px;background:#fffaf0;color:#6f4f16}.budget-over-note>i{width:38px;height:38px;border-radius:12px;background:#f7e8bf;display:grid;place-items:center;color:#8e6415}.budget-over-note strong{display:block;font-size:13.5px}.budget-over-note small{display:block;margin-top:4px;color:#7f6a45;font-size:11.5px;line-height:1.45}
+
+.receipt-key{display:flex;flex-wrap:wrap;gap:7px 10px;align-items:center;padding:2px 1px 0;color:#687a72;font-size:10.5px;line-height:1.35}
+.receipt-key span{display:inline-flex;align-items:center;gap:6px}
+.receipt-key span::before{content:'';width:9px;height:9px;border-radius:3px;background:#eef2f0;border:1px solid #d7e1dc;flex:none}
+.receipt-key .receipt-key-direct::before{background:#e3f3ea;border-color:#a8d9c2}
+.receipt-key .receipt-key-review::before{background:#fff6dc;border-color:#e1c77e}
+@media(min-width:700px){.receipt-reference>.receipt-key{grid-column:1/-1}}
+
+.sync-file-picker>span{display:block;width:100%;text-align:center;pointer-events:none}
+
+/* Quantity-first cupboard. The measured amount is the only stock state shown to the user. */
+.cupboard-quantity-row{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:9px 10px;align-items:center}
+.cupboard-quantity-row>.cupboard-item-name{grid-column:1/-1;min-width:0;margin:0!important}
+.cupboard-current-quantity{grid-column:1;grid-row:2;grid-template-columns:minmax(82px,1fr) minmax(112px,132px)}
+.cupboard-current-quantity .stock-current-amount{height:50px;min-width:0}
+.cupboard-quantity-row>.stock-delete{grid-column:2;grid-row:2;width:42px;height:42px;border:0;border-radius:13px;background:#f8ece9;color:var(--danger);display:grid;place-items:center;align-self:center;cursor:pointer}
+.cupboard-quantity-row>.stock-delete:hover{background:#f4dfda}
+.cupboard-save-note{min-height:15px}
+@media(max-width:620px){.cupboard-current-quantity{grid-template-columns:minmax(74px,1fr) minmax(100px,122px)}}
+
+/* QA.13 quantity-ledger cupboard: exact amounts only. */
+.cupboard-current-quantity .stock-current-amount{height:50px;min-width:0;border:1px solid #cfdcd5;border-radius:15px;background:#f8fbf9;padding:0 14px;color:var(--ink);font:inherit;font-size:14px;font-weight:850;line-height:1.2;outline:0}
+.cupboard-current-quantity .stock-current-amount:focus{border-color:#9bc5b2;box-shadow:0 0 0 3px rgba(21,132,95,.08)}
+@media(min-width:700px) and (orientation:portrait){.shell:has(.cupboard-add) .cupboard-list{grid-template-columns:1fr!important}}
+
+
+/* Canonical food autocomplete used by cupboard and food exclusions. */
+.food-autocomplete-host{position:relative;min-width:0}
+.food-autocomplete-host>input{width:100%}
+.food-autocomplete-menu{position:absolute;z-index:1200;left:0;right:0;top:calc(100% + 7px);max-height:286px;overflow:auto;padding:6px;border:1px solid #d8e5de;border-radius:16px;background:#fff;box-shadow:0 16px 38px rgba(24,55,43,.16)}
+.food-autocomplete-menu[hidden]{display:none}
+.food-autocomplete-option{width:100%;min-height:52px;border:0;border-radius:12px;background:transparent;color:var(--ink);display:grid;grid-template-columns:minmax(0,1fr) 28px;gap:10px;align-items:center;padding:9px 10px;text-align:left;cursor:pointer}
+.food-autocomplete-option:hover,.food-autocomplete-option.active{background:#eef7f2}
+.food-autocomplete-option.custom:hover,.food-autocomplete-option.custom.active{background:#fff8ee}
+.food-autocomplete-option>span{min-width:0}
+.food-autocomplete-option strong,.food-autocomplete-option small{display:block}
+.food-autocomplete-option strong{font-size:13px;line-height:1.25}
+.food-autocomplete-option small{margin-top:3px;color:#6f8078;font-size:10.5px;line-height:1.3;font-weight:650}
+.food-autocomplete-option>i{justify-self:center;color:#2d7b5d}
+.food-autocomplete-option.custom>i{color:#a67420}
+.food-link-status{display:block;min-height:16px;margin-top:6px;font-size:10.5px;line-height:1.35;font-weight:750}
+.food-link-status span{display:inline-flex;align-items:center;gap:6px}
+.food-link-status .linked{color:#237458}
+.food-link-status .choose{color:#5c7268}
+.food-link-status .custom{color:#9a6a10}
+.avoid-feedback{display:grid;gap:5px}
+.avoid-feedback>span{display:flex;align-items:flex-start;gap:6px}
+.cupboard-food-search{align-self:start}
+.cupboard-add>.cupboard-food-search{min-width:0}
+.cupboard-row.linked-food .cupboard-save-note{color:#4f7565}
+.cupboard-recipe-link{display:flex!important;align-items:flex-start;gap:6px;margin-top:5px!important;color:#237458!important;line-height:1.35;overflow-wrap:anywhere}
+.cupboard-recipe-link i{flex:none;margin-top:1px}
+.cupboard-row.custom-food .cupboard-save-note{color:#9a6a10}
+.cupboard-add{position:relative;z-index:40;align-items:start}
+.cupboard-list{position:relative;z-index:1}
+.cupboard-add>.cupboard-food-search{grid-column:1/-1;width:100%;max-width:100%}
+.cupboard-add>.stock-quantity{grid-column:1;min-width:0;width:100%}
+.cupboard-add>#addStock{grid-column:2;align-self:start}
+.cupboard-add .food-autocomplete-menu{z-index:2000;background:#fff;color:var(--ink)}
+.cupboard-add .food-autocomplete-option{background:#fff!important;color:var(--ink)!important;border:0!important}
+.cupboard-add .food-autocomplete-option:hover,.cupboard-add .food-autocomplete-option.active{background:#eef7f2!important;color:var(--ink)!important}
+.cupboard-add .food-autocomplete-option.custom:hover,.cupboard-add .food-autocomplete-option.custom.active{background:#fff8ee!important;color:var(--ink)!important}
+.cupboard-add .food-autocomplete-option small{color:#6f8078!important}
+/* QA.16 cupboard entry alignment: empty match feedback must not create a dead vertical gap. */
+.cupboard-add .food-link-status:empty{display:none;min-height:0;margin-top:0}
+.cupboard-add>#addStock{height:50px;min-height:50px;border-radius:15px;align-self:start}
+.app-update-section{overflow:hidden}
+.app-update-section .settings-link:disabled{opacity:.7}
+.update-release{margin-top:14px;padding-top:14px;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:end}
+.update-release[hidden]{display:none}
+.update-release-copy{min-width:0}
+.update-release-copy>strong,.update-release-copy>small{display:block}
+.update-release-copy>strong{font-size:18px;line-height:1.2;margin-top:3px;color:#10233c}
+.update-release-copy>small{font-size:11px;line-height:1.4;color:var(--muted);margin-top:8px}
+.update-release-copy ul{margin:9px 0 0;padding-left:18px;color:#52655b;font-size:11px;line-height:1.45}
+.update-release .btn{min-width:132px;max-width:100%;white-space:normal}
+@media(max-width:520px){.update-release{grid-template-columns:1fr}.update-release .btn{width:100%}}
+@media(min-width:620px){
+  .cupboard-add>.cupboard-food-search{grid-column:1}
+  .cupboard-add>.stock-quantity{grid-column:2}
+  .cupboard-add>#addStock{grid-column:3}
+}
+@media(max-width:620px){
+  .food-autocomplete-menu{position:absolute;max-height:238px}
+}
