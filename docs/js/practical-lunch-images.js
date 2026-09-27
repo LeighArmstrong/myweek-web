@@ -11,6 +11,8 @@ const hashes={
 'practical-goodfood-ploughmans-sandwich':'e6bb997399a38f7c56c349934843a65835a0bb49de9ede05b0c82a9b530f049e',
 'practical-goodfood-veggie-olive-wrap':'1e0c2704c2a24a500f2e005d7c9a7ae26aa9b9a730f65731ce83ef01f22fb0a9',
 'practical-goodfood-chia-almond-overnight-oats':'6ed824db5805f24b6219fe71d723bf5721ea2a144d21bfd4f41495d281292f6a',
+'practical-goodfood-tuna-salad-sandwich':'bc841daa9853dc53f9dac3a60bd2ffc3d23e02aefe55db80bb1e0b72cabce385',
+'practical-goodfood-caprese-sandwich':'16d76bdd8c0bf65a595294bd0a628d5b722232ab71c49b942a26b4c7cbf9ac0b',
 'practical-goodfood-red-lentil-chickpea-soup':'63d4bebd7b76a012fcb177bff723d9c1ee493d1d4d5b5a78f8cd6ee453391920'
 };
 MW.sourcedFinalCache=MW.sourcedFinalCache||{};

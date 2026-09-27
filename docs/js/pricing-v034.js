@@ -51,6 +51,8 @@ window.MW = window.MW || {};
   from(['Plain Taco Tortillas','Super Soft Tortillas with Whole Wheat','large seeded tortilla wrap'],'wraps or tortillas x8');
   from(['extra virgin rapeseed oil'],'cooking oil 1 litre',{gramsPerMl:0.92});
   put(['green olives'],calibrated(330,'g',1.31,'pitted green olives 330g',{eachWeight:4.5}));
+  put(['Basil pesto','basil pesto'],calibrated(190,'g',2.50,'traditional Italian pesto 190g',{tbspWeight:16,tspWeight:5}));
+  put(['Fresh basil','fresh basil'],calibrated(30,'g',0.55,'fresh basil 30g'));
   put(['chia seeds'],calibrated(300,'g',2.50,'chia seeds 300g'));
   put(['unsweetened almond milk','almond milk'],calibrated(1000,'ml',1.50,'unsweetened almond milk 1 litre'));
   put(['vanilla extract'],calibrated(38,'ml',1.50,'vanilla extract 38ml'));
@@ -386,7 +388,7 @@ window.MW = window.MW || {};
       return Number(entry.defaultUsage)||fallback[entry.unit]||null;
     }
     raw=raw.replace(/^½\s*/,'0.5 ').replace(/^¼\s*/,'0.25 ').replace(/^¾\s*/,'0.75 ');
-    const m=raw.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kg|g|ml|l|tbsp|tsp|tins?|cans?|cloves?|nests?|fillets?|wraps?|tortillas?|sticks?|cartons?|bottles?|packs?|bananas?|sachets?|bunch(?:es)?|balls?|rashers?|slices?|pouch(?:es)?)?\b/);
+    const m=raw.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kg|g|ml|l|tbsp|tsp|tins?|cans?|cloves?|nests?|fillets?|wraps?|tortillas?|sticks?|cartons?|bottles?|packs?|bananas?|sachets?|bunch(?:es)?|balls?|rashers?|slices?|pouch(?:es)?)?\s*$/);
     if(!m) return null;
     const value=Number(m[1]);
     let unit=unitAlias(m[2]||'');

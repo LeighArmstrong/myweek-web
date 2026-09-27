@@ -81,6 +81,22 @@ const rows=[
  steps:['Stir the oats and chia seeds with the almond milk and vanilla extract. Cover and chill overnight so the oats soften and the chia thickens the mixture.','The next day, loosen with a little extra almond milk if needed. Divide into containers and top with the raspberries, almond yoghurt, blueberries and flaked almonds. Keep chilled until needed.']
 },
 {
+ id:'practical-goodfood-tuna-salad-sandwich',sourceId:'goodfood-tuna-salad-sandwich',title:'Tuna salad sandwich',
+ subtitle:'Tuna mayo with celery, red onion, cucumber and crisp lettuce',servings:2,time:10,prepStyle:'no-cook',lunchBucket:'sandwich',practicalLunch:true,
+ sourceUrl:'https://www.bbcgoodfood.com/recipes/tuna-salad-sandwich',
+ sourceImageUrl:'https://images.immediate.co.uk/production/volatile/sites/30/2024/04/TunaSandwich-81a36a8.jpg?quality=90&resize=708%2C643',
+ ingredients:[['1 tin','Tinned tuna'],['0.5','Celery'],['0.5','Red onion'],['5 tsp','Mayonnaise'],['0.25 tsp','Paprika'],['4 slices','Bread'],['8 slices','Cucumber'],['4 leaves','Lettuce']],
+ steps:['Drain the tuna well. Finely dice the celery and red onion, then mix them with the tuna, most of the mayonnaise and a small pinch of paprika. Season to taste.','Divide the tuna filling between two slices of bread. Add the cucumber and lettuce, spread the remaining mayonnaise over the other slices, close the sandwiches and halve them. Keep chilled until lunch.']
+},
+{
+ id:'practical-goodfood-caprese-sandwich',sourceId:'goodfood-caprese-sandwich',title:'Caprese sandwich',
+ subtitle:'Mozzarella, tomato, pesto, rocket and basil in bread or focaccia',servings:4,time:10,prepStyle:'no-cook',lunchBucket:'sandwich',practicalLunch:true,
+ sourceUrl:'https://www.bbcgoodfood.com/recipes/caprese-sandwich',
+ sourceImageUrl:'https://images.immediate.co.uk/production/volatile/sites/30/2022/05/Caprese-sandwich-e1fb6a4.jpg?quality=90&resize=708%2C643',
+ ingredients:[['8 slices','Bread'],['2 tbsp','Basil pesto'],['2 tsp','Extra virgin olive oil'],['1 handful','Rocket'],['250 g','Mozzarella'],['2','Tomato'],['1 small handful','Fresh basil'],['0.5','Red onion'],['2 tsp','Balsamic vinegar']],
+ steps:['Spread the pesto over half the bread and drizzle the remaining slices with the olive oil. Slice the mozzarella, tomatoes and red onion.','Layer the rocket, mozzarella, tomato, basil and red onion over the pesto. Drizzle with balsamic vinegar, close the sandwiches and wrap or box them for lunch.']
+},
+{
  id:'practical-goodfood-red-lentil-chickpea-soup',sourceId:'goodfood-red-lentil-chickpea-chilli-soup',title:'Red lentil, chickpea & chilli soup',
  subtitle:'A simple batch soup with cumin, tomato and chickpeas',servings:4,time:35,prepStyle:'cook',lunchBucket:'soup',practicalLunch:true,light:true,
  sourceUrl:'https://www.bbcgoodfood.com/recipes/red-lentil-chickpea-chilli-soup',

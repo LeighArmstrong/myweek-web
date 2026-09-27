@@ -155,7 +155,10 @@ window.MW = window.MW || {};
   const ingredientName=x=>MW.display?MW.display.ingredient(x):String(x||'');
   const displayAmount=x=>MW.display&&MW.display.amount?MW.display.amount(x):String(x||'');
   const displayEquipment=x=>MW.display&&MW.display.equipment?MW.display.equipment(x):String(x||'');
-  const displayInstruction=x=>MW.display&&MW.display.instruction?MW.display.instruction(x):String(x||'');
+  const displayInstruction=(x,recipeContext,factor,portions)=>MW.display&&MW.display.instruction?MW.display.instruction(x,{recipe:recipeContext,factor,portions}):String(x||'');
+  const inventoryUnitChoices=[['g','g'],['kg','kg'],['oz','oz'],['lb','lb'],['ml','ml'],['l','L'],['fl oz','fl oz'],['tsp','tsp'],['tbsp','tbsp'],['each','Each'],['banana','Banana'],['pack','Pack'],['tin','Tin'],['can','Can'],['bottle','Bottle'],['carton','Carton'],['jar','Jar'],['tub','Tub'],['box','Box'],['bag','Bag'],['pot','Pot'],['tray','Tray'],['roll','Roll'],['packet','Packet'],['clove','Clove'],['bunch','Bunch'],['sachet','Sachet'],['pouch','Pouch'],['nest','Nest'],['fillet','Fillet'],['wrap','Wrap'],['tortilla','Tortilla'],['rasher','Rasher'],['slice','Slice'],['ball','Ball']];
+  const wholeInventoryUnits=new Set(['each','banana','pack','tin','can','bottle','carton','jar','tub','box','bag','pot','tray','roll','packet','clove','bunch','sachet','pouch','nest','fillet','wrap','tortilla','rasher','slice','ball']);
+  const inventoryUnitOptions=selected=>inventoryUnitChoices.map(([v,l])=>'<option value="'+esc(v)+'" '+(v===selected?'selected':'')+'>'+esc(l)+'</option>').join('');
   const alternativeSearchPrompt=name=>'Find me a suitable, easy to find UK supermarket alternative for "'+String(name||'').trim()+'". Explain the best substitute and any quantity or cooking adjustment I should make.';
   const alternativeAiModeUrl=name=>'https://www.google.com/search?udm=50&q='+encodeURIComponent(alternativeSearchPrompt(name));
   const alternativeSearchFallbackUrl=name=>'https://www.google.com/search?q='+encodeURIComponent(alternativeSearchPrompt(name));
@@ -172,17 +175,58 @@ window.MW = window.MW || {};
     window.open(fallback,'_blank','noopener,noreferrer');
   }
   function closeIngredientActions(){const el=document.getElementById('ingredientActionSheet');if(el)el.remove();}
-  function showIngredientActions(name){
+  function showShopSubstitution(options){
     closeIngredientActions();
-    const sheet=document.createElement('div');sheet.id='ingredientActionSheet';sheet.className='ingredient-action-backdrop';sheet.innerHTML='<section class="ingredient-action-sheet" role="dialog" aria-modal="true" aria-labelledby="ingredientActionTitle"><div class="ingredient-action-handle"></div><div class="ingredient-action-head"><div><span class="eyebrow">INGREDIENT</span><h2 id="ingredientActionTitle">'+esc(ingredientName(name))+'</h2></div><button type="button" class="ingredient-action-close" aria-label="Close">'+icon('xmark')+'</button></div><button type="button" class="ingredient-online-alternative">'+icon('magnifying-glass')+'<span><strong>Find an easy alternative with Google AI</strong><small>Opens Google AI Mode for a practical UK supermarket substitute. Nothing changes automatically.</small></span><i class="fa-solid fa-arrow-up-right-from-square"></i></button><button type="button" class="ingredient-action-cancel">Cancel</button></section>';
+    const key=String(options&&options.shopKey||''),originalName=String(options&&options.name||'').trim(),plannedAmount=String(options&&options.plannedAmount||'').trim();
+    if(!key||!originalName)return;
+    const existing=MW.shopping&&MW.shopping.getSubstitution?MW.shopping.getSubstitution(key):null;
+    const planned=MW.inventory&&MW.inventory.parseAmount?MW.inventory.parseAmount(plannedAmount):null;
+    const current=existing&&MW.inventory.parseAmount(existing.replacementAmount);
+    const defaultUnit=current&&current.unit||planned&&planned.unit||'g',defaultValue=current&&current.value!=null?current.value:planned&&planned.value!=null?planned.value:'';
+    const sheet=document.createElement('div');sheet.id='ingredientActionSheet';sheet.className='ingredient-action-backdrop';
+    sheet.innerHTML='<section class="ingredient-action-sheet shop-substitution-sheet" role="dialog" aria-modal="true" aria-labelledby="shopSwapTitle"><div class="ingredient-action-handle"></div><div class="ingredient-action-head"><div><span class="eyebrow">IN STORE SWAP</span><h2 id="shopSwapTitle">What did you buy instead?</h2></div><button type="button" class="ingredient-action-close" aria-label="Close">'+icon('xmark')+'</button></div><div class="shop-swap-original"><span>Planned</span><strong>'+esc(ingredientName(originalName))+'</strong><small>'+esc(displayAmount(plannedAmount))+'</small></div><label class="shop-swap-label"><span>Bought instead</span><div class="food-autocomplete-host"><input id="shopSwapName" value="'+esc(existing?ingredientName(existing.replacementName):'')+'" placeholder="Start typing an ingredient"><span class="food-link-status" id="shopSwapMatch"></span></div></label><div class="shop-swap-quantity"><label><span>Amount</span><input id="shopSwapAmount" type="number" min="0" inputmode="decimal" step="'+(wholeInventoryUnits.has(defaultUnit)?'1':'0.1')+'" value="'+esc(defaultValue)+'"></label><label><span>Unit</span><span class="select-control stock-unit-control"><select id="shopSwapUnit">'+inventoryUnitOptions(defaultUnit)+'</select>'+icon('chevron-down')+'</span></label></div><p class="shop-swap-help">This records what you actually bought. The recipe keeps its original wording and My Week will show the swap when you cook it. It will not guess a conversion if the quantity types cannot be compared safely.</p><div class="shop-swap-actions">'+(existing?'<button type="button" class="btn secondary" id="clearShopSwap">Use planned item</button>':'<button type="button" class="btn secondary" id="cancelShopSwap">Cancel</button>')+'<button type="button" class="btn primary" id="saveShopSwap">Save swap</button></div></section>';
+    document.body.appendChild(sheet);
+    const close=()=>closeIngredientActions(),nameInput=sheet.querySelector('#shopSwapName'),match=sheet.querySelector('#shopSwapMatch'),amountInput=sheet.querySelector('#shopSwapAmount'),unitSelect=sheet.querySelector('#shopSwapUnit');
+    sheet.addEventListener('click',e=>{if(e.target===sheet)close();});
+    sheet.querySelector('.ingredient-action-close').onclick=close;
+    const cancel=sheet.querySelector('#cancelShopSwap');if(cancel)cancel.onclick=close;
+    const updateMatch=()=>{const raw=nameInput.value.trim();if(!raw){match.innerHTML='';return;}const exact=nameInput.dataset.mwCanonical?{canonical:nameInput.dataset.mwCanonical}:MW.foodIdentity&&MW.foodIdentity.resolveExact(raw);match.innerHTML=exact?'<span class="linked">'+icon('link')+' Recognised: '+esc(MW.foodIdentity.canonicalLabel(exact.canonical))+'</span>':'<span class="custom">'+icon('circle-question')+' Custom ingredient</span>';};
+    if(MW.foodIdentity)MW.foodIdentity.attach(nameInput,{limit:5,onSelect:updateMatch});
+    nameInput.addEventListener('input',updateMatch);updateMatch();
+    unitSelect.onchange=()=>{amountInput.step=wholeInventoryUnits.has(unitSelect.value)?'1':'0.1';};
+    const clear=sheet.querySelector('#clearShopSwap');if(clear)clear.onclick=()=>{MW.shopping.clearSubstitution(key);const st=s();if(st.ui&&st.ui.shopChecks)delete st.ui.shopChecks[key];MW.state.save();close();if(typeof options.onCleared==='function')options.onCleared();else samePage(shopReview);};
+    sheet.querySelector('#saveShopSwap').onclick=()=>{
+      const raw=nameInput.value.trim(),value=Number(amountInput.value),unit=unitSelect.value;
+      if(!raw){nameInput.focus();return;}
+      if(!Number.isFinite(value)||value<=0){amountInput.focus();return;}
+      if(wholeInventoryUnits.has(unit)&&!Number.isInteger(value)){amountInput.setCustomValidity('Use a whole number for '+unit+'.');amountInput.reportValidity();return;}
+      amountInput.setCustomValidity('');
+      const exact=nameInput.dataset.mwCanonical?{canonical:nameInput.dataset.mwCanonical}:MW.foodIdentity&&MW.foodIdentity.resolveExact(raw);
+      const replacementName=exact&&exact.canonical||raw,replacementAmount=MW.inventory.formatAmount({value,unit});
+      const parsedReplacement=MW.inventory.parseAmount(replacementAmount),comparison=planned&&parsedReplacement?MW.inventory.valueInUnit(parsedReplacement,planned.unit,replacementName):null,comparable=!planned||Number.isFinite(comparison);
+      if(!comparable&&!confirm('This replacement uses a different quantity type, so My Week cannot safely compare it with the planned amount. It will still record what you bought and show the swap when cooking. Save it anyway?'))return;
+      try{
+        const saved=MW.shopping.setSubstitution(key,{originalName,replacementName,plannedAmount,replacementAmount,comparable});
+        const st=s();st.ui.shopChecks=st.ui.shopChecks||{};st.ui.shopChecks[key]=true;MW.state.save();
+        close();if(typeof options.onSaved==='function')options.onSaved(saved);else samePage(shopReview);
+      }catch(error){match.innerHTML='<span class="custom">'+icon('circle-exclamation')+' '+esc(error&&error.message||'This swap could not be saved.')+'</span>';}
+    };
+    nameInput.focus();
+  }
+  function showIngredientActions(name,options={}){
+    closeIngredientActions();
+    const shopKey=String(options.shopKey||''),existing=shopKey&&MW.shopping&&MW.shopping.getSubstitution?MW.shopping.getSubstitution(shopKey):null;
+    const swapAction=shopKey?'<button type="button" class="ingredient-online-alternative ingredient-shop-substitute">'+icon('right-left')+'<span><strong>'+(existing?'Edit what I bought instead':'I bought something different')+'</strong><small>'+(existing?esc(ingredientName(existing.replacementName))+' is currently recorded instead.':'Record an in store substitute without silently changing the recipe.')+'</small></span><i class="fa-solid fa-chevron-right"></i></button>':'';
+    const sheet=document.createElement('div');sheet.id='ingredientActionSheet';sheet.className='ingredient-action-backdrop';sheet.innerHTML='<section class="ingredient-action-sheet" role="dialog" aria-modal="true" aria-labelledby="ingredientActionTitle"><div class="ingredient-action-handle"></div><div class="ingredient-action-head"><div><span class="eyebrow">INGREDIENT</span><h2 id="ingredientActionTitle">'+esc(ingredientName(name))+'</h2></div><button type="button" class="ingredient-action-close" aria-label="Close">'+icon('xmark')+'</button></div><div class="ingredient-action-options">'+swapAction+'<button type="button" class="ingredient-online-alternative ingredient-google-alternative">'+icon('magnifying-glass')+'<span><strong>Find an easy alternative with Google AI</strong><small>Opens Google AI Mode for a practical UK supermarket substitute. Nothing changes automatically.</small></span><i class="fa-solid fa-arrow-up-right-from-square"></i></button></div><button type="button" class="ingredient-action-cancel">Cancel</button></section>';
     document.body.appendChild(sheet);
     const close=()=>closeIngredientActions();
     sheet.addEventListener('click',e=>{if(e.target===sheet)close();});
     sheet.querySelector('.ingredient-action-close').onclick=close;sheet.querySelector('.ingredient-action-cancel').onclick=close;
-    sheet.querySelector('.ingredient-online-alternative').onclick=async()=>{const button=sheet.querySelector('.ingredient-online-alternative');button.disabled=true;try{await openAlternativeSearch(name);}finally{button.disabled=false;close();}};
-    sheet.querySelector('.ingredient-online-alternative').focus();
+    const swap=sheet.querySelector('.ingredient-shop-substitute');if(swap)swap.onclick=()=>showShopSubstitution({shopKey,name,plannedAmount:options.plannedAmount});
+    const google=sheet.querySelector('.ingredient-google-alternative');google.onclick=async()=>{google.disabled=true;try{await openAlternativeSearch(name);}finally{google.disabled=false;close();}};
+    (swap||sheet.querySelector('.ingredient-online-alternative')).focus();
   }
-  function bindIngredientActions(scope){(scope||document).querySelectorAll('.ingredient-more').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();showIngredientActions(b.dataset.ingredient||'');});}
+  function bindIngredientActions(scope){(scope||document).querySelectorAll('.ingredient-more').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();showIngredientActions(b.dataset.ingredient||'',{shopKey:b.dataset.shopKey||'',plannedAmount:b.dataset.plannedAmount||''});});}
 
   const recipeCost=(r,people)=>{
     if(!r) return 0;
@@ -204,8 +248,9 @@ window.MW = window.MW || {};
     const raw=[].concat(fallback||[]).map(String).filter(Boolean);
     const fbs=[...new Set(raw.filter(x=>x!==src))];
     const attrs=fbs.map((x,i)=>'data-fallback'+i+'="'+esc(x)+'"').join(' ');
-    const onerr="var i=Number(this.dataset.fallbackIndex||0),n=this.dataset['fallback'+i];if(n){this.dataset.fallbackIndex=String(i+1);this.src=n;return;}this.style.display='none';this.parentElement.classList.add('photo-fallback')";
-    return '<div class="'+cls+'"><img src="'+esc(src||'')+'" '+attrs+' alt="'+esc(alt||'')+'" loading="lazy" decoding="async" referrerpolicy="no-referrer" onerror="'+esc(onerr)+'"></div>';
+    const onerr="var i=Number(this.dataset.fallbackIndex||0),n=this.dataset['fallback'+i];if(n){this.dataset.fallbackIndex=String(i+1);this.src=n;return;}this.style.display='none';if(this.parentElement.classList.contains('cook-photo')){this.parentElement.style.display='none';var p=this.closest('.cook-visual-panel');if(p)p.style.display='none';var s=this.closest('.cook-scroll');if(s){s.classList.remove('has-visual');s.classList.add('no-visual');}}else this.parentElement.classList.add('photo-fallback')";
+    const eager=String(cls||'').split(/\s+/).includes('cook-photo');
+    return '<div class="'+cls+'"><img src="'+esc(src||'')+'" '+attrs+' alt="'+esc(alt||'')+'" loading="'+(eager?'eager':'lazy')+'" '+(eager?'fetchpriority="high" ':'')+'decoding="async" referrerpolicy="no-referrer" onerror="'+esc(onerr)+'"></div>';
   };
   const fallbackRecipeImage=r=>{
     const sourcedOnly=Boolean(r&&(r.sourcedCatalogue||r.imageQa&&r.imageQa.status!=='verified'));
@@ -291,11 +336,39 @@ window.MW = window.MW || {};
     add('Wooden spoon or spatula');
     return items;
   }
+  function substitutedIngredient(name,plannedAmount){
+    const sub=MW.shopping&&MW.shopping.substitutionForIngredient?MW.shopping.substitutionForIngredient(name):null;
+    if(!sub)return {name,amount:plannedAmount,originalName:name,originalAmount:plannedAmount,substitution:null,comparable:true};
+    const planned=MW.inventory&&MW.inventory.parseAmount?MW.inventory.parseAmount(plannedAmount):null,replacement=MW.inventory&&MW.inventory.parseAmount?MW.inventory.parseAmount(sub.replacementAmount):null;
+    const converted=planned&&replacement&&sub.comparable!==false?MW.inventory.valueInUnit(planned,replacement.unit,sub.replacementName):null;
+    return {
+      name:sub.replacementName,
+      amount:Number.isFinite(converted)?MW.inventory.formatAmount({value:converted,unit:replacement.unit}):sub.replacementAmount,
+      originalName:name,
+      originalAmount:plannedAmount,
+      substitution:sub,
+      comparable:Number.isFinite(converted)
+    };
+  }
   function prepIngredients(r,factor){
-    return (r.ingredients||[]).map(([q,n])=>({
-      name:n,
-      amount:MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,q,n,factor):(r.scaleSafe===false?q:MW.shopping.scaleAmount(q,factor))
-    }));
+    return (r.ingredients||[]).map(([q,n])=>{
+      const planned=MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,q,n,factor):(r.scaleSafe===false?q:MW.shopping.scaleAmount(q,factor));
+      return substitutedIngredient(n,planned);
+    });
+  }
+  function stepSubstitutionNotes(r,step,stepIndex){
+    if(!(MW.shopping&&MW.shopping.substitutionForIngredient))return [];
+    const notes=[],seen=new Set();
+    (r.ingredients||[]).forEach((row,ingredientIndex)=>{
+      const original=row[1],sub=MW.shopping.substitutionForIngredient(original);
+      if(!sub)return;
+      const ev=MW.stepIngredients&&MW.stepIngredients.evidence?MW.stepIngredients.evidence(r,step,ingredientIndex,stepIndex):null;
+      if(!(ev&&ev.matched))return;
+      const key=MW.inventory.stockKey(original)+'>'+MW.inventory.stockKey(sub.replacementName);
+      if(seen.has(key))return;seen.add(key);
+      notes.push({originalName:original,replacementName:sub.replacementName});
+    });
+    return notes;
   }
 
   function tipForStep(r,step){
@@ -462,6 +535,13 @@ window.MW = window.MW || {};
     st.ui.screen=screen;MW.state.save();
     if(!changed){animateNextPage=false;render();return;}
     const motion=options.motion||motionFor(from,screen);transitionRender(motion,()=>{render();window.scrollTo({top:0,behavior:'instant'});});
+  }
+  function leaveCookingFlow(target){
+    const idx=navStack.lastIndexOf(target);
+    if(idx>=0)navStack.length=idx;
+    else while(navStack.length&&/^(?:recipe:|cookprep:|cookstep:)/.test(String(navStack[navStack.length-1]||'')))navStack.pop();
+    document.body.classList.remove('cooking-active');
+    go(target,{motion:'drill-back',back:true});
   }
 
   window.MyWeekAndroidBack=()=>{
@@ -720,14 +800,17 @@ window.MW = window.MW || {};
     const ranked=browseStyle==='any'||!MW.food||!MW.food.lunchMatchesStyle?rankedBase:rankedBase.filter(x=>MW.food.lunchMatchesStyle(x,browseStyle));
     const randomBase=MW.planner.randomLunchPool?MW.planner.randomLunchPool(current&&current.id):rankedBase;
     const randomLunchPool=browseStyle==='any'||!MW.food||!MW.food.lunchMatchesStyle?randomBase:randomBase.filter(x=>MW.food.lunchMatchesStyle(x,browseStyle));
-    const shown=showAll?ranked:ranked.slice(0,5);
+    const practicalRanked=ranked.filter(x=>MW.food&&MW.food.practicalLunchCandidate?MW.food.practicalLunchCandidate(x):x.practicalLunch);
+    const practicalIds=new Set(practicalRanked.map(x=>x.id));
+    const shortlist=[...practicalRanked,...ranked.filter(x=>!practicalIds.has(x.id))].slice(0,5);
+    const shown=showAll?ranked:shortlist;
     const days=(st.plan.lunchDays||[]).length,eaters=Math.max(1,Number(st.plan.lunchPeople)||1),planned=days*eaters;
     const card=r=>{const style=r.prepStyle==='no-cook'?'Prep at home':'Cook at home',meta=[r.time?r.time+' mins':'Quick prep',style].join(' · ');return '<button class="alternative-card lunch-alt lunch-swap-card" data-id="'+r.id+'">'+recipePhoto(r,'alternative-photo',r.title)+'<span class="lunch-alt-copy"><strong>'+esc(r.title)+'</strong><small>'+esc(r.subtitle)+'</small><em>'+esc(meta)+'</em></span><i class="fa-solid fa-chevron-right"></i></button>';};
     root.innerHTML=shell(
       '<section class="subpage-head lunch-swap-head"><button class="back-button" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow">CHANGE LUNCH</span><h1>Choose another lunch</h1><p>'+planned+' '+(planned===1?'lunch':'lunches')+' this week</p></div></section>'+
       '<button class="planner-utility random-pick lunch-random" id="randomLunch">'+icon('shuffle')+'<span><strong>Choose one for me</strong><small>Pick from '+randomLunchPool.length+' suitable lunches</small></span><i class="fa-solid fa-chevron-right"></i></button>'+
       '<section class="lunch-swap-filters"><span class="eyebrow">LUNCH STYLE</span>'+foodChoice('lunchFilter',filterItems,browseStyle)+'</section>'+
-      '<div class="choice-divider lunch-choice-divider"><span>'+(showAll?ranked.length+' matching '+(ranked.length===1?'lunch':'lunches'):Math.min(5,ranked.length)+' best alternative'+(Math.min(5,ranked.length)===1?'':'s'))+'</span></div>'+
+      '<div class="choice-divider lunch-choice-divider"><span>'+(showAll?ranked.length+' matching '+(ranked.length===1?'lunch':'lunches'):shortlist.length+' best alternative'+(shortlist.length===1?'':'s'))+'</span></div>'+
       '<div class="alternative-list lunch-swap-list">'+shown.map(card).join('')+'</div>'+
       (!ranked.length?'<div class="empty-state">'+icon('utensils')+'<h2>No lunches match</h2><p>Try another lunch style or change your food preferences.</p></div>':'')+
       (ranked.length>5?'<button class="browse-library lunch-browse-all" id="lunchBrowseAll">'+icon(showAll?'arrow-up':'magnifying-glass')+'<span><strong>'+(showAll?'Show 5 best alternatives':'Browse all '+ranked.length+' lunches')+'</strong><small>'+(showAll?'Return to the shortlist':'See every lunch matching this style')+'</small></span><i class="fa-solid fa-chevron-right"></i></button>':''),
@@ -837,12 +920,32 @@ window.MW = window.MW || {};
     const retailOrder=MW.retailGroups?MW.retailGroups.order:['Fruit & Veg','Chilled','Cupboard','Frozen','Bakery','Household','Other'];
     const sourceGroups=Object.keys(shop.groups||{});
     const rawItems=orderLocked?delivery.items.map(x=>({...x,key:x.key,sourceGroup:x.sourceGroup||'Ingredients'})):sourceGroups.flatMap(g=>shop.groups[g].map(x=>({key:g+'|'+x.name,sourceGroup:g,...x})));
-    const allItems=rawItems.map(x=>({...x,group:x.group||retailSection(x)}));
+    const allItems=rawItems.map(x=>{
+      const substitution=x.substitution||MW.shopping&&MW.shopping.getSubstitution&&MW.shopping.getSubstitution(x.key,st)||null;
+      return {...x,group:x.group||retailSection(x),substitution};
+    });
     const retailGroups=retailOrder.filter(g=>allItems.some(x=>x.group===g));
     const done=allItems.filter(x=>checks[x.key]).length;
     const pct=allItems.length?Math.round(done/allItems.length*100):0;
-    const orderLine=x=>{if(!(orderLocked&&delivery&&delivery.confirmed))return esc(x.displayAmount)+(x.savingNote?' · '+esc(x.savingNote):'');const actual=delivery.actualAmounts&&delivery.actualAmounts[x.key]||'0',short=delivery.shortfallAmounts&&delivery.shortfallAmounts[x.key],surplus=delivery.surplusApplied&&delivery.surplusApplied[x.key];return 'Planned '+esc(x.displayAmount)+' · Bought '+esc(actual)+(short?' · Short '+esc(short):surplus&&!/^0(?:\s|$)/.test(surplus)?' · Extra '+esc(surplus):'');};
-    const itemHtml=x=>'<div class="shop-item-shell"><button class="shop-item '+(checks[x.key]?'done':'')+'" data-key="'+esc(x.key)+'"><span class="shop-check">'+(checks[x.key]?icon('check'):'')+'</span><span class="shop-info"><strong>'+esc(ingredientName(x.name))+'</strong><small>'+orderLine(x)+'</small></span>'+(Number.isFinite(Number(x.estimatedPrice))?'<span class="shop-price">~'+money(x.estimatedPrice)+'</span>':'')+'<span class="shop-reason">'+esc((x.reasons||[])[0]||'')+'</span></button><button type="button" class="ingredient-more shop-item-more" data-ingredient="'+esc(x.name)+'" aria-label="More options for '+esc(ingredientName(x.name))+'">'+icon('ellipsis-vertical')+'</button></div>';
+    const substitutionCount=allItems.filter(x=>x.substitution).length;
+    const receiptTotal=delivery&&delivery.receipt&&Number.isFinite(Number(delivery.receipt.total))?Number(delivery.receipt.total):null;
+    const orderLine=x=>{
+      const sub=x.substitution;
+      if(!(orderLocked&&delivery&&delivery.confirmed)){
+        if(sub)return 'Bought instead · '+esc(displayAmount(sub.replacementAmount));
+        return esc(x.displayAmount)+(x.quantityNeedsReview?' retail minimum':'')+(x.savingNote?' · '+esc(x.savingNote):'');
+      }
+      const actual=delivery.actualAmounts&&delivery.actualAmounts[x.key]||(sub&&sub.replacementAmount)||'0',short=delivery.shortfallAmounts&&delivery.shortfallAmounts[x.key],surplus=delivery.surplusApplied&&delivery.surplusApplied[x.key];
+      return (sub?'Bought ':'Planned '+esc(x.displayAmount)+' · Bought ')+esc(actual)+(short?' · Short '+esc(short):surplus&&!/^0(?:\s|$)/.test(surplus)?' · Extra '+esc(surplus):'');
+    };
+    const itemHtml=x=>{
+      const sub=x.substitution,shownName=sub?sub.replacementName:x.name;
+      const subNote=sub?'<span class="shop-substitution-note">'+icon('right-left')+' Instead of '+esc(ingredientName(x.name))+' · planned '+esc(displayAmount(sub.plannedAmount||x.displayAmount))+'</span>':'';
+      const quantityNote=!sub&&x.quantityNeedsReview?'<span class="shop-quantity-note">'+icon('triangle-exclamation')+' Recipe uses '+esc((x.sourceAmounts||x.amounts||[]).join(' + '))+' · check this pack is enough</span>':'';
+      const price=!sub&&Number.isFinite(Number(x.estimatedPrice))?'<span class="shop-price">~'+money(x.estimatedPrice)+'</span>':'';
+      const more=orderLocked?'':'<button type="button" class="ingredient-more shop-item-more" data-ingredient="'+esc(x.name)+'" data-shop-key="'+esc(x.key)+'" data-planned-amount="'+esc(x.inventoryAmount||x.displayAmount||'')+'" aria-label="More options for '+esc(ingredientName(x.name))+'">'+icon('ellipsis-vertical')+'</button>';
+      return '<div class="shop-item-shell '+(sub?'has-substitution ':'')+(orderLocked?'order-locked':'')+'"><button class="shop-item '+(checks[x.key]?'done':'')+'" data-key="'+esc(x.key)+'" '+(orderLocked?'disabled':'')+'><span class="shop-check">'+(checks[x.key]?icon('check'):'')+'</span><span class="shop-info"><strong>'+esc(ingredientName(shownName))+'</strong><small>'+orderLine(x)+'</small>'+subNote+quantityNote+'</span>'+price+'<span class="shop-reason">'+esc((x.reasons||[])[0]||'')+'</span></button>'+more+'</div>';
+    };
     const groupHtml=g=>'<section class="retail-group"><header><span class="retail-icon">'+icon(g==='Fruit & Veg'?'leaf':g==='Chilled'?'snowflake':g==='Cupboard'?'jar':g==='Frozen'?'snowflake':g==='Bakery'?'bread-slice':g==='Household'?'spray-can-sparkles':'basket-shopping')+'</span><span class="retail-heading"><strong>'+esc(g)+'</strong><em>Shop this section</em></span><small>'+allItems.filter(x=>x.group===g).length+'</small></header><div class="retail-items">'+allItems.filter(x=>x.group===g).map(itemHtml).join('')+'</div></section>';
     const groupedHtml=retailGroups.map(groupHtml).join('');
     const missingCount=delivery&&Array.isArray(delivery.missingKeys)?delivery.missingKeys.length:0;
@@ -854,9 +957,11 @@ window.MW = window.MW || {};
         :'';
 
     const postOrderActions=orderLocked?(delivery.confirmed?'<div class="plan-actions"><button class="btn secondary" id="checkDeliveryBottom">Review quantities</button><button class="btn primary" id="continueRecipes">Recipes</button></div>':'<div class="plan-actions"><button class="btn secondary" id="checkDeliveryBottom">Check quantities</button><button class="btn primary" id="continueRecipes">Recipes</button></div>'):'<div class="plan-actions"><button class="btn secondary" id="guided">Guided shop</button><button class="btn primary" id="doneShop">Order placed</button></div>';
+    const totalValue=receiptTotal!=null?receiptTotal:shop.estimatedTotal;
+    const totalMeta=receiptTotal!=null?'receipt total':substitutionCount?(substitutionCount+' in-store swap'+(substitutionCount===1?'':'s')+' not repriced · planned estimate'):shop.savingMode?('after ~'+money(shop.estimatedSavings)+' saving'):('estimated · '+Math.round(shop.priceCoverage||0)+'% benchmark coverage');
 
     root.innerHTML=shell(
-      '<section class="page-head shop-head"><div><span class="eyebrow">'+(orderLocked?'YOUR ORDER':'YOUR SHOP')+'</span><h1>'+shop.itemCount+' things</h1><p>'+(orderLocked?'Original shopping list kept for this week':esc(shop.priceRetailer||st.household.retailer)+' · price estimate'+(shop.priceAsOf?' · updated '+esc(shop.priceAsOf):''))+'</p></div><div class="shop-total"><strong>'+money(shop.estimatedTotal)+'</strong>'+(shop.savingMode?'<span>after ~'+money(shop.estimatedSavings)+' saving</span>':'<span>estimated · '+Math.round(shop.priceCoverage||0)+'% benchmark coverage</span>')+'</div></section>'+
+      '<section class="page-head shop-head"><div><span class="eyebrow">'+(orderLocked?'YOUR ORDER':'YOUR SHOP')+'</span><h1>'+shop.itemCount+' things</h1><p>'+(orderLocked?'Original shopping list kept for this week':esc(shop.priceRetailer||st.household.retailer)+' · price estimate'+(shop.priceAsOf?' · updated '+esc(shop.priceAsOf):''))+'</p></div><div class="shop-total"><strong>'+money(totalValue)+'</strong><span>'+esc(totalMeta)+'</span></div></section>'+
       deliveryNotice+
       '<section class="shop-progress" id="shopProgress"><div><strong id="shopProgressCount">'+done+' of '+allItems.length+'</strong><span> checked off</span></div><span id="shopProgressPct">'+pct+'%</span><div class="progress"><span id="shopProgressBar" style="width:'+pct+'%"></span></div></section>'+
       (orderLocked?'':shop.savingMode?'<section class="saving-summary compact-saving"><div>'+icon('sterling-sign')+'<div><strong>Lower-price mode</strong><small>~'+money(shop.estimatedSavings)+' estimated saving</small></div></div><label class="toggle"><input id="normalPrice" type="checkbox" checked><span></span></label></section>':'<button class="saving-prompt" id="lowerShop">'+icon('sterling-sign')+'<span><strong>Try to lower the price</strong><small>Replan the week only if the corrected trolley estimate can genuinely fall.</small></span><i class="fa-solid fa-chevron-right"></i></button>')+
@@ -899,7 +1004,7 @@ window.MW = window.MW || {};
     const normal=document.getElementById('normalPrice');
     if(normal) normal.onchange=e=>{const enabled=e.currentTarget.checked;if(!enabled){MW.planner.rebuildForPriceMode(false);MW.shopping.build({savingMode:false});samePage(shopReview);return;}MW.shopping.build({savingMode:true});samePage(shopReview);};
     const guided=document.getElementById('guided');
-    if(guided) guided.onclick=()=>{const flat=allItems.filter(x=>!checks[x.key]).map(x=>({name:x.name,amount:x.displayAmount,category:x.group,key:x.key}));st.ui.shopping={items:flat,index:0,done:[]};MW.state.save();go('shopping');};
+    if(guided) guided.onclick=()=>{const flat=allItems.filter(x=>!checks[x.key]).map(x=>({name:x.name,amount:x.displayAmount,inventoryAmount:x.inventoryAmount||x.displayAmount,category:x.group,key:x.key,substitution:x.substitution||null,quantityNeedsReview:Boolean(x.quantityNeedsReview),sourceAmounts:(x.sourceAmounts||x.amounts||[]).slice()}));st.ui.shopping={items:flat,index:0,done:[]};MW.state.save();go('shopping');};
     const checkDelivery=document.getElementById('checkDelivery'),checkDeliveryBottom=document.getElementById('checkDeliveryBottom');
     if(checkDelivery) checkDelivery.onclick=()=>go('delivery');if(checkDeliveryBottom) checkDeliveryBottom.onclick=()=>go('delivery');
     const doneShop=document.getElementById('doneShop');if(doneShop) doneShop.onclick=()=>{MW.delivery.begin(allItems.map(x=>({...x,checked:Boolean(checks[x.key])})));go('recipes');};
@@ -910,17 +1015,19 @@ window.MW = window.MW || {};
   function guidedShopping(){
     const st=s(),q=st.ui.shopping;
     if(!q||q.index>=q.items.length){st.ui.shopping=null;MW.state.save();return go('shopreview');}
-    const item=q.items[q.index],pct=Math.round((q.index/q.items.length)*100);
+    const item=q.items[q.index],pct=Math.round((q.index/q.items.length)*100),currentSub=MW.shopping&&MW.shopping.getSubstitution?MW.shopping.getSubstitution(item.key,st):null;
+    const shownName=currentSub?currentSub.replacementName:item.name,shownAmount=currentSub?currentSub.replacementAmount:item.amount;
     root.innerHTML=shell(
-      '<section class="guided-card"><div class="guided-icon">'+icon('basket-shopping')+'</div><div class="progress"><span style="width:'+pct+'%"></span></div><small>'+(q.index+1)+' of '+q.items.length+' · '+esc(item.category)+'</small><h1>'+esc(ingredientName(item.name))+'</h1><strong>'+esc(item.amount)+'</strong><button class="btn primary" id="added">Got it</button><button class="btn secondary" id="skip">Skip</button><button class="text-action" id="stop">Back to full list</button></section>',
+      '<section class="guided-card"><div class="guided-icon">'+icon('basket-shopping')+'</div><div class="progress"><span style="width:'+pct+'%"></span></div><small>'+(q.index+1)+' of '+q.items.length+' · '+esc(item.category)+'</small><h1>'+esc(ingredientName(shownName))+'</h1><strong>'+esc(displayAmount(shownAmount))+'</strong>'+(currentSub?'<p class="guided-substitution-note">'+icon('right-left')+' Instead of '+esc(ingredientName(item.name))+'</p>':'')+(!currentSub&&item.quantityNeedsReview?'<p class="guided-quantity-note">'+icon('triangle-exclamation')+' Retail minimum. Recipe uses '+esc((item.sourceAmounts||[]).join(' + '))+'. Check this pack is enough.</p>':'')+'<button class="btn primary" id="added">Got it</button><button class="btn secondary" id="guidedSubstitute">'+icon('right-left')+' I bought something different</button><button class="btn secondary" id="skip">Skip</button><button class="text-action" id="stop">Back to full list</button></section>',
       'shop'
     );
     function next(status){
       q.done.push({name:item.name,status});
-      if(status==='added'){st.ui.shopChecks=st.ui.shopChecks||{};st.ui.shopChecks[item.key]=true;}
+      if(status==='added'||status==='substituted'){st.ui.shopChecks=st.ui.shopChecks||{};st.ui.shopChecks[item.key]=true;}
       q.index++;MW.state.save();samePage(guidedShopping,'continuity-forward');
     }
-    document.getElementById('added').onclick=()=>next('added');
+    document.getElementById('added').onclick=()=>next(currentSub?'substituted':'added');
+    document.getElementById('guidedSubstitute').onclick=()=>showShopSubstitution({shopKey:item.key,name:item.name,plannedAmount:item.inventoryAmount||item.amount,onSaved:()=>next('substituted'),onCleared:()=>samePage(guidedShopping)});
     document.getElementById('skip').onclick=()=>next('skipped');
     document.getElementById('stop').onclick=()=>go('shopreview');
     bindNav();
@@ -930,14 +1037,20 @@ window.MW = window.MW || {};
     const st=s();
     const shop=st.week&&st.week.shop;if(!shop)return go('shopreview');
     if(!st.week.delivery||!Array.isArray(st.week.delivery.items)){
-      const items=Object.keys(shop.groups||{}).flatMap(group=>(shop.groups[group]||[]).map(x=>({key:group+'|'+x.name,sourceGroup:group,group:MW.retailGroups?MW.retailGroups.section(x.name,group):'Other',...x})));
+      const items=Object.keys(shop.groups||{}).flatMap(group=>(shop.groups[group]||[]).map(x=>{
+        const key=group+'|'+x.name,substitution=MW.shopping&&MW.shopping.getSubstitution?MW.shopping.getSubstitution(key,st):null;
+        return {key,sourceGroup:group,group:MW.retailGroups?MW.retailGroups.section(x.name,group):'Other',...x,substitution};
+      }));
       MW.delivery.begin(items);
     }
     const delivery=s().week.delivery,items=delivery.items,missing=new Set(delivery.missingKeys||[]);
     const actual=Object.assign({},delivery.actualAmounts||{});let receiptSummary=delivery.receipt||null;const receiptFilled=new Map();
-    const actualParts=x=>{const parsed=MW.inventory.parseAmount(actual[x.key]||x.inventoryAmount||x.displayAmount);return parsed||{value:'',unit:x.unit||'count'};};
-    const summary=()=>{let full=0,partial=0,none=0;for(const x of items){const need=Number(x.needed),a=actualParts(x);if(missing.has(x.key)||Number(a.value)===0)none++;else if(Number.isFinite(need)&&Number(a.value)+1e-9<need)partial++;else full++;}return {full,partial,none};};
-    const row=x=>{const a=actualParts(x),isMissing=missing.has(x.key);return '<article class="delivery-item '+(isMissing?'missing':'')+'" data-key="'+esc(x.key)+'"><button type="button" class="delivery-status" data-key="'+esc(x.key)+'"><span class="delivery-state">'+icon(isMissing?'xmark':'check')+'</span><span><strong>'+esc(ingredientName(x.name))+'</strong><small>Planned '+esc(x.displayAmount)+' · '+esc(x.group||x.sourceGroup)+'</small><small class="receipt-match-note"></small></span><em>'+(isMissing?'Missing':'Expected')+'</em></button><label class="delivery-qty"><span>Actual quantity</span><span class="delivery-qty-control"><input class="delivery-actual" data-key="'+esc(x.key)+'" type="number" min="0" step="any" inputmode="decimal" value="'+esc(a.value)+'" '+(isMissing?'disabled':'')+'><b>'+esc(a.unit==='count'?'each':a.unit)+'</b></span></label></article>';};
+    const plannedParts=x=>MW.inventory.parseAmount(x.inventoryAmount||x.displayAmount)||((Number.isFinite(Number(x.needed))&&x.unit)?{value:Number(x.needed),unit:x.unit}:null);
+    const expectedParts=x=>MW.inventory.parseAmount(x.substitution&&x.substitution.replacementAmount||x.inventoryAmount||x.displayAmount)||{value:'',unit:x.unit||'count'};
+    const actualParts=x=>{const expected=expectedParts(x),parsed=MW.inventory.parseAmount(actual[x.key]||MW.inventory.formatAmount(expected));return parsed||expected;};
+    const comparison=x=>{const need=plannedParts(x),a=actualParts(x);if(!need||!a)return null;if(!x.substitution)return a.unit===need.unit?a.value:null;if(x.substitution.comparable===false)return null;const converted=MW.inventory.valueInUnit(a,need.unit,x.substitution.replacementName);return Number.isFinite(converted)?converted:null;};
+    const summary=()=>{let full=0,partial=0,none=0,swapped=0;for(const x of items){const need=plannedParts(x),a=actualParts(x),comp=comparison(x);if(missing.has(x.key)||Number(a.value)===0){none++;continue;}if(x.substitution&&comp==null){swapped++;continue;}if(need&&Number.isFinite(comp)&&comp+1e-9<need.value)partial++;else full++;}return {full,partial,none,swapped};};
+    const row=x=>{const a=actualParts(x),isMissing=missing.has(x.key),sub=x.substitution,shown=sub?sub.replacementName:x.name,meta=sub?'Instead of '+ingredientName(x.name)+' · planned '+displayAmount(sub.plannedAmount||x.displayAmount):'Planned '+displayAmount(x.displayAmount)+' · '+(x.group||x.sourceGroup),state=isMissing?'Missing':sub?'Swapped':'Expected';return '<article class="delivery-item '+(isMissing?'missing ':'')+(sub?'substituted':'')+'" data-key="'+esc(x.key)+'"><button type="button" class="delivery-status" data-key="'+esc(x.key)+'"><span class="delivery-state">'+icon(isMissing?'xmark':sub?'right-left':'check')+'</span><span><strong>'+esc(ingredientName(shown))+'</strong><small>'+esc(meta)+'</small><small class="receipt-match-note"></small></span><em>'+state+'</em></button><label class="delivery-qty"><span>Actual quantity</span><span class="delivery-qty-control"><input class="delivery-actual" data-key="'+esc(x.key)+'" type="number" min="0" step="any" inputmode="decimal" value="'+esc(a.value)+'" '+(isMissing?'disabled':'')+'><b>'+esc(a.unit==='count'?'each':a.unit)+'</b></span></label></article>';};
     root.innerHTML=shell(
       '<section class="subpage-head"><button class="back-button" id="backDelivery">'+icon('arrow-left')+'</button><div><span class="eyebrow">SHOP CHECK</span><h1>What did you actually get?</h1><p>Everything starts with the expected pack quantity. Only change an amount when the pack was different, or mark it missing.</p></div></section>'+
       '<section class="receipt-reference"><div>'+icon('receipt')+'<span><strong>Scan a receipt</strong><small>Read a receipt on this device to prefill what you actually bought. Nothing is uploaded and nothing changes until you save.</small></span></div><label class="receipt-picker">Take photo or choose image<input id="receiptFile" type="file" accept="image/*" capture="environment"></label><div class="receipt-key"><span class="receipt-key-direct">Green: quantity read directly</span><span class="receipt-key-review">Amber: best guess, check it</span><span>Plain: expected quantity, not confirmed by receipt</span></div><div id="receiptPreview"></div></section>'+
@@ -946,17 +1059,18 @@ window.MW = window.MW || {};
       '<div class="delivery-actions"><button class="btn primary" id="confirmDelivery">Save quantities & update inventory</button><button class="btn secondary" id="allDelivered">Reset to expected quantities</button></div>',
       'shop'
     );
-    const refreshSummary=()=>{const x=summary(),el=document.getElementById('deliverySummary');if(el)el.textContent=x.full+' as expected'+(x.partial?' · '+x.partial+' short':'')+(x.none?' · '+x.none+' missing':'');};
+    const refreshSummary=()=>{const x=summary(),el=document.getElementById('deliverySummary');if(el)el.textContent=x.full+' as expected'+(x.swapped?' · '+x.swapped+' swapped':'')+(x.partial?' · '+x.partial+' short':'')+(x.none?' · '+x.none+' missing':'');};
     const clearReceiptMark=(key,card)=>{receiptFilled.delete(key);if(!card)return;card.classList.remove('receipt-match-direct','receipt-match-review');const note=card.querySelector('.receipt-match-note');if(note){note.textContent='';note.removeAttribute('data-kind');}};
     const markReceipt=(key,card,match)=>{if(!card||!match)return;receiptFilled.set(key,match);card.classList.remove('receipt-match-direct','receipt-match-review');card.classList.add(match.needsReview?'receipt-match-review':'receipt-match-direct');const note=card.querySelector('.receipt-match-note');if(note){note.dataset.kind=match.needsReview?'review':'direct';note.textContent=match.needsReview?'Receipt match · check this quantity':'Receipt matched · quantity prefilled';}card.querySelector('.delivery-status em').textContent=match.needsReview?'Check':'Receipt';};
-    const setMissing=(key,on)=>{const card=root.querySelector('.delivery-item[data-key="'+CSS.escape(key)+'"]');if(!card)return;clearReceiptMark(key,card);const x=items.find(v=>v.key===key),input=card.querySelector('.delivery-actual');card.classList.toggle('missing',on);card.querySelector('.delivery-state').innerHTML=icon(on?'xmark':'check');card.querySelector('.delivery-status em').textContent=on?'Missing':'Expected';input.disabled=on;if(on){missing.add(key);input.value='0';actual[key]='0 '+(actualParts(x).unit||'');}else{missing.delete(key);const p=MW.inventory.parseAmount(x.inventoryAmount||x.displayAmount);input.value=p?p.value:'';actual[key]=x.inventoryAmount||x.displayAmount;}refreshSummary();};
+    const setMissing=(key,on)=>{const card=root.querySelector('.delivery-item[data-key="'+CSS.escape(key)+'"]');if(!card)return;clearReceiptMark(key,card);const x=items.find(v=>v.key===key),input=card.querySelector('.delivery-actual'),expected=expectedParts(x),sub=x.substitution;card.classList.toggle('missing',on);card.querySelector('.delivery-state').innerHTML=icon(on?'xmark':sub?'right-left':'check');card.querySelector('.delivery-status em').textContent=on?'Missing':sub?'Swapped':'Expected';input.disabled=on;if(on){missing.add(key);input.value='0';actual[key]='0 '+(expected.unit||'');}else{missing.delete(key);input.value=expected.value;actual[key]=MW.inventory.formatAmount(expected);}refreshSummary();};
     root.querySelectorAll('.delivery-status').forEach(b=>b.onclick=()=>setMissing(b.dataset.key,!missing.has(b.dataset.key)));
-    root.querySelectorAll('.delivery-actual').forEach(input=>input.oninput=()=>{const key=input.dataset.key,x=items.find(v=>v.key===key),u=actualParts(x).unit||'count';actual[key]=String(Math.max(0,Number(input.value)||0))+' '+(u==='count'?'each':u);missing.delete(key);const card=input.closest('.delivery-item');if(card){clearReceiptMark(key,card);card.classList.remove('missing');card.querySelector('.delivery-state').innerHTML=icon('check');card.querySelector('.delivery-status em').textContent='Edited';}refreshSummary();});
-    document.getElementById('allDelivered').onclick=()=>{for(const x of items){const p=MW.inventory.parseAmount(x.inventoryAmount||x.displayAmount);actual[x.key]=x.inventoryAmount||x.displayAmount;missing.delete(x.key);const card=root.querySelector('.delivery-item[data-key="'+CSS.escape(x.key)+'"]');if(card){clearReceiptMark(x.key,card);const input=card.querySelector('.delivery-actual');input.disabled=false;input.value=p?p.value:'';card.classList.remove('missing');card.querySelector('.delivery-state').innerHTML=icon('check');card.querySelector('.delivery-status em').textContent='Expected';}}refreshSummary();};
+    root.querySelectorAll('.delivery-actual').forEach(input=>input.oninput=()=>{const key=input.dataset.key,x=items.find(v=>v.key===key),u=expectedParts(x).unit||'count';actual[key]=String(Math.max(0,Number(input.value)||0))+' '+(u==='count'?'each':u);missing.delete(key);const card=input.closest('.delivery-item');if(card){clearReceiptMark(key,card);card.classList.remove('missing');card.querySelector('.delivery-state').innerHTML=icon(x.substitution?'right-left':'check');card.querySelector('.delivery-status em').textContent='Edited';}refreshSummary();});
+    document.getElementById('allDelivered').onclick=()=>{for(const x of items){const p=expectedParts(x);actual[x.key]=MW.inventory.formatAmount(p);missing.delete(x.key);const card=root.querySelector('.delivery-item[data-key="'+CSS.escape(x.key)+'"]');if(card){clearReceiptMark(x.key,card);const input=card.querySelector('.delivery-actual');input.disabled=false;input.value=p.value;card.classList.remove('missing');card.querySelector('.delivery-state').innerHTML=icon(x.substitution?'right-left':'check');card.querySelector('.delivery-status em').textContent=x.substitution?'Swapped':'Expected';}}refreshSummary();};
     const receipt=document.getElementById('receiptFile');
     const fileDataUrl=file=>new Promise((resolve,reject)=>{const fr=new FileReader();fr.onload=()=>resolve(String(fr.result||''));fr.onerror=()=>reject(fr.error||new Error('The receipt image could not be read.'));fr.readAsDataURL(file);});
-    const setActual=(key,value,match)=>{const input=root.querySelector('.delivery-actual[data-key="'+CSS.escape(key)+'"]');if(!input||!value)return false;const parsed=MW.inventory.parseAmount(value);if(!parsed)return false;const x=items.find(v=>v.key===key),planned=actualParts(x);if(planned.unit!==parsed.unit)return false;input.value=parsed.value;actual[key]=MW.inventory.formatAmount(parsed);missing.delete(key);const card=input.closest('.delivery-item');if(card){card.classList.remove('missing');card.querySelector('.delivery-state').innerHTML=icon('check');if(match)markReceipt(key,card,match);else card.querySelector('.delivery-status em').textContent='Expected';}return true;};
-    receipt.onchange=async()=>{const file=receipt.files&&receipt.files[0],host=document.getElementById('receiptPreview');host.innerHTML='';if(!file)return;const url=URL.createObjectURL(file),img=document.createElement('img');img.src=url;img.alt='Receipt preview';img.onload=()=>URL.revokeObjectURL(url);host.appendChild(img);const status=document.createElement('div');status.className='receipt-scan-status';status.innerHTML='<span class="loading-spinner"></span><strong>Reading receipt on this device…</strong>';host.appendChild(status);try{const nativeOcr=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorPluginMlKitTextRecognition;let result;if(nativeOcr&&typeof nativeOcr.detectText==='function'){const dataUrl=await fileDataUrl(file),base64Image=String(dataUrl).replace(/^data:image\/[^;]+;base64,/i,'');result=await nativeOcr.detectText({base64Image,rotation:0});}else if(MW.webOcr&&typeof MW.webOcr.detectText==='function'){result=await MW.webOcr.detectText(file,progress=>{const pct=Math.round((Number(progress.progress)||0)*100);if(pct>0)status.innerHTML='<span class="loading-spinner"></span><strong>Reading receipt on this device… '+pct+'%</strong>';});}else throw new Error('Receipt text reading is not available in this build. You can still enter the quantities below.');const parsed=MW.receipt.parse(result&&result.text||''),matched=MW.receipt.match(items,parsed);let applied=0;for(const m of matched.matches)if(setActual(m.key,m.actualAmount,m))applied++;const review=matched.matches.filter(x=>x.needsReview).length,direct=matched.matches.length-review;receiptSummary={scannedAt:new Date().toISOString(),source:'on-device-ocr',total:Number.isFinite(parsed.total)?parsed.total:null,itemLines:parsed.itemLineCount,matched:matched.matches.length,directMatches:direct,reviewMatches:review,unmatchedReceipt:matched.unmatchedReceipt.length,matchDetails:matched.matches.map(x=>({key:x.key,receiptLabel:x.receiptLabel,score:x.score,amountBasis:x.amountBasis,needsReview:x.needsReview}))};status.innerHTML='<i class="fa-solid fa-circle-check"></i><div><strong>'+applied+' shopping item'+(applied===1?'':'s')+' prefilled</strong><small>'+(Number.isFinite(parsed.total)?'Receipt total '+money(parsed.total)+' · ':'')+direct+' green match'+(direct===1?'':'es')+' · '+review+' amber check'+(review===1?'':'s')+' · '+matched.unmatchedReceipt.length+' unmatched receipt line'+(matched.unmatchedReceipt.length===1?'':'s')+'. Green rows came directly from the receipt. Amber rows used a likely match or known pack size, so check those before saving.</small></div>';refreshSummary();}catch(error){status.innerHTML='<i class="fa-solid fa-circle-info"></i><div><strong>Receipt kept as a reference</strong><small>'+esc(error&&error.message||'Text could not be read automatically.')+'</small></div>';}};
+    const setActual=(key,value,match)=>{const input=root.querySelector('.delivery-actual[data-key="'+CSS.escape(key)+'"]');if(!input||!value)return false;const parsed=MW.inventory.parseAmount(value);if(!parsed)return false;const x=items.find(v=>v.key===key),expected=expectedParts(x);if(expected.unit!==parsed.unit)return false;input.value=parsed.value;actual[key]=MW.inventory.formatAmount(parsed);missing.delete(key);const card=input.closest('.delivery-item');if(card){card.classList.remove('missing');card.querySelector('.delivery-state').innerHTML=icon(x.substitution?'right-left':'check');if(match)markReceipt(key,card,match);else card.querySelector('.delivery-status em').textContent=x.substitution?'Swapped':'Expected';}return true;};
+    const receiptItems=items.map(x=>x.substitution?{...x,name:x.substitution.replacementName,displayAmount:x.substitution.replacementAmount,inventoryAmount:x.substitution.replacementAmount}:x);
+    receipt.onchange=async()=>{const file=receipt.files&&receipt.files[0],host=document.getElementById('receiptPreview');host.innerHTML='';if(!file)return;const url=URL.createObjectURL(file),img=document.createElement('img');img.src=url;img.alt='Receipt preview';img.onload=()=>URL.revokeObjectURL(url);host.appendChild(img);const status=document.createElement('div');status.className='receipt-scan-status';status.innerHTML='<span class="loading-spinner"></span><strong>Reading receipt on this device…</strong>';host.appendChild(status);try{const nativeOcr=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.CapacitorPluginMlKitTextRecognition;let result;if(nativeOcr&&typeof nativeOcr.detectText==='function'){const dataUrl=await fileDataUrl(file),base64Image=String(dataUrl).replace(/^data:image\/[^;]+;base64,/i,'');result=await nativeOcr.detectText({base64Image,rotation:0});}else if(MW.webOcr&&typeof MW.webOcr.detectText==='function'){result=await MW.webOcr.detectText(file,progress=>{const pct=Math.round((Number(progress.progress)||0)*100);if(pct>0)status.innerHTML='<span class="loading-spinner"></span><strong>Reading receipt on this device… '+pct+'%</strong>';});}else throw new Error('Receipt text reading is not available in this build. You can still enter the quantities below.');const parsed=MW.receipt.parse(result&&result.text||''),matched=MW.receipt.match(receiptItems,parsed);let applied=0;for(const m of matched.matches)if(setActual(m.key,m.actualAmount,m))applied++;const review=matched.matches.filter(x=>x.needsReview).length,direct=matched.matches.length-review;receiptSummary={scannedAt:new Date().toISOString(),source:'on-device-ocr',total:Number.isFinite(parsed.total)?parsed.total:null,itemLines:parsed.itemLineCount,matched:matched.matches.length,directMatches:direct,reviewMatches:review,unmatchedReceipt:matched.unmatchedReceipt.length,matchDetails:matched.matches.map(x=>({key:x.key,receiptLabel:x.receiptLabel,score:x.score,amountBasis:x.amountBasis,needsReview:x.needsReview}))};status.innerHTML='<i class="fa-solid fa-circle-check"></i><div><strong>'+applied+' shopping item'+(applied===1?'':'s')+' prefilled</strong><small>'+(Number.isFinite(parsed.total)?'Receipt total '+money(parsed.total)+' · ':'')+direct+' green match'+(direct===1?'':'es')+' · '+review+' amber check'+(review===1?'':'s')+' · '+matched.unmatchedReceipt.length+' unmatched receipt line'+(matched.unmatchedReceipt.length===1?'':'s')+'. Green rows came directly from the receipt. Amber rows used a likely match or known pack size, so check those before saving.</small></div>';refreshSummary();}catch(error){status.innerHTML='<i class="fa-solid fa-circle-info"></i><div><strong>Receipt kept as a reference</strong><small>'+esc(error&&error.message||'Text could not be read automatically.')+'</small></div>';}};
     document.getElementById('backDelivery').onclick=()=>go('shopreview');
     document.getElementById('confirmDelivery').onclick=e=>withLoading(e.currentTarget,()=>{MW.delivery.reconcile({missingKeys:[...missing],actualAmounts:actual,receipt:receiptSummary});go('shopreview');});
     refreshSummary();bindNav();
@@ -1079,13 +1193,13 @@ window.MW = window.MW || {};
       ((!r.online&&r.sourcedCatalogue&&r.sourceUrl)?'<a class="photo-credit" href="'+esc(r.sourceUrl)+'" target="_blank" rel="noopener">Recipe source · '+esc(r.source||'Published recipe')+'</a>':((!r.online&&r.imageSource&&displayRecipeImage(r))?'<a class="photo-credit" href="'+esc(r.imageSource)+'" target="_blank" rel="noopener">Photo source · '+esc(r.imageLicense||'Source')+'</a>':''))+
       ((MW.equipment&&MW.equipment.requirements(r).length)?'<div class="equipment-note">'+icon('utensils')+'<span>Requires '+esc(MW.equipment.requirements(r).map(MW.equipment.label).join(', '))+'.</span></div>':'')+
       (selectedAllergens.length?'<div class="allergen-note">'+icon('triangle-exclamation')+'<span>Allergen filters use listed ingredients only. Check packets, labels and cross-contamination information.</span></div>':'')+
-      '<section class="recipe-section ingredients-section"><div class="section-title"><div><span class="eyebrow">INGREDIENTS</span><h2>What you need</h2></div></div>'+r.ingredients.map(x=>{const amount=MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,x[0],x[1],factor):(r.scaleSafe===false?x[0]:MW.shopping.scaleAmount(x[0],factor));const stocked=MW.inventory&&MW.inventory.covers(x[1],amount);return '<div class="ingredient-row '+(stocked?'from-cupboard':'')+'"><span>'+esc(ingredientName(x[1]))+(stocked?'<small>In your cupboard</small>':'')+'</span><strong>'+esc(displayAmount(amount))+'</strong><button type="button" class="ingredient-more" data-ingredient="'+esc(x[1])+'" aria-label="More options for '+esc(ingredientName(x[1]))+'">'+icon('ellipsis-vertical')+'</button></div>';}).join('')+'</section>'+
+      '<section class="recipe-section ingredients-section"><div class="section-title"><div><span class="eyebrow">INGREDIENTS</span><h2>What you need</h2></div></div>'+r.ingredients.map(x=>{const planned=MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,x[0],x[1],factor):(r.scaleSafe===false?x[0]:MW.shopping.scaleAmount(x[0],factor)),shown=substitutedIngredient(x[1],planned),stocked=MW.inventory&&MW.inventory.covers(shown.name,shown.amount),subNote=shown.substitution?'<small class="ingredient-substitution-note">'+icon('right-left')+' Instead of '+esc(ingredientName(shown.originalName))+' · recipe calls for '+esc(displayAmount(shown.originalAmount))+(shown.comparable?'':' · quantity comparison needs judgement')+'</small>':'';return '<div class="ingredient-row '+(stocked?'from-cupboard ':'')+(shown.substitution?'has-substitution':'')+'"><span>'+esc(ingredientName(shown.name))+(stocked?'<small>In your cupboard</small>':'')+subNote+'</span><strong>'+esc(displayAmount(shown.amount))+'</strong><button type="button" class="ingredient-more" data-ingredient="'+esc(x[1])+'" aria-label="More options for '+esc(ingredientName(x[1]))+'">'+icon('ellipsis-vertical')+'</button></div>';}).join('')+'</section>'+
       '<section class="recipe-section equipment-section"><div class="section-title"><div><span class="eyebrow">EQUIPMENT</span><h2>Get these ready</h2></div></div><div class="cook-equipment-list">'+toolsNeeded.map(x=>'<span>'+icon('check')+esc(x)+'</span>').join('')+'</div></section>'+
-      '<section class="recipe-section method-section"><div class="section-title"><div><span class="eyebrow">METHOD</span><h2>Cook it</h2></div></div><div class="steps">'+r.steps.map((x,i)=>{const used=stepIngredients(r,x,factor,i);return '<div class="step"><span>'+(i+1)+'</span><div><p>'+esc(displayInstruction(x))+'</p>'+(used.length?'<div class="step-amounts">'+used.map(v=>'<em>'+esc(displayAmount(v.amount))+' '+esc(ingredientName(v.name))+'</em>').join('')+'</div>':'')+'</div></div>';}).join('')+'</div></section>'+
+      '<section class="recipe-section method-section"><div class="section-title"><div><span class="eyebrow">METHOD</span><h2>Cook it</h2></div></div><div class="steps">'+r.steps.map((x,i)=>{const used=stepIngredients(r,x,factor,i);return '<div class="step"><span>'+(i+1)+'</span><div><p>'+esc(displayInstruction(x,r,factor,people))+'</p>'+(used.length?'<div class="step-amounts">'+used.map(v=>{const shown=substitutedIngredient(v.name,v.amount);return '<em>'+esc(displayAmount(shown.amount))+' '+esc(ingredientName(shown.name))+(shown.substitution?' '+icon('right-left'):'')+'</em>';}).join('')+'</div>':'')+'</div></div>';}).join('')+'</div></section>'+
       (tips.length?'<section class="recipe-section tips-section"><div class="section-title"><div><span class="eyebrow">HELPFUL</span><h2>Tips & tricks</h2></div></div>'+tips.map(t=>'<div class="tip-row">'+icon('lightbulb')+'<span>'+esc(t)+'</span></div>').join('')+'</section>':''),
       'cook'
     );
-    document.getElementById('back').onclick=()=>go('recipes');
+    document.getElementById('back').onclick=()=>{if(!window.MyWeekAndroidBack())go('recipes',{motion:'drill-back'});};
     bindIngredientActions(root);
     document.getElementById('startCooking').onclick=()=>{MW.preparation.begin(r,people);go('cookprep:'+r.id);};
     bindNav();
@@ -1116,7 +1230,7 @@ window.MW = window.MW || {};
           (r.isLunch?(()=>{const q=MW.preparation.quantities(r),days=(st.plan.lunchDays||[]).length,eaters=Math.max(1,Number(st.plan.lunchPeople)||1),equation=days+' lunch day'+(days===1?'':'s')+' × '+eaters+' '+(eaters===1?'person':'people')+' = '+q.planned+' '+(q.planned===1?'lunch':'lunches');return '<section class="preparation-note lunch-plan-note lunch-plan-compact"><span class="eyebrow">WEEKLY LUNCH PREP · AT HOME</span><h2>'+people+' '+(people===1?'lunch':'lunches')+' to prepare</h2><div class="lunch-plan-equation">'+esc(equation)+'</div>'+(q.prepared?'<p class="lunch-plan-summary">'+q.prepared+' already prepared · '+q.remaining+' remaining</p>':'')+'<details class="lunch-storage-note"><summary>Workday storage & reheating</summary><p>'+esc(r.storageNote)+'</p>'+(r.restText?'<p>'+esc(r.restText)+'</p>':'')+'</details></section>';})():'')+
           '<section class="cook-prep-card">'+
             '<div class="cook-prep-heading">'+icon('basket-shopping')+'<div><span>Ingredients</span><strong>Get these out</strong></div></div>'+
-            '<div class="cook-prep-list">'+ingredients.map(v=>'<div><span>'+esc(ingredientName(v.name))+'</span><strong>'+esc(displayAmount(v.amount))+'</strong></div>').join('')+'</div>'+
+            '<div class="cook-prep-list">'+ingredients.map(v=>'<div class="'+(v.substitution?'has-substitution':'')+'"><span>'+esc(ingredientName(v.name))+(v.substitution?'<small>'+icon('right-left')+' Instead of '+esc(ingredientName(v.originalName))+'</small>':'')+'</span><strong>'+esc(displayAmount(v.amount))+'</strong></div>').join('')+'</div>'+
           '</section>'+
           '<section class="cook-prep-card">'+
             '<div class="cook-prep-heading">'+icon('utensils')+'<div><span>Equipment</span><strong>Have this ready</strong></div></div>'+
@@ -1130,8 +1244,8 @@ window.MW = window.MW || {};
         globalNav('cook')+
       '</main>';
     document.body.classList.add('cooking-active');
-    document.getElementById('closePrep').onclick=()=>{document.body.classList.remove('cooking-active');go('recipe:'+id);};
-    document.getElementById('backToRecipe').onclick=()=>{document.body.classList.remove('cooking-active');go('recipe:'+id);};
+    document.getElementById('closePrep').onclick=()=>leaveCookingFlow('recipe:'+id);
+    document.getElementById('backToRecipe').onclick=()=>leaveCookingFlow('recipe:'+id);
     document.getElementById('beginSteps').onclick=()=>go('cookstep:'+id+':0');
     bindNav();
   }
@@ -1149,13 +1263,16 @@ window.MW = window.MW || {};
     const factor=r.scaleSafe===false?1:people/(r.servings||2);
     const currentStep=steps[index];
     const used=stepIngredients(r,currentStep,factor,index);
+    const stepSwapNotes=stepSubstitutionNotes(r,currentStep,index);
     const stepMeta=r&&Array.isArray(r.sourceStepImages)&&r.sourceStepImages[index]||null;
     const exactStep=stepMeta&&stepMeta.src||'';
     const originalStep=stepMeta&&stepMeta.originalSrc||'';
     const localStep=r&&MW.sourcedImageMap&&MW.sourcedImageMap.steps&&MW.sourcedImageMap.steps[r.id]&&MW.sourcedImageMap.steps[r.id][index]||'';
-    const stepCandidates=[...new Set([localStep,helloFreshMirror(exactStep,900),exactStep,helloFreshMirror(originalStep,900),originalStep].filter(Boolean))];
+    const safeStepFallback=MW.cookingVisuals&&MW.cookingVisuals.fallbackForStep?MW.cookingVisuals.fallbackForStep(currentStep,index,r):null;
+    const stepCandidates=[...new Set([localStep,helloFreshMirror(exactStep,900),exactStep,helloFreshMirror(originalStep,900),originalStep,safeStepFallback&&safeStepFallback.src].filter(Boolean))];
     const stepTitle=String(stepMeta&&stepMeta.caption||('Step '+(index+1))).trim();
-    const instructionParts=String(currentStep).split(/(?<=[.!?])\s+(?=[A-Z])/)
+    const displayedStep=displayInstruction(currentStep,r,factor,people);
+    const instructionParts=String(displayedStep).split(/(?<=[.!?])\s+(?=[A-Z])/)
       .map(x=>x.trim()).filter(Boolean);
     const rawFacts=[
       ...(String(currentStep).match(/\b\d{2,3}°C(?:\/\d{2,3}°C fan)?(?:\/gas mark \d+)?/gi)||[]),
@@ -1185,10 +1302,11 @@ window.MW = window.MW || {};
             '<aside class="cook-visual-panel">'+photo(stepCandidates[0],'cook-photo',stepTitle,stepCandidates.slice(1))+'</aside>'
           :'')+
           '<article class="cook-instruction">'+
-            '<div class="cook-action-list">'+instructionParts.map((part,i)=>'<div><span>'+(i+1)+'</span><p>'+esc(displayInstruction(part))+'</p></div>').join('')+'</div>'+
+            (stepSwapNotes.length?'<div class="cook-substitution-banner">'+icon('right-left')+'<div><strong>Your shop swap applies here</strong>'+stepSwapNotes.map(x=>'<small>Use '+esc(ingredientName(x.replacementName))+' instead of '+esc(ingredientName(x.originalName))+'.</small>').join('')+'</div></div>':'')+
+            '<div class="cook-action-list">'+instructionParts.map((part,i)=>'<div><span>'+(i+1)+'</span><p>'+esc(part)+'</p></div>').join('')+'</div>'+
             (used.length?
               '<div class="cook-ingredients"><span>For this step</span>'+
-                used.map(v=>'<strong>'+esc(displayAmount(v.amount))+' '+esc(ingredientName(v.name))+'</strong>').join('')+
+                used.map(v=>{const shown=substitutedIngredient(v.name,v.amount);return '<strong class="'+(shown.substitution?'has-substitution':'')+'">'+esc(displayAmount(shown.amount))+' '+esc(ingredientName(shown.name))+(shown.substitution?' '+icon('right-left'):'')+'</strong>';}).join('')+
               '</div>'
             :'')+
             (tip?'<div class="cook-tip">'+icon('lightbulb')+'<span><strong>Top tip</strong><small>'+esc(tip)+'</small></span></div>':'')+
@@ -1202,10 +1320,7 @@ window.MW = window.MW || {};
       '</main>';
 
     document.body.classList.add('cooking-active');
-    document.getElementById('closeCook').onclick=()=>{
-      document.body.classList.remove('cooking-active');
-      go('recipe:'+id);
-    };
+    document.getElementById('closeCook').onclick=()=>leaveCookingFlow('recipe:'+id);
     document.getElementById('prevStep').onclick=()=>{
       if(index>0) go('cookstep:'+id+':'+(index-1));
     };
@@ -1213,8 +1328,7 @@ window.MW = window.MW || {};
       if(index<steps.length-1) go('cookstep:'+id+':'+(index+1));
       else{
         MW.preparation.finish(r);
-        document.body.classList.remove('cooking-active');
-        go('recipes');
+        leaveCookingFlow('recipes');
       }
     };
     bindNav();
@@ -1387,9 +1501,8 @@ window.MW = window.MW || {};
   function cupboard(){
     const st=s();
     const items=Object.entries(st.inventory||{}).map(([key,item])=>({...item,_key:key})).filter(x=>MW.inventory.parseAmount(x.amountText)).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
-    const units=[['g','g'],['kg','kg'],['oz','oz'],['lb','lb'],['ml','ml'],['l','L'],['fl oz','fl oz'],['tsp','tsp'],['tbsp','tbsp'],['each','Each'],['banana','Banana'],['pack','Pack'],['tin','Tin'],['can','Can'],['bottle','Bottle'],['carton','Carton'],['jar','Jar'],['tub','Tub'],['box','Box'],['bag','Bag'],['pot','Pot'],['tray','Tray'],['roll','Roll'],['packet','Packet'],['clove','Clove'],['bunch','Bunch'],['sachet','Sachet'],['pouch','Pouch'],['nest','Nest'],['fillet','Fillet'],['wrap','Wrap'],['tortilla','Tortilla'],['rasher','Rasher'],['slice','Slice'],['ball','Ball']];
-    const wholeStockUnits=new Set(['each','banana','pack','tin','can','bottle','carton','jar','tub','box','bag','pot','tray','roll','packet','clove','bunch','sachet','pouch','nest','fillet','wrap','tortilla','rasher','slice','ball']);
-    const unitOptions=current=>units.map(x=>'<option value="'+x[0]+'" '+(x[0]===current?'selected':'')+'>'+x[1]+'</option>').join('');
+    const wholeStockUnits=wholeInventoryUnits;
+    const unitOptions=inventoryUnitOptions;
     const itemRow=x=>{
       const p=MW.inventory.partsForEdit(x.amountText)||{value:'',unit:'g'},keyMatch=MW.foodIdentity&&MW.foodIdentity.resolveExact(x._key),nameMatch=MW.foodIdentity&&MW.foodIdentity.resolveExact(x.name),resolved=x.canonical||keyMatch&&keyMatch.canonical||nameMatch&&nameMatch.canonical,linked=Boolean(resolved);
       const usage=linked&&MW.inventory.plannedUsage?MW.inventory.plannedUsage(resolved):[];

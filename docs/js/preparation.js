@@ -55,15 +55,26 @@ window.MW=window.MW||{};
       st.week.completedRecipes=st.week.completedRecipes||[];
       if(!recipe.isLunch&&st.week.completedRecipes.includes(recipe.id)){a.finished=true;return false;}
       const f=recipe.scaleSafe===false?1:a.portions/(recipe.servings||2);
-      const rows=MW.pricing.rowsForRecipe(recipe);
-      const uses=rows.map(([amount,name])=>({name,amountText:scaleAmount(recipe,amount,name,f)}));
+      const rows=MW.pricing.rowsForRecipe(recipe),uses=[],substitutionUncertain=[];
+      for(const [amount,name] of rows){
+        const plannedAmount=scaleAmount(recipe,amount,name,f);
+        const sub=MW.shopping&&MW.shopping.substitutionForIngredient?MW.shopping.substitutionForIngredient(name,st):null;
+        if(!sub){uses.push({name,amountText:plannedAmount});continue;}
+        const planned=MW.inventory.parseAmount(plannedAmount),replacement=MW.inventory.parseAmount(sub.replacementAmount);
+        const converted=planned&&replacement&&sub.comparable!==false?MW.inventory.valueInUnit(planned,replacement.unit,sub.replacementName):null;
+        if(!planned||!replacement||!Number.isFinite(converted)){
+          substitutionUncertain.push({original:name,replacement:sub.replacementName,plannedAmount,replacementAmount:sub.replacementAmount});
+          continue;
+        }
+        uses.push({name:sub.replacementName,amountText:MW.inventory.formatAmount({value:converted,unit:replacement.unit}),substitutedFor:name});
+      }
       const uncertain=MW.inventory.applyUse(st,uses);
       if(recipe.isLunch){
         st.week.preparedLunchPortions=st.week.preparedLunchPortions||{};
         st.week.preparedLunchPortions[recipe.id]=(Number(st.week.preparedLunchPortions[recipe.id])||0)+a.portions;
       }else st.week.completedRecipes.push(recipe.id);
       a.finished=true;a.finishedAt=new Date().toISOString();
-      st.events.push({at:a.finishedAt,type:'preparation_finished',data:{recipeId:recipe.id,portions:a.portions,uncertain}});
+      st.events.push({at:a.finishedAt,type:'preparation_finished',data:{recipeId:recipe.id,portions:a.portions,uncertain,substitutionUncertain}});
       st.events=st.events.slice(-500);return true;
     });
   }

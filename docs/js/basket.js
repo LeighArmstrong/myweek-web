@@ -96,13 +96,16 @@ window.MW = window.MW || {};
       const normal=e?Math.max(0,Number(e.price)||0)*packs:b.fallbackCost;
       const price=e&&savingMode&&Number.isFinite(e.savingPrice)?Math.max(0,Math.min(Number(e.price),e.savingPrice)):e?Math.max(0,Number(e.price)||0):0;
       const cost=e?price*packs:b.fallbackCost;
+      const retailAmount=e?quantity(Number(e.packQty)*packs,e.unit):null;
       const x={name:b.name,amounts:b.amounts,reasons:b.reasons,category:b.category,sourceQuantity:b.sourceQuantity,
-        displayAmount:e&&!b.unknown?quantity(purchaseNeed,e.unit):b.amounts.join(' + '),
+        displayAmount:e?(b.unknown?retailAmount:quantity(purchaseNeed,e.unit)):b.amounts.join(' + '),
+        sourceAmounts:b.amounts.slice(),
         estimatedPrice:round(cost),normalEstimatedPrice:round(normal),priceConfidence:'unverified-benchmark',
         priceLabel:e?e.label:'Unpriced item estimate',quantityNeedsReview:Boolean(b.unknown),packs,
+        quantityNote:b.unknown&&e?'Recipe uses '+b.amounts.join(' + ')+'; this is the minimum retail pack because that recipe measure cannot be converted safely.':null,
         retailEvidence:e&&e.observedRetail||null,packSize:e?quantity(e.packQty,e.unit):null,packPrice:e?price:null,
         label:e?e.label:b.name,needed:Math.round(b.needed*1000)/1000,unit:e?e.unit:null,cost:round(cost),normalCost:round(normal),sources:b.reasons};
-      if(e){x.inventoryAmount=quantity(Number(e.packQty)*packs,e.unit);matched++;}
+      if(e){x.inventoryAmount=retailAmount;matched++;}
       else{x.inventoryAmount=x.displayAmount;x.priceConfidence='unpriced-estimate';}
       if(!groups[x.category]) groups[x.category]=[];
       groups[x.category].push(x);lines.push(x);total+=x.estimatedPrice;normalTotal+=x.normalEstimatedPrice;

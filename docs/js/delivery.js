@@ -14,7 +14,8 @@
       needed:Number.isFinite(Number(x.needed))?Number(x.needed):null,unit:x.unit||null,
       estimatedPrice:Number.isFinite(Number(x.estimatedPrice))?Number(x.estimatedPrice):null,
       packSize:x.packSize||null,packs:Number.isFinite(Number(x.packs))?Number(x.packs):null,
-      checked:Boolean(x.checked),reasons:Array.isArray(x.reasons)?x.reasons.slice():[]
+      checked:Boolean(x.checked),reasons:Array.isArray(x.reasons)?x.reasons.slice():[],
+      substitution:x.substitution?Object.assign({},x.substitution):null
     };
   }
   function begin(items){
@@ -61,31 +62,48 @@
       if(!d||!Array.isArray(d.items)) throw new Error('No recorded order is available for this delivery.');
       const valid=new Set(d.items.map(x=>x.key)),missing=new Set(input.missingKeys||[]),actualInput=input.actualAmounts||{};
       if([...missing].some(k=>!valid.has(k))||Object.keys(actualInput).some(k=>!valid.has(k))) throw new Error('The delivery quantities do not match the recorded order.');
-      const actualAmounts={},purchaseApplied={},surplusApplied={},shortfallAmounts={},received=[],short=[];
+      const actualAmounts={},purchaseApplied={},surplusApplied={},shortfallAmounts={},received=[],short=[],comparisonUncertain=[];
+      const actualName=x=>x.substitution&&x.substitution.replacementName||x.name;
       for(const x of d.items){
-        const need=planned(x);
+        const need=planned(x),sub=x.substitution||null,name=actualName(x);
         if(!need) throw new Error('Check the planned quantity for '+x.name+'.');
-        let actual=missing.has(x.key)?zero(need.unit):parse(actualInput[x.key]||d.actualAmounts&&d.actualAmounts[x.key]||x.inventoryAmount||x.displayAmount);
-        if(!actual||actual.unit!==need.unit) throw new Error('Use the same quantity type for '+x.name+' as the planned shop.');
+        const expected=sub?parse(sub.replacementAmount):need;
+        if(!expected) throw new Error('Check the replacement quantity for '+name+'.');
+        let actual=missing.has(x.key)?zero(expected.unit):parse(actualInput[x.key]||d.actualAmounts&&d.actualAmounts[x.key]||(sub&&sub.replacementAmount)||x.inventoryAmount||x.displayAmount);
+        if(!actual||actual.unit!==expected.unit) throw new Error('Use the same quantity type for '+name+' as the item you bought.');
         actualAmounts[x.key]=fmt(actual);
         if(actual.value>0) received.push(x.key);
-        const surplus=Math.max(0,actual.value-need.value),shortage=Math.max(0,need.value-actual.value);
-        if(shortage>0.000001){short.push(x.key);shortfallAmounts[x.key]=fmt({value:shortage,unit:need.unit});}
+
+        const converted=sub?MW.inventory.valueInUnit(actual,need.unit,name):actual.value;
+        const comparable=sub?sub.comparable!==false&&Number.isFinite(converted):true;
+        let surplus=0,shortage=0;
+        if(missing.has(x.key)){
+          shortage=need.value;
+          shortfallAmounts[x.key]=sub?fmt(expected):fmt({value:need.value,unit:need.unit});
+        }else if(comparable){
+          surplus=Math.max(0,converted-need.value);
+          shortage=Math.max(0,need.value-converted);
+          if(shortage>0.000001)shortfallAmounts[x.key]=fmt({value:shortage,unit:need.unit});
+        }else if(actual.value>0){
+          comparisonUncertain.push(x.key);
+        }
+        if(shortage>0.000001&&!short.includes(x.key))short.push(x.key);
+
         if(['Household','Extras'].includes(x.sourceGroup)) continue;
-        const old=parse(d.purchaseApplied&&d.purchaseApplied[x.key])||zero(need.unit);
-        if(old.unit!==need.unit) throw new Error('Check the saved purchase quantity for '+x.name+'.');
-        if(!d.confirmed) adjustInventory(st,x.name,actual.value-old.value,need.unit);
+        const old=parse(d.purchaseApplied&&d.purchaseApplied[x.key])||zero(actual.unit);
+        if(old.unit!==actual.unit&&!d.confirmed) throw new Error('Check the saved purchase quantity for '+name+'.');
+        if(!d.confirmed) adjustInventory(st,name,actual.value-old.value,actual.unit);
         purchaseApplied[x.key]=d.confirmed?(d.purchaseApplied&&d.purchaseApplied[x.key]||fmt(actual)):fmt(actual);
-        surplusApplied[x.key]=fmt({value:surplus,unit:need.unit});
+        surplusApplied[x.key]=comparable&&surplus>0.000001?fmt({value:surplus,unit:need.unit}):'';
       }
       const oldProblemNames=new Set([...(d.missingNames||[]),...(d.shortNames||[])]);
-      const problemNames=d.items.filter(x=>short.includes(x.key)&&!['Household','Extras'].includes(x.sourceGroup)).map(x=>x.name);
+      const problemNames=d.items.filter(x=>short.includes(x.key)&&!['Household','Extras'].includes(x.sourceGroup)).map(x=>x.substitution&&x.substitution.replacementName||x.name);
       st.week.forceBuy=[...new Set((st.week.forceBuy||[]).filter(n=>!oldProblemNames.has(n)).concat(problemNames))];
-      const missingNames=d.items.filter(x=>missing.has(x.key)&&!['Household','Extras'].includes(x.sourceGroup)).map(x=>x.name);
-      const shortNames=d.items.filter(x=>short.includes(x.key)&&!missing.has(x.key)&&!['Household','Extras'].includes(x.sourceGroup)).map(x=>x.name);
-      Object.assign(d,{confirmed:true,confirmedAt:now(),receivedKeys:received,missingKeys:[...missing],shortKeys:short,missingNames,shortNames,actualAmounts,purchaseApplied,surplusApplied,shortfallAmounts,receipt:input.receipt||d.receipt||null});
+      const missingNames=d.items.filter(x=>missing.has(x.key)&&!['Household','Extras'].includes(x.sourceGroup)).map(x=>x.substitution&&x.substitution.replacementName||x.name);
+      const shortNames=d.items.filter(x=>short.includes(x.key)&&!missing.has(x.key)&&!['Household','Extras'].includes(x.sourceGroup)).map(x=>x.substitution&&x.substitution.replacementName||x.name);
+      Object.assign(d,{confirmed:true,confirmedAt:now(),receivedKeys:received,missingKeys:[...missing],shortKeys:short,missingNames,shortNames,actualAmounts,purchaseApplied,surplusApplied,shortfallAmounts,comparisonUncertainKeys:comparisonUncertain,receipt:input.receipt||d.receipt||null});
       st.week.status='delivery-checked';
-      recordEvent(st,'delivery_reconciled',{received:received.length,missing:missing.size,short:short.length,purchasedItems:Object.values(purchaseApplied).filter(Boolean).length,surplusItems:Object.values(surplusApplied).filter(Boolean).length});
+      recordEvent(st,'delivery_reconciled',{received:received.length,missing:missing.size,short:short.length,comparisonUncertain:comparisonUncertain.length,substitutions:d.items.filter(x=>x.substitution).length,purchasedItems:Object.values(purchaseApplied).filter(Boolean).length,surplusItems:Object.values(surplusApplied).filter(Boolean).length});
       return d;
     });
   }

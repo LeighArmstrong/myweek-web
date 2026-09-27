@@ -16,6 +16,60 @@ window.MW = window.MW || {};
 
   const getRecipe=id=>(MW.catalog&&MW.catalog.get(id))||MW.RECIPES.find(x=>x.id===id);
 
+  const itemKey=x=>String(x||'');
+  function substitutionMap(state){
+    state=state||MW.state.get();
+    if(!state.week)return {};
+    state.week.shoppingSubstitutions=state.week.shoppingSubstitutions||{};
+    return state.week.shoppingSubstitutions;
+  }
+  function getSubstitution(key,state){
+    return substitutionMap(state)[itemKey(key)]||null;
+  }
+  function setSubstitution(key,data){
+    const cleanKey=itemKey(key);
+    if(!cleanKey)throw new Error('The shopping item could not be identified.');
+    return MW.state.transaction(st=>{
+      if(!st.week)throw new Error('Create a week before recording a shop swap.');
+      const originalName=String(data&&data.originalName||'').trim(),replacementName=String(data&&data.replacementName||'').trim();
+      const plannedAmount=String(data&&data.plannedAmount||'').trim(),replacementAmount=String(data&&data.replacementAmount||'').trim();
+      if(!originalName||!replacementName||!replacementAmount)throw new Error('Choose what you bought and enter the amount.');
+      const originalKey=MW.inventory?MW.inventory.stockKey(originalName):norm(originalName),replacementKey=MW.inventory?MW.inventory.stockKey(replacementName):norm(replacementName);
+      if(originalKey&&replacementKey&&originalKey===replacementKey)throw new Error('That matches the planned ingredient, so it does not need to be recorded as a swap.');
+      const map=substitutionMap(st);
+      map[cleanKey]={
+        key:cleanKey,
+        originalName,
+        replacementName,
+        plannedAmount,
+        replacementAmount,
+        comparable:data&&data.comparable!==false,
+        recordedAt:new Date().toISOString()
+      };
+      st.events=st.events||[];
+      st.events.push({at:new Date().toISOString(),type:'shopping_substitution_recorded',data:{key:cleanKey,originalName,replacementName,plannedAmount,replacementAmount}});
+      st.events=st.events.slice(-500);
+      return map[cleanKey];
+    });
+  }
+  function clearSubstitution(key){
+    return MW.state.transaction(st=>{
+      if(!st.week)return;
+      const map=substitutionMap(st),cleanKey=itemKey(key),old=map[cleanKey];
+      if(old){
+        delete map[cleanKey];
+        st.events=st.events||[];
+        st.events.push({at:new Date().toISOString(),type:'shopping_substitution_cleared',data:{key:cleanKey,originalName:old.originalName,replacementName:old.replacementName}});
+        st.events=st.events.slice(-500);
+      }
+    });
+  }
+  function substitutionForIngredient(name,state){
+    const target=MW.inventory?MW.inventory.stockKey(name):norm(name);
+    if(!target)return null;
+    return Object.values(substitutionMap(state)).find(x=>(MW.inventory?MW.inventory.stockKey(x.originalName):norm(x.originalName))===target)||null;
+  }
+
   function signature(){
     const s=MW.state.get(),w=s.week||{};
     return JSON.stringify({
@@ -37,6 +91,11 @@ window.MW = window.MW || {};
   MW.shopping={
     scaleAmount,
     signature,
+    substitutionMap,
+    getSubstitution,
+    setSubstitution,
+    clearSubstitution,
+    substitutionForIngredient,
     build(options){
       const s=MW.state.get();
       if(!s.week||!Array.isArray(s.week.meals)) throw new Error('No weekly plan is available yet.');
@@ -50,6 +109,14 @@ window.MW = window.MW || {};
       if(savingMode&&estimate.lines.some(x=>x.reasons.length>1)) savingTips.push('Shared ingredients are already consolidated');
       s.week.inventoryUsed=inventoryUsed;
       s.week.savingMode=savingMode;
+      const validSubstitutions=new Map();
+      for(const [group,rows] of Object.entries(groups||{}))for(const row of rows||[])validSubstitutions.set(group+'|'+row.name,row);
+      const savedSubstitutions=substitutionMap(s);
+      for(const key of Object.keys(savedSubstitutions)){
+        const row=validSubstitutions.get(key),sub=savedSubstitutions[key];
+        const planned=row&&String(row.inventoryAmount||row.displayAmount||'').trim();
+        if(!row||(sub.plannedAmount&&planned&&String(sub.plannedAmount).trim()!==planned))delete savedSubstitutions[key];
+      }
       s.week.shop={
         groups,
         estimatedTotal:Math.round(estimated*100)/100,

@@ -171,7 +171,6 @@ window.MW = window.MW || {};
     if(lunch.practicalLunch)return true;
     const bucket=String(lunch.lunchBucket||''),prep=String(lunch.prepStyle||''),time=Number(lunch.time)||0;
     if(prep==='no-cook'&&time>0&&time<=15&&['sandwich','wrap','other'].includes(bucket))return true;
-    if(bucket==='soup'&&time>0&&time<=40)return true;
     return false;
   }
 

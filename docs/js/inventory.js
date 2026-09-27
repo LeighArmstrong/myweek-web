@@ -136,16 +136,22 @@ window.MW = window.MW || {};
   function plannedUsage(name){
     const state=MW.state.get(),target=stockKey(name),hits=[],seen=new Set();
     if(!state.week||!target)return hits;
+    const rowMatches=row=>{
+      const original=row&&row[1];
+      if(stockKey(original)===target)return true;
+      const sub=MW.shopping&&MW.shopping.substitutionForIngredient?MW.shopping.substitutionForIngredient(original,state):null;
+      return Boolean(sub&&stockKey(sub.replacementName)===target);
+    };
     (state.week.meals||[]).forEach(meal=>{
       const recipe=MW.catalog&&MW.catalog.get?MW.catalog.get(meal.recipeId):MW.RECIPES.find(x=>x.id===meal.recipeId);
-      if(!recipe||!(recipe.ingredients||[]).some(row=>stockKey(row[1])===target))return;
+      if(!recipe||!(recipe.ingredients||[]).some(rowMatches))return;
       const key='dinner:'+recipe.id;
       if(seen.has(key))return;
       seen.add(key);
       hits.push({type:'Dinner',recipeId:recipe.id,label:recipe.title||recipe.name||'Dinner'});
     });
     const lunch=MW.LUNCHES.find(x=>x.id===state.week.lunchId);
-    if(lunch&&(state.plan.lunchDays||[]).length&&(lunch.ingredients||[]).some(row=>stockKey(row[1])===target)){
+    if(lunch&&(state.plan.lunchDays||[]).length&&(lunch.ingredients||[]).some(rowMatches)){
       const key='lunch:'+lunch.id;
       if(!seen.has(key)){seen.add(key);hits.push({type:'Lunch',recipeId:lunch.id,label:lunch.title||lunch.name||'Lunch'});}
     }
@@ -179,9 +185,21 @@ window.MW = window.MW || {};
   function consumeRecipe(recipe,people){
     if(!recipe)return;
     const factor=recipe.scaleSafe===false?1:(Number(people)||2)/(recipe.servings||2);
-    const rows=MW.pricing&&MW.pricing.rowsForRecipe?MW.pricing.rowsForRecipe(recipe):recipe.ingredients||[];
-    const uses=rows.map(([q,n])=>({name:n,amountText:recipe.scaleSafe===false?String(q):(MW.shopping?MW.shopping.scaleAmount(q,factor):String(q))}));
-    commitUse(uses);MW.state.log('recipe_inventory_consumed',{recipeId:recipe.id,count:uses.length});
+    const rows=MW.pricing&&MW.pricing.rowsForRecipe?MW.pricing.rowsForRecipe(recipe):recipe.ingredients||[],uses=[],substitutionUncertain=[];
+    for(const [q,n] of rows){
+      const plannedAmount=recipe.scaleSafe===false?String(q):(MW.shopping?MW.shopping.scaleAmount(q,factor):String(q));
+      const sub=MW.shopping&&MW.shopping.substitutionForIngredient?MW.shopping.substitutionForIngredient(n):null;
+      if(!sub){uses.push({name:n,amountText:plannedAmount});continue;}
+      const planned=parseAmount(plannedAmount),replacement=parseAmount(sub.replacementAmount);
+      const converted=planned&&replacement?valueInUnit(planned,replacement.unit,sub.replacementName):null;
+      if(!planned||!replacement||sub.comparable===false||!Number.isFinite(converted)){
+        substitutionUncertain.push({original:n,replacement:sub.replacementName,plannedAmount,replacementAmount:sub.replacementAmount});
+        continue;
+      }
+      uses.push({name:sub.replacementName,amountText:formatAmount({value:converted,unit:replacement.unit}),substitutedFor:n});
+    }
+    const uncertain=commitUse(uses);
+    MW.state.log('recipe_inventory_consumed',{recipeId:recipe.id,count:uses.length,uncertain,substitutionUncertain});
   }
 
   MW.inventory={applyUse,stockKey,find,covers,set,setQuantity,remove,questions,commitUse,consumeRecipe,addPurchase,markUndelivered,isPlannedIngredient,plannedUsage,plannedNames,parseAmount,formatAmount,partsForEdit,valueInUnit};
