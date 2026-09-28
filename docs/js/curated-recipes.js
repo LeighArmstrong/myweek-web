@@ -2,7 +2,7 @@ window.MW = window.MW || {};
 (function(){
   const P=id=>MW.images.pexels(id);
   const pexels=(id,url)=>({image:P(id),imageSource:url,imageLicense:'Pexels License'});
-  const original={recipeSource:'My Week original',recipeProvenance:'Curated locally for the My Week prototype'};
+  const original={recipeSource:'My Week original',recipeProvenance:'Curated locally for My Week'};
 
   MW.CURATED_RECIPES=[
     {
@@ -90,7 +90,7 @@ window.MW = window.MW || {};
   });
   MW.RECIPES.forEach(r=>{
     if(!r.recipeSource) r.recipeSource='My Week original';
-    if(!r.recipeProvenance) r.recipeProvenance='Curated locally for the My Week prototype';
+    if(!r.recipeProvenance) r.recipeProvenance='Curated locally for My Week';
     if(!r.imageLicense && /^https:\/\/www\.pexels\.com\//.test(String(r.imageSource||''))) r.imageLicense='Pexels License';
   });
 })();

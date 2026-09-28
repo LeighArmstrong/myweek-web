@@ -101,7 +101,7 @@ window.MW = window.MW || {};
   function allergens(){
     return '<section class="onboard-heading"><span>4 · ALLERGIES & RESTRICTIONS</span><h1>Any allergies we should be aware of?</h1><p>Select every allergen that should be excluded from recipe suggestions, or continue with none.</p></section><section class="onboard-card">'+
       chipRow('obAllergens',MW.food.allergens,draft.allergens,true)+
-      '<div class="onboard-safety">'+icon('triangle-exclamation')+'<p>Recipes without verified allergen records are excluded. This catalogue does not yet have those records, so selecting an allergy will leave no recipe suggestions. This prototype is not an allergy safety tool.</p></div>'+
+      '<div class="onboard-safety">'+icon('triangle-exclamation')+'<p>Recipes without verified allergen records are excluded. This catalogue does not yet have those records, so selecting an allergy will leave no recipe suggestions. Always check ingredient and product labels yourself; My Week is not a substitute for medical or product-label advice.</p></div>'+
       '</section>'+nextButton();
   }
 

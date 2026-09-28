@@ -175,6 +175,25 @@ window.MW = window.MW || {};
     window.open(fallback,'_blank','noopener,noreferrer');
   }
   function closeIngredientActions(){const el=document.getElementById('ingredientActionSheet');if(el)el.remove();}
+  function confirmAction(options={}){
+    return new Promise(resolve=>{
+      const previous=document.getElementById('confirmActionSheet');if(previous)previous.remove();
+      const backdrop=document.createElement('div');
+      backdrop.id='confirmActionSheet';backdrop.className='ingredient-action-backdrop';
+      const title=String(options.title||'Are you sure?'),message=String(options.message||''),confirmLabel=String(options.confirmLabel||'Continue'),cancelLabel=String(options.cancelLabel||'Cancel'),eyebrow=String(options.eyebrow||'PLEASE CHECK');
+      backdrop.innerHTML='<section class="ingredient-action-sheet" role="alertdialog" aria-modal="true" aria-labelledby="confirmActionTitle" aria-describedby="confirmActionMessage"><div class="ingredient-action-handle"></div><div class="ingredient-action-head"><div><span class="eyebrow">'+esc(eyebrow)+'</span><h2 id="confirmActionTitle">'+esc(title)+'</h2></div><button type="button" class="ingredient-action-close" aria-label="Close">'+icon('xmark')+'</button></div><p id="confirmActionMessage" class="operation-error">'+esc(message)+'</p><div class="shop-swap-actions"><button type="button" class="btn secondary" id="confirmActionCancel">'+esc(cancelLabel)+'</button><button type="button" class="btn '+(options.danger?'danger':'primary')+'" id="confirmActionConfirm">'+esc(confirmLabel)+'</button></div></section>';
+      let settled=false;
+      const finish=value=>{if(settled)return;settled=true;document.removeEventListener('keydown',onKey);backdrop.remove();resolve(Boolean(value));};
+      const onKey=e=>{if(e.key==='Escape')finish(false);};
+      backdrop.addEventListener('click',e=>{if(e.target===backdrop)finish(false);});
+      backdrop.querySelector('.ingredient-action-close').onclick=()=>finish(false);
+      backdrop.querySelector('#confirmActionCancel').onclick=()=>finish(false);
+      backdrop.querySelector('#confirmActionConfirm').onclick=()=>finish(true);
+      document.addEventListener('keydown',onKey);
+      document.body.appendChild(backdrop);
+      backdrop.querySelector('#confirmActionCancel').focus();
+    });
+  }
   function showShopSubstitution(options){
     closeIngredientActions();
     const key=String(options&&options.shopKey||''),originalName=String(options&&options.name||'').trim(),plannedAmount=String(options&&options.plannedAmount||'').trim();
@@ -513,7 +532,7 @@ window.MW = window.MW || {};
     const header='<header class="appbar"><button class="account-link '+(st.onboarded?'':'static')+'" id="accountButton"><span class="account-name">'+esc(title)+'</span><span class="account-sub">'+esc(sub)+'</span></button>'+
       (st.onboarded?'<button class="settings-button" id="settingsButton" aria-label="Settings">'+icon('gear')+'</button>':'')+
     '</header>';
-    const allergyNotice=(st.foodProfile&&st.foodProfile.allergens||[]).length?'<section class="allergen-note" role="status"><span>Allergy matching is unavailable for recipes without verified allergen records. These recipes are excluded from suggestions. Do not rely on this prototype for allergy safety; check ingredient labels and cross-contamination advice.</span></section>':'';
+    const allergyNotice=(st.foodProfile&&st.foodProfile.allergens||[]).length?'<section class="allergen-note" role="status"><span>Allergy matching is unavailable for recipes without verified allergen records. These recipes are excluded from suggestions. Do not rely on My Week alone for allergy safety; always check ingredient labels and cross-contamination advice.</span></section>':'';
     return '<main class="shell">'+header+allergyNotice+body+nav+'</main>';
   }
 
@@ -755,9 +774,16 @@ window.MW = window.MW || {};
         const intro=root.querySelector('.home-intro');if(!intro)return;
         const notice=document.createElement('button');
         notice.id='homeUpdateNotice';notice.className='delivery-notice';
-        notice.innerHTML=icon('cloud-arrow-down')+'<span><strong>My Week '+esc(result.manifest.versionName)+' is available</strong><small>Update without losing this week, your cupboard or preferences.</small></span><i class="fa-solid fa-chevron-right"></i>';
+        const installed=String(result.local&&result.local.version||'unknown');
+        notice.innerHTML=icon('cloud-arrow-down')+'<span><strong>Update available: '+esc(result.manifest.versionName)+'</strong><small>Installed '+esc(installed)+' · tap to download and verify.</small></span><i class="fa-solid fa-chevron-right"></i>';
         intro.insertAdjacentElement('afterend',notice);
-        notice.onclick=e=>withLoading(e.currentTarget,async()=>{await MW.updates.install(result.manifest);});
+        notice.onclick=e=>withLoading(e.currentTarget,async()=>{
+          const installResult=await MW.updates.install(result.manifest);
+          const copy=notice.querySelector('span');
+          if(installResult&&installResult.needsInstallPermission)copy.innerHTML='<strong>Install permission needed</strong><small>Allow My Week to install verified updates, then tap again.</small>';
+          else if(installResult&&installResult.installerOpened)copy.innerHTML='<strong>Android installer opened</strong><small>Finish the installation in Android. My Week will confirm the installed version next time it opens.</small>';
+          return installResult;
+        });
       }).catch(()=>{});
     }
   }
@@ -1348,7 +1374,7 @@ window.MW = window.MW || {};
       '<section class="settings-section"><label>First name</label><input id="profileName" value="'+esc((st.profile&&st.profile.name)||'')+'" placeholder="Your name"></section>'+
       '<section class="settings-section"><label>Supermarket</label><span class="select-control settings-select-control"><select id="retailer">'+MW.RETAILERS.map(x=>'<option '+(x===st.household.retailer?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select>'+icon('chevron-down')+'</span></section>'+
       '<section class="settings-section"><label>Weekly food budget</label><div class="prefix-input"><span>£</span><input id="budget" type="number" inputmode="decimal" min="0" step="1" value="'+st.household.budget+'"></div></section>'+
-      '<section class="settings-section food-settings"><label>Eating style</label>'+foodChoice('settingsDiet',MW.food.patterns,foodProfile().diet)+'<label class="sub-label">Meal priorities</label>'+multiFoodChoice('settingsGoals',MW.food.goals,foodProfile().goals)+'<label class="sub-label">Lunch styles you like</label>'+multiFoodChoice('settingsLunchStyles',MW.food.lunchStyles,MW.food.lunchPreferences?MW.food.lunchPreferences(foodProfile()):[foodProfile().lunchStyle||'any'])+'<small class="setting-help">Choose one or more. My Week still picks one lunch recipe for the week by default.</small><label class="sub-label">Foods you do not want</label><div class="food-autocomplete-host"><input id="avoidFoods" value="'+esc(avoidValue)+'" placeholder="Start typing a food"></div><small class="setting-help">Type a food and choose the recognised match. Add commas for more than one food.</small><span class="avoid-feedback" id="settingsAvoidFeedback"></span><details class="allergen-details compact"><summary><span><strong>Allergens</strong><small>'+((foodProfile().allergens||[]).length?foodProfile().allergens.length+' selected':'None selected')+'</small></span>'+icon('chevron-down')+'</summary>'+multiFoodChoice('settingsAllergens',MW.food.allergens,foodProfile().allergens)+'<p class="allergen-warning">Recipes without verified allergen records are excluded. This prototype is not an allergy safety tool.</p></details></section>'+
+      '<section class="settings-section food-settings"><label>Eating style</label>'+foodChoice('settingsDiet',MW.food.patterns,foodProfile().diet)+'<label class="sub-label">Meal priorities</label>'+multiFoodChoice('settingsGoals',MW.food.goals,foodProfile().goals)+'<label class="sub-label">Lunch styles you like</label>'+multiFoodChoice('settingsLunchStyles',MW.food.lunchStyles,MW.food.lunchPreferences?MW.food.lunchPreferences(foodProfile()):[foodProfile().lunchStyle||'any'])+'<small class="setting-help">Choose one or more. My Week still picks one lunch recipe for the week by default.</small><label class="sub-label">Foods you do not want</label><div class="food-autocomplete-host"><input id="avoidFoods" value="'+esc(avoidValue)+'" placeholder="Start typing a food"></div><small class="setting-help">Type a food and choose the recognised match. Add commas for more than one food.</small><span class="avoid-feedback" id="settingsAvoidFeedback"></span><details class="allergen-details compact"><summary><span><strong>Allergens</strong><small>'+((foodProfile().allergens||[]).length?foodProfile().allergens.length+' selected':'None selected')+'</small></span>'+icon('chevron-down')+'</summary>'+multiFoodChoice('settingsAllergens',MW.food.allergens,foodProfile().allergens)+'<p class="allergen-warning">Recipes without verified allergen records are excluded. Always check ingredient and product labels for your own allergies.</p></details></section>'+
       '<section class="settings-section equipment-settings"><div class="setting-title"><div><label>Kitchen equipment</label><small>Standard oven, hob, pans and utensils are assumed. Select specialist appliances you can use.</small></div></div><div class="equipment-grid" id="settingsEquipment">'+MW.equipment.items.map(x=>'<button type="button" data-v="'+x.id+'" class="'+((st.household.equipment||[]).includes(x.id)?'active':'')+'">'+icon(x.icon||'utensils')+'<span>'+esc(x.label)+'</span></button>').join('')+'</div></section>'+
       '<section class="settings-section"><div class="setting-title"><div><label>Dinner days</label><small>Choose the days you want dinner planned.</small></div></div>'+dayToggles('dinnerDays',st.plan.dinnerDays)+'</section>'+
       '<section class="settings-section"><div class="setting-title"><div><label>Lunch days</label><small>Your lunch recipe scales automatically to these days.</small></div></div>'+dayToggles('lunchDays',st.plan.lunchDays)+'<label class="sub-label">People eating the planned lunch</label>'+selectionButtons('lunchPeople',[1,2,3,4].map(v=>({v,label:String(v)})),st.plan.lunchPeople,'numeric-choice-row')+'</section>'+
@@ -1357,7 +1383,7 @@ window.MW = window.MW || {};
       (MW.updates?'<section class="settings-section app-update-section" id="appUpdatePanel"><button class="settings-link" id="checkUpdates">'+icon('cloud-arrow-down')+'<span><strong>App updates</strong><small id="updateStatus">'+(MW.updates.isNativeAndroid()?'Checking installed version…':'Web app updates automatically')+'</small></span><i class="fa-solid fa-chevron-right"></i></button><div class="update-release" id="updateRelease" hidden></div></section>':'')+
       '<section class="settings-section"><div class="switch-row"><span><strong>Lower-cost planning</strong><small>Cheaper meals and more ingredient overlap.</small></span><label class="toggle"><input id="priceMode" type="checkbox" '+(st.plan.priceMode?'checked':'')+'><span></span></label></div></section>'+
       '<div class="plan-actions single-action"><button class="btn primary" id="save">Save & rebuild week</button></div>'+ 
-      '<button class="danger-link" id="reset">Reset prototype</button>' ,
+      '<button class="danger-link" id="reset">Reset My Week</button>' ,
       'more'
     );
 
@@ -1401,8 +1427,11 @@ window.MW = window.MW || {};
     const renderUpdate=async manual=>{
       if(!updateButton||!MW.updates)return;
       updateButton.disabled=true;
-      if(updateStatus)updateStatus.textContent='Checking for updates…';
+      let justInstalled='';
+      if(updateStatus)updateStatus.textContent='Checking installed and available versions…';
       try{
+        const pending=MW.updates.pendingStatus?await MW.updates.pendingStatus():null;
+        if(pending&&pending.installed)justInstalled=String(pending.pending&&pending.pending.versionName||pending.local&&pending.local.version||'');
         const result=await MW.updates.check({manual:Boolean(manual)});
         const local=result.local||await MW.updates.appInfo();
         if(result.reason==='web'){
@@ -1410,27 +1439,38 @@ window.MW = window.MW || {};
           if(updateRelease){updateRelease.hidden=true;updateRelease.innerHTML='';}
           return;
         }
+        const installed=String(local.version||'unknown');
         if(!result.available){
-          if(updateStatus)updateStatus.textContent='My Week '+esc(local.version||'')+' is up to date';
+          if(updateStatus)updateStatus.textContent=justInstalled?'Updated successfully · Installed '+installed:'Installed '+installed+' · Up to date';
           if(updateRelease){updateRelease.hidden=true;updateRelease.innerHTML='';}
           return;
         }
         const release=result.manifest||{};
-        if(updateStatus)updateStatus.textContent='My Week '+release.versionName+' is available';
+        if(updateStatus)updateStatus.textContent='Installed '+installed+' · '+String(release.versionName||'New version')+' available';
         if(updateRelease){
           const notes=Array.isArray(release.releaseNotes)?release.releaseNotes:[];
-          updateRelease.innerHTML='<div class="update-release-copy"><span class="eyebrow">UPDATE AVAILABLE</span><strong>'+esc(release.versionName)+'</strong>'+(notes.length?'<ul>'+notes.slice(0,5).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')+'<small>Your week, cupboard and preferences stay on this device during a normal update.</small></div><button class="btn primary" id="installUpdate">Update My Week</button>';
+          updateRelease.innerHTML='<div class="update-release-copy"><span class="eyebrow">UPDATE AVAILABLE</span><strong>'+esc(release.versionName)+'</strong>'+(notes.length?'<ul>'+notes.slice(0,5).map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'')+'<small>Installed: '+esc(installed)+'. Your week, cupboard and preferences stay on this device during a normal update.</small></div><button class="btn primary" id="installUpdate">Update My Week</button>';
           updateRelease.hidden=false;
           document.getElementById('installUpdate').onclick=async e=>{
             const button=e.currentTarget,original=button.textContent;
-            const onProgress=event=>{const pct=Math.max(0,Math.min(100,Number(event&&event.detail&&event.detail.percent)||0));button.textContent=pct?'Downloading '+pct+'%':'Preparing update…';};
+            const onProgress=event=>{
+              const pct=Math.max(0,Math.min(100,Number(event&&event.detail&&event.detail.percent)||0));
+              button.textContent=pct?'Downloading '+pct+'%':'Preparing update…';
+              if(updateStatus)updateStatus.textContent=pct?'Downloading verified update · '+pct+'%':'Preparing verified update…';
+            };
             button.disabled=true;window.addEventListener('mw:update-progress',onProgress);
             try{
-              const result=await MW.updates.install(release);
-              if(result&&result.needsInstallPermission){
+              const installResult=await MW.updates.install(release);
+              if(installResult&&installResult.needsInstallPermission){
                 if(updateStatus)updateStatus.textContent='Allow My Week to install verified updates, then tap Update again';
                 button.textContent='Update My Week';
-              }else button.textContent='Opening installer…';
+              }else if(installResult&&installResult.installerOpened){
+                if(updateStatus)updateStatus.textContent='Download verified · Android installer opened';
+                button.textContent='Installer opened';
+              }else{
+                if(updateStatus)updateStatus.textContent='Verified update ready for Android';
+                button.textContent='Continue update';
+              }
             }catch(error){
               button.textContent=original;
               if(updateStatus)updateStatus.textContent='Update could not be installed';
@@ -1475,7 +1515,19 @@ window.MW = window.MW || {};
       MW.planner.buildWeek({preserveExtras:true});
       go('week');
     };
-    document.getElementById('reset').onclick=()=>{if(confirm('Reset all My Week data on this phone?')){MW.state.reset();if(MW.onboarding)MW.onboarding.reset();render();}};
+    document.getElementById('reset').onclick=async()=>{
+      const confirmed=await confirmAction({
+        eyebrow:'RESET MY WEEK',
+        title:'Erase My Week data on this device?',
+        message:'This permanently erases your current week, cupboard, shopping progress, preferences and history. This cannot be undone. Export a transfer first if you want a backup.',
+        confirmLabel:'Reset My Week',
+        danger:true
+      });
+      if(!confirmed)return;
+      MW.state.reset();
+      if(MW.onboarding)MW.onboarding.reset();
+      render();
+    };
     bindNav();
   }
 
@@ -1483,17 +1535,37 @@ window.MW = window.MW || {};
     const st=s();let pending=null;
     const summary=packet=>{const x=packet&&packet.state||{};const inv=Object.keys(x.inventory||{}).length,week=x.week&&x.week.weekKey||'No current week';return '<div class="sync-preview-card"><span class="eyebrow">TRANSFER FOUND</span><strong>'+esc((x.profile&&x.profile.name)||'My Week')+'</strong><small>'+esc(week)+' · '+inv+' cupboard item'+(inv===1?'':'s')+' · exported '+esc(packet.exportedAt||'')+'</small></div>';};
     root.innerHTML=shell(
-      '<section class="subpage-head"><button class="back-button" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow">YOUR DATA</span><h1>Device sync & transfer</h1><p>Move your complete My Week state directly between devices. No My Week account or online storage is used. This is a manual snapshot transfer, so create a new transfer whenever you want another device brought up to date.</p></div></section>'+
-      '<section class="sync-explainer">'+icon('shield-halved')+'<div><strong>Serverless by design</strong><small>A short six-digit code would need a server to look up your data. My Week instead creates a self-contained transfer code or file that carries the data itself.</small></div></section>'+
-      '<section class="settings-section sync-section"><span class="eyebrow">SEND FROM THIS DEVICE</span><h2>Create a transfer</h2><p>The transfer includes your week, shopping progress, saved delivery quantities, cupboard, preferences and history. Receipt images are only a temporary local reference while checking a shop and are not included.</p><div class="sync-actions"><button class="btn secondary" id="createSyncCode">Create transfer code</button><button class="btn primary" id="shareSyncFile">Share transfer file</button></div><div id="syncCodeArea"></div></section>'+
-      '<section class="settings-section sync-section"><span class="eyebrow">RECEIVE ON THIS DEVICE</span><h2>Import a transfer</h2><p>Nothing is replaced until you review the transfer and confirm.</p><textarea id="syncImportCode" rows="5" placeholder="Paste a My Week transfer code"></textarea><div class="sync-actions"><button class="btn secondary" id="readSyncCode">Check code</button><label class="btn secondary sync-file-picker"><span>Choose .myweek file</span><input id="syncFile" type="file" accept=".myweek,application/json,text/plain"></label></div><div id="syncImportPreview"></div></section>',
+      '<section class="subpage-head"><button class="back-button" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow">YOUR DATA</span><h1>Device sync & transfer</h1><p>Move your complete My Week state directly between devices. Use either a transfer file or a transfer code; you do not need both. No My Week account or online storage is used.</p></div></section>'+
+      '<section class="sync-explainer">'+icon('shield-halved')+'<div><strong>Two ways to transfer</strong><small>The .myweek file and transfer code contain the same snapshot. Choose whichever is easier for the devices you are moving between.</small></div></section>'+
+      '<section class="settings-section sync-section"><span class="eyebrow">SEND FROM THIS DEVICE</span><h2>Create a transfer</h2><p>The transfer includes your week, shopping progress, saved delivery quantities, cupboard, preferences and history. Receipt images are only a temporary local reference while checking a shop and are not included.</p><div class="sync-actions"><button class="btn primary" id="shareSyncFile">Share transfer file</button><button class="btn secondary" id="createSyncCode">Create transfer code</button></div><div id="syncCodeArea"></div></section>'+
+      '<section class="settings-section sync-section"><span class="eyebrow">RECEIVE ON THIS DEVICE</span><h2>Import a transfer</h2><p>Choose a .myweek file or paste a transfer code. You only need one method. Nothing is replaced until you review the transfer and confirm.</p><textarea id="syncImportCode" rows="5" placeholder="Paste a My Week transfer code"></textarea><div class="sync-actions"><button class="btn secondary" id="readSyncCode">Check transfer code</button><label class="btn secondary sync-file-picker"><span>Choose .myweek file</span><input id="syncFile" type="file" accept=".myweek,application/json,text/plain"></label></div><div id="syncImportPreview"></div></section>',
       'more'
     );
     const preview=document.getElementById('syncImportPreview');
-    const showPending=packet=>{pending=packet;preview.innerHTML=summary(packet)+'<button class="btn primary" id="applySyncTransfer">Replace this device with this transfer</button>';document.getElementById('applySyncTransfer').onclick=()=>{if(!confirm('Replace all My Week data on this device with this transfer? The current device state will be overwritten.'))return;MW.syncTransfer.apply(pending);render();};};
+    const showPending=packet=>{
+      pending=packet;
+      preview.innerHTML=summary(packet)+'<p class="setting-help">This transfer is ready to import. Your current data will not change until you confirm below.</p><button class="btn primary" id="applySyncTransfer">Replace this device with this transfer</button>';
+      document.getElementById('applySyncTransfer').onclick=async()=>{
+        const confirmed=await confirmAction({
+          eyebrow:'REPLACE DEVICE DATA',
+          title:'Replace the My Week data on this device?',
+          message:'Your current week, cupboard, shopping progress, preferences and history will be overwritten by the transfer you just checked.',
+          confirmLabel:'Replace this device',
+          danger:true
+        });
+        if(!confirmed)return;
+        try{
+          MW.syncTransfer.apply(pending);
+          pending=null;
+          preview.innerHTML='<div class="sync-preview-card"><span class="eyebrow">IMPORT COMPLETE</span><strong>My Week data replaced successfully</strong><small>The transferred week, cupboard, preferences and history are now active on this device.</small></div>';
+        }catch(error){
+          preview.innerHTML='<p class="operation-error" role="alert">'+esc(error&&error.message||'This transfer could not be applied.')+'</p>';
+        }
+      };
+    };
     document.getElementById('createSyncCode').onclick=e=>withLoading(e.currentTarget,async()=>{const code=await MW.syncTransfer.createCode(),area=document.getElementById('syncCodeArea');area.innerHTML='<div class="sync-code-card"><div><strong>Transfer code</strong><small>'+code.length.toLocaleString()+' characters · self-contained</small></div><textarea id="syncCode" rows="5" readonly>'+esc(code)+'</textarea><button class="btn secondary" id="copySyncCode">Copy code</button></div>';document.getElementById('copySyncCode').onclick=async()=>{const box=document.getElementById('syncCode');try{await navigator.clipboard.writeText(box.value);}catch{box.select();document.execCommand('copy');}document.getElementById('copySyncCode').textContent='Copied';};});
     document.getElementById('shareSyncFile').onclick=e=>withLoading(e.currentTarget,async()=>{await MW.syncTransfer.shareFile();});
-    document.getElementById('readSyncCode').onclick=e=>withLoading(e.currentTarget,async()=>{const value=document.getElementById('syncImportCode').value.trim();if(!value)throw new Error('Paste a My Week transfer code first.');showPending(await MW.syncTransfer.readCode(value));});
+    document.getElementById('readSyncCode').onclick=e=>withLoading(e.currentTarget,async()=>{const value=document.getElementById('syncImportCode').value.trim();pending=null;if(!value){preview.innerHTML='<p class="operation-error" role="alert">Paste a My Week transfer code first.</p>';return;}preview.innerHTML='<p class="setting-help" role="status">Checking transfer code…</p>';try{showPending(await MW.syncTransfer.readCode(value));}catch(error){preview.innerHTML='<p class="operation-error" role="alert">'+esc(error&&error.message||'This transfer code could not be read.')+'</p>';}});
     document.getElementById('syncFile').onchange=async e=>{const file=e.target.files&&e.target.files[0];if(!file)return;try{showPending(await MW.syncTransfer.readFile(file));}catch(error){preview.innerHTML='<p class="operation-error" role="alert">'+esc(error.message||'This transfer file could not be read.')+'</p>';}};
     document.getElementById('back').onclick=()=>go('settings');bindNav();
   }

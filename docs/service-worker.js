@@ -1,4 +1,5 @@
-const CACHE='myweek-shell-v3';
+const CACHE_PREFIX='myweek-shell-v';
+const CACHE=CACHE_PREFIX+'35018';
 const FIXED_SHELL=[
   './manifest.webmanifest',
   './assets/brand/icon-192.png',
@@ -40,7 +41,7 @@ self.addEventListener('install',event=>{
 self.addEventListener('activate',event=>{
   event.waitUntil(
     caches.keys()
-      .then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))
+      .then(keys=>Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE).map(key=>caches.delete(key))))
       .then(()=>self.clients.claim())
   );
 });
@@ -49,13 +50,12 @@ async function networkFirst(request,fallback){
   const cache=await caches.open(CACHE);
   try{
     const response=await fetch(request);
-    if(response&&response.ok)cache.put(request,response.clone());
+    if(response&&response.ok)await cache.put(request,response.clone());
     return response;
   }catch(error){
     return (await cache.match(request))||(fallback?await cache.match(fallback):undefined)||Promise.reject(error);
   }
 }
-
 self.addEventListener('fetch',event=>{
   const request=event.request;
   if(request.method!=='GET')return;
@@ -74,14 +74,17 @@ self.addEventListener('fetch',event=>{
     return;
   }
 
-  event.respondWith(caches.match(request).then(cached=>{
-    if(cached)return cached;
-    return fetch(request).then(response=>{
-      if(response&&response.ok){
-        const copy=response.clone();
-        caches.open(CACHE).then(cache=>cache.put(request,copy));
-      }
-      return response;
-    });
-  }));
+  event.respondWith(
+    caches.open(CACHE).then(async cache=>{
+      const cached=await cache.match(request);
+      if(cached)return cached;
+      return fetch(request).then(response=>{
+        if(response&&response.ok){
+          const copy=response.clone();
+          event.waitUntil(cache.put(request,copy));
+        }
+        return response;
+      });
+    })
+  );
 });

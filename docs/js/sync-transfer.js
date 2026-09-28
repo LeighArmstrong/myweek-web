@@ -2,6 +2,7 @@ window.MW=window.MW||{};
 (function(){
   'use strict';
   const FORMAT='myweek-transfer-v2',LEGACY_FORMAT='myweek-transfer-v1';
+  const MAX_CODE_CHARS=5*1024*1024,MAX_TRANSFER_BYTES=10*1024*1024;
   const enc=new TextEncoder(),dec=new TextDecoder();
   const clone=x=>JSON.parse(JSON.stringify(x));
   function checksum(text){
@@ -40,9 +41,9 @@ window.MW=window.MW||{};
     return gz?'MWG1.'+toB64(gz):'MWJ1.'+toB64(bytes);
   }
   async function readCode(code){
-    code=String(code||'').trim();const i=code.indexOf('.');if(i<0)throw new Error('Transfer code is incomplete.');
+    code=String(code||'').trim();if(code.length>MAX_CODE_CHARS)throw new Error('This transfer code is too large to import safely.');const i=code.indexOf('.');if(i<0)throw new Error('Transfer code is incomplete.');
     const prefix=code.slice(0,i),payload=fromB64(code.slice(i+1));
-    const bytes=prefix==='MWG1'?await decompress(payload):prefix==='MWJ1'?payload:null;if(!bytes)throw new Error('Unsupported My Week transfer code.');
+    const bytes=prefix==='MWG1'?await decompress(payload):prefix==='MWJ1'?payload:null;if(!bytes)throw new Error('Unsupported My Week transfer code.');if(bytes.length>MAX_TRANSFER_BYTES)throw new Error('This transfer expands beyond the safe import limit.');
     return validate(JSON.parse(dec.decode(bytes)));
   }
   function createFile(){
@@ -50,10 +51,28 @@ window.MW=window.MW||{};
     return new File([JSON.stringify(packet,null,2)],'my-week-'+stamp+'.myweek',{type:'application/json'});
   }
   async function readFile(file){
+    if(file&&Number(file.size)>MAX_TRANSFER_BYTES)throw new Error('This transfer file is too large to import safely.');
     const text=await file.text();
     try{const parsed=JSON.parse(text);if(parsed&&parsed.schema===1)return wrapper(parsed);return validate(parsed);}catch(e){return readCode(text);}
   }
-  function apply(packet){packet=validate(packet);const result=MW.state.replace(packet.state);if(MW.onlineRecipes&&MW.onlineRecipes.replaceData)MW.onlineRecipes.replaceData(packet.localRecipes||{recipes:[],syncedAt:null});return result;}
+  function apply(packet){
+    packet=validate(packet);
+    const previousState=clone(MW.state.get());
+    const previousRecipes=MW.onlineRecipes&&MW.onlineRecipes.exportData?MW.onlineRecipes.exportData():null;
+    let stateApplied=false;
+    try{
+      const result=MW.state.replace(packet.state);
+      stateApplied=true;
+      if(MW.onlineRecipes&&MW.onlineRecipes.replaceData)MW.onlineRecipes.replaceData(packet.localRecipes||{recipes:[],syncedAt:null});
+      return result;
+    }catch(error){
+      let restored=true;
+      if(stateApplied){try{MW.state.replace(previousState);}catch{restored=false;}}
+      if(previousRecipes&&MW.onlineRecipes&&MW.onlineRecipes.replaceData){try{MW.onlineRecipes.replaceData(previousRecipes);}catch{restored=false;}}
+      if(!restored)throw new Error('The transfer could not be completed and automatic recovery also failed. Do not make further changes until recovery is checked.');
+      throw new Error('The transfer could not be completed. Your previous data was restored.');
+    }
+  }
   async function shareFile(){
     const file=createFile(),plugins=window.Capacitor&&window.Capacitor.Plugins||{},fs=plugins.Filesystem,share=plugins.Share;
     if(fs&&share&&typeof fs.writeFile==='function'&&typeof share.share==='function'){

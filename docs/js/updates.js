@@ -4,6 +4,7 @@ window.MW=window.MW||{};
   const MANIFEST_URL='https://raw.githubusercontent.com/LeighArmstrong/myweek-updates/main/latest.json';
   const CACHE_KEY='myweek_update_check_v2';
   const CHECK_INTERVAL=12*60*60*1000;
+  const PENDING_KEY='myweek_update_pending_v1';
   let progressBound=false;
 
   function isNativeAndroid(){
@@ -55,22 +56,39 @@ window.MW=window.MW||{};
   async function check(options={}){
     if(!isNativeAndroid())return {supported:false,reason:'web',local:await appInfo(),automatic:true};
     const now=Date.now(),manual=Boolean(options.manual);
+    const local=await appInfo();
     if(!manual){
       try{
         const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
-        if(cached&&now-Number(cached.checkedAt||0)<CHECK_INTERVAL&&cached.result)return cached.result;
+        if(cached&&now-Number(cached.checkedAt||0)<CHECK_INTERVAL&&validManifest(cached.manifest)){
+          const manifest=cached.manifest;
+          return {supported:true,available:newer(manifest,local),manifest,local,checkedAt:Number(cached.checkedAt||now),cached:true};
+        }
       }catch{}
-    }    const local=await appInfo();
+    }
     try{
       const manifest=await fetchManifest();
       const result={supported:true,available:newer(manifest,local),manifest,local,checkedAt:now};
-      try{localStorage.setItem(CACHE_KEY,JSON.stringify({checkedAt:now,result}));}catch{}
+      try{localStorage.setItem(CACHE_KEY,JSON.stringify({checkedAt:now,manifest}));}catch{}
       return result;
     }catch(error){
       const result={supported:true,available:false,error:String(error&&error.message||error),local,checkedAt:now};
       if(manual)throw error;
       return result;
     }
+  }
+
+  async function pendingStatus(){
+    if(!isNativeAndroid())return null;
+    let pending=null;
+    try{pending=JSON.parse(localStorage.getItem(PENDING_KEY)||'null');}catch{}
+    if(!pending||!Number.isFinite(Number(pending.versionCode)))return null;
+    const local=await appInfo();
+    const installed=Number(local.build)>=Number(pending.versionCode);
+    if(installed){
+      try{localStorage.removeItem(PENDING_KEY);localStorage.removeItem(CACHE_KEY);}catch{}
+    }
+    return {pending,local,installed};
   }
 
   async function bindProgress(){
@@ -90,9 +108,22 @@ window.MW=window.MW||{};
     if(!isNativeAndroid())throw new Error('The web app updates itself automatically.');
     const updater=nativeUpdater();
     if(!updater||typeof updater.installUpdate!=='function')throw new Error('This My Week build cannot install updates safely yet.');
+    try{
+      localStorage.setItem(PENDING_KEY,JSON.stringify({
+        versionCode:Number(manifest.versionCode),
+        versionName:String(manifest.versionName||''),
+        requestedAt:new Date().toISOString()
+      }));
+      localStorage.removeItem(CACHE_KEY);
+    }catch{}
     await bindProgress();
-    return updater.installUpdate({url:manifest.apkUrl,sha256:String(manifest.sha256).toLowerCase()});
+    try{
+      return await updater.installUpdate({url:manifest.apkUrl,sha256:String(manifest.sha256).toLowerCase()});
+    }catch(error){
+      try{localStorage.removeItem(PENDING_KEY);}catch{}
+      throw error;
+    }
   }
 
-  MW.updates={MANIFEST_URL,isNativeAndroid,appInfo,check,install,validManifest,newer,bindProgress};
+  MW.updates={MANIFEST_URL,isNativeAndroid,appInfo,check,install,pendingStatus,validManifest,newer,bindProgress};
 })();
