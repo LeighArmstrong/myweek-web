@@ -4,11 +4,19 @@ window.MW = window.MW || {};
   const s=()=>MW.state.get();
   let animateNextPage=true;
   let pendingMotion='context';
+  let activeViewTransition=null;
   let previewRolloverFor='';
   const navStack=[];
   const reducedMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const motionClass=motion=>'motion-'+String(motion||'context').replace(/[^a-z-]/g,'');
   const clearMotionDataset=()=>{if(document.documentElement.dataset.mwMotion) delete document.documentElement.dataset.mwMotion;};
+  const finishInterruptedMotion=()=>{
+    if(activeViewTransition){try{activeViewTransition.skipTransition();}catch{} activeViewTransition=null;}
+    animateNextPage=false;
+    clearMotionDataset();
+    const page=root.firstElementChild;
+    if(page)['page-enter','motion-context','motion-drill-forward','motion-drill-back','motion-continuity-forward','motion-continuity-back','motion-flow-forward','motion-flow-back'].forEach(x=>page.classList.remove(x));
+  };
   const animatePage=(motion)=>{
     const page=root.firstElementChild;
     if(!page||reducedMotion()) return;
@@ -64,7 +72,10 @@ window.MW = window.MW || {};
     if(typeof document.startViewTransition==='function'){
       animateNextPage=false;
       const transition=document.startViewTransition(()=>fn());
-      Promise.resolve(transition.finished).catch(()=>{}).finally(clearMotionDataset);
+      activeViewTransition=transition;
+      Promise.resolve(transition.finished).catch(()=>{}).finally(()=>{
+        if(activeViewTransition===transition){activeViewTransition=null;clearMotionDataset();}
+      });
       return;
     }
     animateNextPage=true;
@@ -815,10 +826,12 @@ window.MW = window.MW || {};
           const copy=notice.querySelector('span');
           const leadingIcon=notice.querySelector('i');
           const originalIconClass=leadingIcon.className;
+          const originalIconContent=leadingIcon.innerHTML;
           notice.disabled=true;
           notice.classList.add('is-loading');
           notice.setAttribute('aria-busy','true');
-          leadingIcon.className='fa-solid fa-circle-notch mw-loading-icon';
+          leadingIcon.className='update-loading-slot';
+          leadingIcon.innerHTML='<i class="fa-solid fa-circle-notch mw-loading-icon" aria-hidden="true"></i>';
           try{
             const installResult=await MW.updates.install(result.manifest);
             if(installResult&&installResult.needsInstallPermission)copy.innerHTML='<strong>Install permission needed</strong><small>Allow My Week to install verified updates, then return to My Week. The update will continue automatically.</small>';
@@ -826,6 +839,7 @@ window.MW = window.MW || {};
           }catch(error){
             copy.innerHTML='<strong>Update could not start</strong><small>'+esc(error&&error.message||'Please try again.')+'</small>';
           }finally{
+            leadingIcon.innerHTML=originalIconContent;
             leadingIcon.className=originalIconClass;
             notice.disabled=false;
             notice.classList.remove('is-loading');
@@ -1691,9 +1705,15 @@ window.MW = window.MW || {};
     bindNav();
   }
 
-  function bindNativeBack(){const app=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;if(!app||typeof app.addListener!=='function')return;app.addListener('backButton',()=>{if(window.MyWeekAndroidBack&&window.MyWeekAndroidBack())return;if(typeof app.minimizeApp==='function')app.minimizeApp();else if(typeof app.exitApp==='function')app.exitApp();});}
+  function bindNativeBack(){
+    const app=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+    if(!app||typeof app.addListener!=='function')return;
+    app.addListener('backButton',()=>{if(window.MyWeekAndroidBack&&window.MyWeekAndroidBack())return;if(typeof app.minimizeApp==='function')app.minimizeApp();else if(typeof app.exitApp==='function')app.exitApp();});
+    app.addListener('appStateChange',state=>{if(state&&state.isActive)finishInterruptedMotion();});
+  }
   root.addEventListener('click',e=>{if(e.target.closest('#openLunch')){const id=s().week&&s().week.lunchId;if(id)go('recipe:'+id);}});
   window.addEventListener('mw:storage-error',storageRecovery);
   bindNativeBack();
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)finishInterruptedMotion();});
   render();
 })();
