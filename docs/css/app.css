@@ -635,8 +635,8 @@ html,body{background:var(--bg)}
 }
 .onboard-counts{
   display:grid;
-  grid-template-columns:repeat(var(--count-cols,7),minmax(0,1fr));
-  gap:7px;
+  grid-template-columns:repeat(var(--count-cols,7),50px);
+  gap:10px;
   width:min(100%,430px);
   align-items:center;
 }
@@ -3652,7 +3652,7 @@ body:not(.cooking-active) .lunch-swap-card .alternative-photo{width:76px;height:
   .onboard-counts.cols-5,
   .onboard-counts.cols-6,
   .onboard-counts.cols-7{
-    grid-template-columns:repeat(4,minmax(44px,1fr));
+    grid-template-columns:repeat(4,50px);
   }
   .onboard-counts button{
     min-width:44px;
@@ -3667,3 +3667,12 @@ body:not(.cooking-active) .lunch-swap-card .alternative-photo{width:76px;height:
     width:100%;
   }
 }
+
+/* Keep the home updater message in its three-column layout while loading. */
+.delivery-notice.is-loading{opacity:.78;cursor:progress}
+.delivery-notice.is-loading .mw-loading-icon{animation:mwSpin .72s linear infinite}
+@media (prefers-reduced-motion:reduce){.delivery-notice.is-loading .mw-loading-icon{animation:none}}
+
+/* All numbered choices use the same circle diameter. */
+.onboard-counts button,.numeric-choice-row button{width:50px;height:50px;min-width:50px;min-height:50px}
+.numeric-choice-row{grid-template-columns:repeat(4,50px)}

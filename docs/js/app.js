@@ -810,13 +810,28 @@ window.MW = window.MW || {};
         const installed=String(result.local&&result.local.version||'unknown');
         notice.innerHTML=icon('cloud-arrow-down')+'<span><strong>Update available: '+esc(result.manifest.versionName)+'</strong><small>Installed '+esc(installed)+' · tap to download and verify.</small></span><i class="fa-solid fa-chevron-right"></i>';
         intro.insertAdjacentElement('afterend',notice);
-        notice.onclick=e=>withLoading(e.currentTarget,async()=>{
-          const installResult=await MW.updates.install(result.manifest);
+        notice.onclick=async()=>{
+          if(notice.disabled)return;
           const copy=notice.querySelector('span');
-          if(installResult&&installResult.needsInstallPermission)copy.innerHTML='<strong>Install permission needed</strong><small>Allow My Week to install verified updates, then return to My Week. The update will continue automatically.</small>';
-          else if(installResult&&installResult.installerOpened)copy.innerHTML='<strong>Android installer opened</strong><small>Finish the installation in Android. My Week will confirm the installed version next time it opens.</small>';
-          return installResult;
-        });
+          const leadingIcon=notice.querySelector('i');
+          const originalIconClass=leadingIcon.className;
+          notice.disabled=true;
+          notice.classList.add('is-loading');
+          notice.setAttribute('aria-busy','true');
+          leadingIcon.className='fa-solid fa-circle-notch mw-loading-icon';
+          try{
+            const installResult=await MW.updates.install(result.manifest);
+            if(installResult&&installResult.needsInstallPermission)copy.innerHTML='<strong>Install permission needed</strong><small>Allow My Week to install verified updates, then return to My Week. The update will continue automatically.</small>';
+            else if(installResult&&installResult.installerOpened)copy.innerHTML='<strong>Android installer opened</strong><small>Finish the installation in Android. My Week will confirm the installed version next time it opens.</small>';
+          }catch(error){
+            copy.innerHTML='<strong>Update could not start</strong><small>'+esc(error&&error.message||'Please try again.')+'</small>';
+          }finally{
+            leadingIcon.className=originalIconClass;
+            notice.disabled=false;
+            notice.classList.remove('is-loading');
+            notice.removeAttribute('aria-busy');
+          }
+        };
       }).catch(()=>{});
     }
   }
