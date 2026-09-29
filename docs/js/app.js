@@ -22,6 +22,35 @@ window.MW = window.MW || {};
     requestAnimationFrame(()=>animatePage(pendingMotion));
   });
   pageObserver.observe(root,{childList:true});
+  window.addEventListener('mw:update-permission-resume',event=>{
+    const detail=event&&event.detail||{};
+    const status=document.getElementById('updateStatus');
+    const settingsButton=document.getElementById('installUpdate');
+    const homeNotice=document.getElementById('homeUpdateNotice');
+    const homeCopy=homeNotice&&homeNotice.querySelector('span');
+    if(detail.error){
+      if(status)status.textContent='Update could not resume automatically';
+      if(homeCopy)homeCopy.innerHTML='<strong>Update needs attention</strong><small>'+esc(detail.error)+'</small>';
+      return;
+    }
+    if(detail.waitingForPermission){
+      if(status)status.textContent='Allow My Week to install verified updates, then return here';
+      if(homeCopy)homeCopy.innerHTML='<strong>One permission needed</strong><small>Turn on Allow from this source, then return to My Week.</small>';
+      return;
+    }
+    if(detail.resumed){
+      const result=detail.result||{};
+      if(result.installerOpened){
+        if(status)status.textContent='Permission granted · verified update resumed · Android installer opened';
+        if(settingsButton)settingsButton.textContent='Installer opened';
+        if(homeCopy)homeCopy.innerHTML='<strong>Android installer opened</strong><small>Finish the update in Android. Your My Week data stays on this device.</small>';
+      }else{
+        if(status)status.textContent='Permission granted · continuing verified update';
+        if(settingsButton)settingsButton.textContent='Continuing update…';
+        if(homeCopy)homeCopy.innerHTML='<strong>Continuing update</strong><small>My Week is resuming the verified download automatically.</small>';
+      }
+    }
+  });
 
   function transitionRender(motion,fn){
     pendingMotion=motion||'context';
@@ -154,6 +183,8 @@ window.MW = window.MW || {};
   };
   const ingredientName=x=>MW.display?MW.display.ingredient(x):String(x||'');
   const displayAmount=x=>MW.display&&MW.display.amount?MW.display.amount(x):String(x||'');
+  const practicalQuantity=(recipe,ingredientIndex,factor=1,multiplier=1)=>MW.practicalQuantities&&MW.practicalQuantities.resolve?MW.practicalQuantities.resolve(recipe,ingredientIndex,factor,multiplier):null;
+  const cookingAmount=(value,approximate)=>MW.practicalQuantities&&MW.practicalQuantities.label?MW.practicalQuantities.label(value,approximate):(approximate?'About '+displayAmount(value):displayAmount(value));
   const displayEquipment=x=>MW.display&&MW.display.equipment?MW.display.equipment(x):String(x||'');
   const displayInstruction=(x,recipeContext,factor,portions)=>MW.display&&MW.display.instruction?MW.display.instruction(x,{recipe:recipeContext,factor,portions}):String(x||'');
   const inventoryUnitChoices=[['g','g'],['kg','kg'],['oz','oz'],['lb','lb'],['ml','ml'],['l','L'],['fl oz','fl oz'],['tsp','tsp'],['tbsp','tbsp'],['each','Each'],['banana','Banana'],['pack','Pack'],['tin','Tin'],['can','Can'],['bottle','Bottle'],['carton','Carton'],['jar','Jar'],['tub','Tub'],['box','Box'],['bag','Bag'],['pot','Pot'],['tray','Tray'],['roll','Roll'],['packet','Packet'],['clove','Clove'],['bunch','Bunch'],['sachet','Sachet'],['pouch','Pouch'],['nest','Nest'],['fillet','Fillet'],['wrap','Wrap'],['tortilla','Tortilla'],['rasher','Rasher'],['slice','Slice'],['ball','Ball']];
@@ -370,9 +401,11 @@ window.MW = window.MW || {};
     };
   }
   function prepIngredients(r,factor){
-    return (r.ingredients||[]).map(([q,n])=>{
-      const planned=MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,q,n,factor):(r.scaleSafe===false?q:MW.shopping.scaleAmount(q,factor));
-      return substitutedIngredient(n,planned);
+    return (r.ingredients||[]).map(([q,n],ingredientIndex)=>{
+      const practical=practicalQuantity(r,ingredientIndex,factor),planned=practical?practical.amount:(MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,q,n,factor):(r.scaleSafe===false?q:MW.shopping.scaleAmount(q,factor)));
+      const shown=substitutedIngredient(n,planned);
+      shown.practicalApproximate=!shown.substitution&&Boolean(practical&&practical.approximate);
+      return shown;
     });
   }
   function stepSubstitutionNotes(r,step,stepIndex){
@@ -676,11 +709,11 @@ window.MW = window.MW || {};
     const savingResult=st.week&&st.week.savingResult;
     const savingCopy=st.plan.priceMode&&savingResult
       ?(savingResult.changed
-        ?(savingResult.metBudget?'Estimated trolley '+money(savingResult.candidateTotal)+' · about '+money(savingResult.saved)+' lower than the previous plan.':'Best suitable lower-cost plan found is '+money(savingResult.candidateTotal)+', still '+money(savingResult.overBudgetBy)+' above your target.')
+        ?(savingResult.metBudget?'Estimated trolley '+money(savingResult.candidateTotal)+' · about '+money(savingResult.saved)+' lower than the previous plan.':'No suitable plan could be found within your '+money(budget)+' weekly budget, so My Week kept the previous meals.')
         :'No genuinely cheaper suitable plan was found, so your meals were left unchanged.')
       :'Prioritise cheaper meals, sensible own-brand swaps and more shared ingredients.';
     const budgetWarning=st.plan.priceMode&&savingResult&&savingResult.metBudget===false
-      ?'<section class="budget-over-note">'+icon('triangle-exclamation')+'<div><strong>Still '+money(savingResult.overBudgetBy)+' above your weekly target</strong><small>My Week has already prioritised lower-cost suitable meals. Reducing a planned meal, changing lunch or removing optional extras may be needed to reach '+money(budget)+'.</small></div></section>'
+      ?'<section class="budget-over-note">'+icon('triangle-exclamation')+'<div><strong>'+money(savingResult.overBudgetBy)+' above your weekly budget</strong><small>My Week will not generate a new week above '+money(budget)+'. Change this manually edited plan or regenerate it to bring the estimate back within budget.</small></div></section>'
       :'';
 
     const homeDelivery=st.week&&st.week.delivery;
@@ -729,7 +762,7 @@ window.MW = window.MW || {};
       '<section class="list-section home-dinners"><div class="section-title"><div><span class="eyebrow">DINNERS</span><h2>Dinners this week</h2></div><span>'+meals.length+' planned</span></div>'+list+'</section>'+
       regenerateAction+
       (lunchPortions&&lunch?'<section class="lunch-feature '+(!displayRecipeImage(lunch)?'no-photo':'')+'">'+recipePhoto(lunch,'lunch-photo',lunch.title)+'<div class="lunch-body"><span class="eyebrow">LUNCH PREP</span><h2>'+esc(lunch.title)+'</h2><p>'+lunchPortions+' '+(lunchPortions===1?'lunch':'lunches')+' across '+(st.plan.lunchDays||[]).length+' '+((st.plan.lunchDays||[]).length===1?'day':'days')+' for '+Math.max(1,Number(st.plan.lunchPeople)||1)+' '+(Math.max(1,Number(st.plan.lunchPeople)||1)===1?'person':'people')+'</p><button class="text-action" id="openLunch">Prepare lunch</button><button class="text-action" id="changeLunch">Change lunch</button></div></section>':'<section class="lunch-feature no-photo"><div class="lunch-body"><span class="eyebrow">LUNCH</span><h2>No lunches planned</h2><button class="text-action" id="editPlan">Add lunches</button></div></section>')+
-      '<section class="budget-progress"><div><strong>'+money(plannedCost)+'</strong><span>estimated trolley</span></div><div><strong>'+money(budget)+'</strong><span>weekly target</span></div><div class="progress"><span style="width:'+budgetPct+'%"></span></div></section>'+
+      '<section class="budget-progress"><div><strong>'+money(plannedCost)+'</strong><span>estimated trolley</span></div><div><strong>'+money(budget)+'</strong><span>weekly budget</span></div><div class="progress"><span style="width:'+budgetPct+'%"></span></div></section>'+
       budgetWarning+
       (!st.household.equipmentConfigured?'<section class="kitchen-nudge"><span>'+icon('utensils')+'</span><div><strong>Match recipes to your kitchen</strong><small>Specialist recipes stay out until you tell My Week what equipment you have.</small></div><button id="kitchenSetup">Set up</button></section>':'')+
       '<section class="home-saving-switch '+(st.plan.priceMode?'active':'')+'"><div><span class="saving-icon">'+icon('sterling-sign')+'</span><div><strong>Lower-cost planning</strong><small>'+esc(savingCopy)+'</small></div></div><label class="toggle"><input id="homeSavingToggle" type="checkbox" '+(st.plan.priceMode?'checked':'')+'><span></span></label></section>'+
@@ -780,7 +813,7 @@ window.MW = window.MW || {};
         notice.onclick=e=>withLoading(e.currentTarget,async()=>{
           const installResult=await MW.updates.install(result.manifest);
           const copy=notice.querySelector('span');
-          if(installResult&&installResult.needsInstallPermission)copy.innerHTML='<strong>Install permission needed</strong><small>Allow My Week to install verified updates, then tap again.</small>';
+          if(installResult&&installResult.needsInstallPermission)copy.innerHTML='<strong>Install permission needed</strong><small>Allow My Week to install verified updates, then return to My Week. The update will continue automatically.</small>';
           else if(installResult&&installResult.installerOpened)copy.innerHTML='<strong>Android installer opened</strong><small>Finish the installation in Android. My Week will confirm the installed version next time it opens.</small>';
           return installResult;
         });
@@ -867,7 +900,7 @@ window.MW = window.MW || {};
       '<section class="subpage-head simple"><div><span class="eyebrow">BEFORE THE SHOP</span><h1>Quick check</h1><p>Only confirm the things that can change this week.</p></div></section>'+
       (questions.length?'<section class="check-section"><div class="section-title"><div><span class="eyebrow">CUPBOARD</span><h2>Still have enough?</h2></div></div><div class="stock-questions">'+questions.map((q,i)=>'<div class="stock-question" data-name="'+esc(ingredientName(q.name))+'"><div><strong>'+esc(ingredientName(q.name))+'</strong><small>'+(q.amountText?esc(q.amountText)+' noted · ':'')+'I am not fully sure this is still in stock.</small></div><div><button class="stock-answer yes" data-i="'+i+'">Yes</button><button class="stock-answer no" data-i="'+i+'">Add it</button></div></div>').join('')+'</div></section>':'')+
       (forced.length?'<section class="forced-buy-note">'+icon('basket-shopping')+'<div><strong>Definitely add to the shop</strong><small>'+forced.map(x=>esc(ingredientName(x))).join(' · ')+'</small></div></section>':'')+
-      '<section class="check-budget"><span><strong>'+money(st.household.budget)+'</strong> weekly target</span><small>Meals + anything you add here count towards the rough estimate.</small></section>'+
+      '<section class="check-budget"><span><strong>'+money(st.household.budget)+'</strong> weekly budget</span><small>Meals, lunches and anything you add here count towards the weekly budget estimate.</small></section>'+
       '<section class="check-section"><div class="section-title"><div><span class="eyebrow">WEEKLY ESSENTIALS</span><h2>Add what you need</h2></div></div><div class="essential-list" id="regulars">'+st.regulars.map(x=>'<div class="essential-row '+(x.selected?'active':'')+'" data-id="'+x.id+'"><div class="essential-name"><strong>'+esc(ingredientName(x.name))+'</strong><small>'+(x.selected?'Added to this shop':'Not added')+'</small></div><label class="toggle"><input class="regular-toggle" data-id="'+x.id+'" type="checkbox" '+(x.selected?'checked':'')+'><span></span></label>'+(x.selected?'<div class="qty-stepper"><button class="qty-minus" data-id="'+x.id+'" aria-label="Reduce '+esc(ingredientName(x.name))+'">'+icon('minus')+'</button><strong>'+esc(regularQty(x))+'</strong><button class="qty-plus" data-id="'+x.id+'" aria-label="Increase '+esc(ingredientName(x.name))+'">'+icon('plus')+'</button></div>':'')+'</div>').join('')+'</div></section>'+
       '<section class="check-section"><div class="section-title"><div><span class="eyebrow">ANYTHING ELSE</span><h2>Add extras</h2></div></div><span class="mini-label">Popular</span><div class="quick-adds">'+MW.EXTRA_SUGGESTIONS.map((x,i)=>'<button class="quick-add" data-index="'+i+'">'+icon('plus')+' '+esc(ingredientName(x.name))+'</button>').join('')+'</div><span class="mini-label custom-label">Something else</span><div class="add-custom"><input id="extra" placeholder="e.g. coffee, shampoo, pet food"><button id="addExtra">'+icon('plus')+' Add</button></div><div class="extras-list">'+(extras.length?'<span class="mini-label added-label">Added to this shop</span>'+extras.map((x,i)=>'<div class="extra-row"><span><strong>'+esc(ingredientName(x.name))+'</strong><small>'+esc(x.category||'Extras')+'</small></span><button class="remove-extra" data-index="'+i+'" aria-label="Remove">'+icon('trash')+'</button></div>').join(''):'')+'</div></section>'+
       '<section class="saving-toggle '+(st.plan.priceMode?'active':'')+'"><div><span class="saving-icon">'+icon('sterling-sign')+'</span><div><strong>Lower-price mode</strong><small>'+(st.week.savingResult&&st.week.savingResult.changed?'About '+money(st.week.savingResult.saved)+' lower than the previous plan.':'Replans only when the corrected trolley estimate is genuinely lower.')+'</small></div></div><label class="toggle"><input id="savingToggle" type="checkbox" '+(st.plan.priceMode?'checked':'')+'><span></span></label></section>'+
@@ -1219,9 +1252,9 @@ window.MW = window.MW || {};
       ((!r.online&&r.sourcedCatalogue&&r.sourceUrl)?'<a class="photo-credit" href="'+esc(r.sourceUrl)+'" target="_blank" rel="noopener">Recipe source · '+esc(r.source||'Published recipe')+'</a>':((!r.online&&r.imageSource&&displayRecipeImage(r))?'<a class="photo-credit" href="'+esc(r.imageSource)+'" target="_blank" rel="noopener">Photo source · '+esc(r.imageLicense||'Source')+'</a>':''))+
       ((MW.equipment&&MW.equipment.requirements(r).length)?'<div class="equipment-note">'+icon('utensils')+'<span>Requires '+esc(MW.equipment.requirements(r).map(MW.equipment.label).join(', '))+'.</span></div>':'')+
       (selectedAllergens.length?'<div class="allergen-note">'+icon('triangle-exclamation')+'<span>Allergen filters use listed ingredients only. Check packets, labels and cross-contamination information.</span></div>':'')+
-      '<section class="recipe-section ingredients-section"><div class="section-title"><div><span class="eyebrow">INGREDIENTS</span><h2>What you need</h2></div></div>'+r.ingredients.map(x=>{const planned=MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,x[0],x[1],factor):(r.scaleSafe===false?x[0]:MW.shopping.scaleAmount(x[0],factor)),shown=substitutedIngredient(x[1],planned),stocked=MW.inventory&&MW.inventory.covers(shown.name,shown.amount),subNote=shown.substitution?'<small class="ingredient-substitution-note">'+icon('right-left')+' Instead of '+esc(ingredientName(shown.originalName))+' · recipe calls for '+esc(displayAmount(shown.originalAmount))+(shown.comparable?'':' · quantity comparison needs judgement')+'</small>':'';return '<div class="ingredient-row '+(stocked?'from-cupboard ':'')+(shown.substitution?'has-substitution':'')+'"><span>'+esc(ingredientName(shown.name))+(stocked?'<small>In your cupboard</small>':'')+subNote+'</span><strong>'+esc(displayAmount(shown.amount))+'</strong><button type="button" class="ingredient-more" data-ingredient="'+esc(x[1])+'" aria-label="More options for '+esc(ingredientName(x[1]))+'">'+icon('ellipsis-vertical')+'</button></div>';}).join('')+'</section>'+
+      '<section class="recipe-section ingredients-section"><div class="section-title"><div><span class="eyebrow">INGREDIENTS</span><h2>What you need</h2></div></div>'+r.ingredients.map((x,ingredientIndex)=>{const practical=practicalQuantity(r,ingredientIndex,factor),planned=practical?practical.amount:(MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,x[0],x[1],factor):(r.scaleSafe===false?x[0]:MW.shopping.scaleAmount(x[0],factor))),shown=substitutedIngredient(x[1],planned),approximate=!shown.substitution&&Boolean(practical&&practical.approximate),stocked=MW.inventory&&MW.inventory.covers(shown.name,shown.amount),subNote=shown.substitution?'<small class="ingredient-substitution-note">'+icon('right-left')+' Instead of '+esc(ingredientName(shown.originalName))+' · recipe calls for '+esc(displayAmount(shown.originalAmount))+(shown.comparable?'':' · quantity comparison needs judgement')+'</small>':'';return '<div class="ingredient-row '+(stocked?'from-cupboard ':'')+(shown.substitution?'has-substitution':'')+'"><span>'+esc(ingredientName(shown.name))+(stocked?'<small>In your cupboard</small>':'')+subNote+'</span><strong>'+esc(cookingAmount(shown.amount,approximate))+'</strong><button type="button" class="ingredient-more" data-ingredient="'+esc(x[1])+'" aria-label="More options for '+esc(ingredientName(x[1]))+'">'+icon('ellipsis-vertical')+'</button></div>';}).join('')+'</section>'+
       '<section class="recipe-section equipment-section"><div class="section-title"><div><span class="eyebrow">EQUIPMENT</span><h2>Get these ready</h2></div></div><div class="cook-equipment-list">'+toolsNeeded.map(x=>'<span>'+icon('check')+esc(x)+'</span>').join('')+'</div></section>'+
-      '<section class="recipe-section method-section"><div class="section-title"><div><span class="eyebrow">METHOD</span><h2>Cook it</h2></div></div><div class="steps">'+r.steps.map((x,i)=>{const used=stepIngredients(r,x,factor,i);return '<div class="step"><span>'+(i+1)+'</span><div><p>'+esc(displayInstruction(x,r,factor,people))+'</p>'+(used.length?'<div class="step-amounts">'+used.map(v=>{const shown=substitutedIngredient(v.name,v.amount);return '<em>'+esc(displayAmount(shown.amount))+' '+esc(ingredientName(shown.name))+(shown.substitution?' '+icon('right-left'):'')+'</em>';}).join('')+'</div>':'')+'</div></div>';}).join('')+'</div></section>'+
+      '<section class="recipe-section method-section"><div class="section-title"><div><span class="eyebrow">METHOD</span><h2>Cook it</h2></div></div><div class="steps">'+r.steps.map((x,i)=>{const used=stepIngredients(r,x,factor,i);return '<div class="step"><span>'+(i+1)+'</span><div><p>'+esc(displayInstruction(x,r,factor,people))+'</p>'+(used.length?'<div class="step-amounts">'+used.map(v=>{const shown=substitutedIngredient(v.name,v.amount),approximate=!shown.substitution&&Boolean(v.practicalApproximate);return '<em>'+esc(cookingAmount(shown.amount,approximate))+' '+esc(ingredientName(shown.name))+(shown.substitution?' '+icon('right-left'):'')+'</em>';}).join('')+'</div>':'')+'</div></div>';}).join('')+'</div></section>'+
       (tips.length?'<section class="recipe-section tips-section"><div class="section-title"><div><span class="eyebrow">HELPFUL</span><h2>Tips & tricks</h2></div></div>'+tips.map(t=>'<div class="tip-row">'+icon('lightbulb')+'<span>'+esc(t)+'</span></div>').join('')+'</section>':''),
       'cook'
     );
@@ -1256,7 +1289,7 @@ window.MW = window.MW || {};
           (r.isLunch?(()=>{const q=MW.preparation.quantities(r),days=(st.plan.lunchDays||[]).length,eaters=Math.max(1,Number(st.plan.lunchPeople)||1),equation=days+' lunch day'+(days===1?'':'s')+' × '+eaters+' '+(eaters===1?'person':'people')+' = '+q.planned+' '+(q.planned===1?'lunch':'lunches');return '<section class="preparation-note lunch-plan-note lunch-plan-compact"><span class="eyebrow">WEEKLY LUNCH PREP · AT HOME</span><h2>'+people+' '+(people===1?'lunch':'lunches')+' to prepare</h2><div class="lunch-plan-equation">'+esc(equation)+'</div>'+(q.prepared?'<p class="lunch-plan-summary">'+q.prepared+' already prepared · '+q.remaining+' remaining</p>':'')+'<details class="lunch-storage-note"><summary>Workday storage & reheating</summary><p>'+esc(r.storageNote)+'</p>'+(r.restText?'<p>'+esc(r.restText)+'</p>':'')+'</details></section>';})():'')+
           '<section class="cook-prep-card">'+
             '<div class="cook-prep-heading">'+icon('basket-shopping')+'<div><span>Ingredients</span><strong>Get these out</strong></div></div>'+
-            '<div class="cook-prep-list">'+ingredients.map(v=>'<div class="'+(v.substitution?'has-substitution':'')+'"><span>'+esc(ingredientName(v.name))+(v.substitution?'<small>'+icon('right-left')+' Instead of '+esc(ingredientName(v.originalName))+'</small>':'')+'</span><strong>'+esc(displayAmount(v.amount))+'</strong></div>').join('')+'</div>'+
+            '<div class="cook-prep-list">'+ingredients.map(v=>'<div class="'+(v.substitution?'has-substitution':'')+'"><span>'+esc(ingredientName(v.name))+(v.substitution?'<small>'+icon('right-left')+' Instead of '+esc(ingredientName(v.originalName))+'</small>':'')+'</span><strong>'+esc(cookingAmount(v.amount,v.practicalApproximate))+'</strong></div>').join('')+'</div>'+
           '</section>'+
           '<section class="cook-prep-card">'+
             '<div class="cook-prep-heading">'+icon('utensils')+'<div><span>Equipment</span><strong>Have this ready</strong></div></div>'+
@@ -1332,7 +1365,7 @@ window.MW = window.MW || {};
             '<div class="cook-action-list">'+instructionParts.map((part,i)=>'<div><span>'+(i+1)+'</span><p>'+esc(part)+'</p></div>').join('')+'</div>'+
             (used.length?
               '<div class="cook-ingredients"><span>For this step</span>'+
-                used.map(v=>{const shown=substitutedIngredient(v.name,v.amount);return '<strong class="'+(shown.substitution?'has-substitution':'')+'">'+esc(displayAmount(shown.amount))+' '+esc(ingredientName(shown.name))+(shown.substitution?' '+icon('right-left'):'')+'</strong>';}).join('')+
+                used.map(v=>{const shown=substitutedIngredient(v.name,v.amount),approximate=!shown.substitution&&Boolean(v.practicalApproximate);const splitPrepared=v.reused&&Number(v.multiplier)<1;const label=v.reused?(splitPrepared?esc(cookingAmount(shown.amount,approximate))+' '+esc(ingredientName(shown.name))+' · prepared earlier':esc(ingredientName(shown.name))+' · prepared earlier'):esc(cookingAmount(shown.amount,approximate))+' '+esc(ingredientName(shown.name));return '<strong class="'+(shown.substitution?'has-substitution':'')+'">'+label+(shown.substitution?' '+icon('right-left'):'')+'</strong>';}).join('')+
               '</div>'
             :'')+
             (tip?'<div class="cook-tip">'+icon('lightbulb')+'<span><strong>Top tip</strong><small>'+esc(tip)+'</small></span></div>':'')+
@@ -1462,7 +1495,7 @@ window.MW = window.MW || {};
             try{
               const installResult=await MW.updates.install(release);
               if(installResult&&installResult.needsInstallPermission){
-                if(updateStatus)updateStatus.textContent='Allow My Week to install verified updates, then tap Update again';
+                if(updateStatus)updateStatus.textContent='Allow My Week to install verified updates, then return to My Week. The update will continue automatically';
                 button.textContent='Update My Week';
               }else if(installResult&&installResult.installerOpened){
                 if(updateStatus)updateStatus.textContent='Download verified · Android installer opened';

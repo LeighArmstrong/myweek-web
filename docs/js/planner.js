@@ -284,48 +284,72 @@ window.MW = window.MW || {};
     return candidates[Math.floor(Math.random()*candidates.length)]||null;
   }
 
-  function regenerateAll(opts){
-    const s=MW.state.get();
-    opts=opts||{};
-    const validDays=new Set(MW.DAYS.map(x=>x.key));
-    const configured=Array.isArray(opts.dinnerDaysOverride)?opts.dinnerDaysOverride:(s.plan.dinnerDays||[]);
-    const dinnerDays=[...new Set(configured.filter(x=>validDays.has(x)))];
-    const previous=s.week||{};
-    if(previous.weekKey&&previous.weekKey!==currentWeekKey()){s.weekHistory=Array.isArray(s.weekHistory)?s.weekHistory:[];s.weekHistory.push(JSON.parse(JSON.stringify(previous)));}
-    const previousIds=(previous.meals||[]).map(x=>x.recipeId).filter(Boolean);
-    const chosen=choose(dinnerDays.length,Boolean(s.plan.priceMode),{
-      excludeIds:previousIds,
-      randomise:true
-    });
-    const lunch=randomLunchAlternative(previous.lunchId);
-    const hadShop=Boolean(previous.shop);
-
-    s.week={
-      createdAt:new Date().toISOString(),
-      weekKey:currentWeekKey(),
-      planMode:opts.planMode||'normal',
-      status:previous.weekKey===currentWeekKey()&&previous.delivery?previous.status:'draft',
-      delivery:previous.weekKey===currentWeekKey()?previous.delivery||null:null,
-      completedRecipes:previous.weekKey===currentWeekKey()?previous.completedRecipes||[]:[],
-      preparedLunchPortions:previous.weekKey===currentWeekKey()?previous.preparedLunchPortions||{}:{},
-      preparation:previous.weekKey===currentWeekKey()?previous.preparation||null:null,
-      meals:dinnerDays.map((day,i)=>({day,recipeId:chosen[i]&&chosen[i].id})).filter(x=>x.recipeId),
-      lunchId:lunch&&lunch.id,
-      extras:Array.isArray(previous.extras)?previous.extras:[],
-      shop:null,
-      inventoryUsed:[],
-      forceBuy:Array.isArray(previous.forceBuy)?previous.forceBuy.slice():[],
-      savingMode:Boolean(s.plan.priceMode)
+  function snapshotPlanningState(s){
+    return {
+      week:s.week?JSON.parse(JSON.stringify(s.week)):null,
+      weekHistory:Array.isArray(s.weekHistory)?JSON.parse(JSON.stringify(s.weekHistory)):[]
     };
-    MW.state.log('week_regenerated',{
-      previousRecipeIds:previousIds,
-      recipeIds:s.week.meals.map(x=>x.recipeId),
-      previousLunchId:previous.lunchId||'',
-      lunchId:s.week.lunchId||''
-    });
+  }
+
+  function restorePlanningState(s,snapshot){
+    s.week=snapshot.week;
+    s.weekHistory=snapshot.weekHistory;
     MW.state.save();
-    if(hadShop&&opts.rebuildShop!==false&&MW.shopping) MW.shopping.build({savingMode:Boolean(s.plan.priceMode),preserveChecks:true});
-    return s.week;
+  }
+
+  function enforceGeneratedBudget(context){
+    const enforce=MW.planner&&MW.planner.enforceGeneratedBudget;
+    return typeof enforce==='function'?enforce(context):null;
+  }
+
+  function regenerateAll(opts){
+    const s=MW.state.get(),snapshot=snapshotPlanningState(s);
+    opts=opts||{};
+    try{
+      const validDays=new Set(MW.DAYS.map(x=>x.key));
+      const configured=Array.isArray(opts.dinnerDaysOverride)?opts.dinnerDaysOverride:(s.plan.dinnerDays||[]);
+      const dinnerDays=[...new Set(configured.filter(x=>validDays.has(x)))];
+      const previous=s.week||{};
+      if(previous.weekKey&&previous.weekKey!==currentWeekKey()){s.weekHistory=Array.isArray(s.weekHistory)?s.weekHistory:[];s.weekHistory.push(JSON.parse(JSON.stringify(previous)));}
+      const previousIds=(previous.meals||[]).map(x=>x.recipeId).filter(Boolean);
+      const chosen=choose(dinnerDays.length,Boolean(s.plan.priceMode),{
+        excludeIds:previousIds,
+        randomise:true
+      });
+      const lunch=randomLunchAlternative(previous.lunchId);
+      const hadShop=Boolean(previous.shop);
+
+      s.week={
+        createdAt:new Date().toISOString(),
+        weekKey:currentWeekKey(),
+        planMode:opts.planMode||'normal',
+        status:previous.weekKey===currentWeekKey()&&previous.delivery?previous.status:'draft',
+        delivery:previous.weekKey===currentWeekKey()?previous.delivery||null:null,
+        completedRecipes:previous.weekKey===currentWeekKey()?previous.completedRecipes||[]:[],
+        preparedLunchPortions:previous.weekKey===currentWeekKey()?previous.preparedLunchPortions||{}:{},
+        preparation:previous.weekKey===currentWeekKey()?previous.preparation||null:null,
+        meals:dinnerDays.map((day,i)=>({day,recipeId:chosen[i]&&chosen[i].id})).filter(x=>x.recipeId),
+        lunchId:lunch&&lunch.id,
+        extras:Array.isArray(previous.extras)?previous.extras:[],
+        shop:null,
+        inventoryUsed:[],
+        forceBuy:Array.isArray(previous.forceBuy)?previous.forceBuy.slice():[],
+        savingMode:Boolean(s.plan.priceMode)
+      };
+      MW.state.log('week_regenerated',{
+        previousRecipeIds:previousIds,
+        recipeIds:s.week.meals.map(x=>x.recipeId),
+        previousLunchId:previous.lunchId||'',
+        lunchId:s.week.lunchId||''
+      });
+      MW.state.save();
+      enforceGeneratedBudget('regenerate');
+      if(hadShop&&opts.rebuildShop!==false&&MW.shopping)MW.shopping.build({savingMode:Boolean(s.plan.priceMode),preserveChecks:true});
+      return s.week;
+    }catch(error){
+      restorePlanningState(s,snapshot);
+      throw error;
+    }
   }
 
   function invalidateShop(s,rebuild){
@@ -339,43 +363,49 @@ window.MW = window.MW || {};
   }
 
   function buildWeek(opts){
-    const s=MW.state.get();
+    const s=MW.state.get(),snapshot=snapshotPlanningState(s);
     opts=opts||{};
-    const validDays=new Set(MW.DAYS.map(x=>x.key));
-    const configured=Array.isArray(opts.dinnerDaysOverride)?opts.dinnerDaysOverride:(s.plan.dinnerDays||[]);
-    const dinnerDays=[...new Set(configured.filter(x=>validDays.has(x)))];
-    const chosen=choose(dinnerDays.length,Boolean(s.plan.priceMode));
-    const previous=s.week||{};
-    if(previous.weekKey&&previous.weekKey!==currentWeekKey()){s.weekHistory=Array.isArray(s.weekHistory)?s.weekHistory:[];s.weekHistory.push(JSON.parse(JSON.stringify(previous)));}
-    const lunchPool=MW.LUNCHES.filter(lunchAllowed);
-    const existingLunch=lunchPool.find(x=>x.id===previous.lunchId);
-    const lunch=existingLunch||randomLunchAlternative(null)||null;
+    try{
+      const validDays=new Set(MW.DAYS.map(x=>x.key));
+      const configured=Array.isArray(opts.dinnerDaysOverride)?opts.dinnerDaysOverride:(s.plan.dinnerDays||[]);
+      const dinnerDays=[...new Set(configured.filter(x=>validDays.has(x)))];
+      const chosen=choose(dinnerDays.length,Boolean(s.plan.priceMode));
+      const previous=s.week||{};
+      if(previous.weekKey&&previous.weekKey!==currentWeekKey()){s.weekHistory=Array.isArray(s.weekHistory)?s.weekHistory:[];s.weekHistory.push(JSON.parse(JSON.stringify(previous)));}
+      const lunchPool=MW.LUNCHES.filter(lunchAllowed);
+      const existingLunch=lunchPool.find(x=>x.id===previous.lunchId);
+      const lunch=existingLunch||randomLunchAlternative(null)||null;
 
-    s.week={
-      createdAt:new Date().toISOString(),
-      weekKey:currentWeekKey(),
-      planMode:opts.planMode||'normal',
-      status:previous.weekKey===currentWeekKey()&&previous.delivery?previous.status:'draft',
-      delivery:previous.weekKey===currentWeekKey()?previous.delivery||null:null,
-      completedRecipes:previous.weekKey===currentWeekKey()?previous.completedRecipes||[]:[],
-      preparedLunchPortions:previous.weekKey===currentWeekKey()?previous.preparedLunchPortions||{}:{},
-      preparation:previous.weekKey===currentWeekKey()?previous.preparation||null:null,
-      meals:dinnerDays.map((day,i)=>({day,recipeId:chosen[i]&&chosen[i].id})).filter(x=>x.recipeId),
-      lunchId:lunch?lunch.id:null,
-      extras:opts.preserveExtras&&Array.isArray(previous.extras)?previous.extras:[],
-      shop:null,
-      inventoryUsed:[],
-      forceBuy:Array.isArray(previous.forceBuy)?previous.forceBuy.slice():[],
-      savingMode:Boolean(s.plan.priceMode)
-    };
-    MW.state.log('week_created',{
-      recipeIds:s.week.meals.map(x=>x.recipeId),
-      dinnerDays:dinnerDays,
-      lunchDays:(s.plan.lunchDays||[]).slice(),
-      priceMode:Boolean(s.plan.priceMode)
-    });
-    MW.state.save();
-    return s.week;
+      s.week={
+        createdAt:new Date().toISOString(),
+        weekKey:currentWeekKey(),
+        planMode:opts.planMode||'normal',
+        status:previous.weekKey===currentWeekKey()&&previous.delivery?previous.status:'draft',
+        delivery:previous.weekKey===currentWeekKey()?previous.delivery||null:null,
+        completedRecipes:previous.weekKey===currentWeekKey()?previous.completedRecipes||[]:[],
+        preparedLunchPortions:previous.weekKey===currentWeekKey()?previous.preparedLunchPortions||{}:{},
+        preparation:previous.weekKey===currentWeekKey()?previous.preparation||null:null,
+        meals:dinnerDays.map((day,i)=>({day,recipeId:chosen[i]&&chosen[i].id})).filter(x=>x.recipeId),
+        lunchId:lunch?lunch.id:null,
+        extras:opts.preserveExtras&&Array.isArray(previous.extras)?previous.extras:[],
+        shop:null,
+        inventoryUsed:[],
+        forceBuy:Array.isArray(previous.forceBuy)?previous.forceBuy.slice():[],
+        savingMode:Boolean(s.plan.priceMode)
+      };
+      MW.state.log('week_created',{
+        recipeIds:s.week.meals.map(x=>x.recipeId),
+        dinnerDays:dinnerDays,
+        lunchDays:(s.plan.lunchDays||[]).slice(),
+        priceMode:Boolean(s.plan.priceMode)
+      });
+      MW.state.save();
+      enforceGeneratedBudget('build');
+      return s.week;
+    }catch(error){
+      restorePlanningState(s,snapshot);
+      throw error;
+    }
   }
 
   MW.planner={
@@ -511,7 +541,9 @@ window.MW = window.MW || {};
     return count+' '+unit;
   }
 
+  function basketEngineAvailable(){return Boolean(MW.basket&&typeof MW.basket.calculate==='function');}
   function basketEstimate(meals,options){
+    if(!basketEngineAvailable())throw new Error('My Week basket engine is not loaded, so a shopping-budget total cannot be calculated yet.');
     return MW.basket.calculate(meals,options);
   }
 
@@ -544,10 +576,13 @@ window.MW = window.MW || {};
     const hit=rows.find(x=>x[1].test(t));return hit?hit[0]:'';
   }
   const visualKey=r=>planner.visualKey(r);
-  function overlapCount(r,chosen){
-    const used=new Set();
-    chosen.forEach(x=>(x.ingredients||[]).forEach(row=>{const e=p.entryFor(row[1]);used.add(productKey(row[1],e));}));
-    return (r.ingredients||[]).reduce((n,row)=>{const e=p.entryFor(row[1]);return n+(used.has(productKey(row[1],e))?1:0);},0);
+  const budgetCandidateMetaCache=new WeakMap();
+  function budgetCandidateMeta(r){
+    if(budgetCandidateMetaCache.has(r))return budgetCandidateMetaCache.get(r);
+    const ingredientKeys=new Set((r.ingredients||[]).map(row=>productKey(row[1],p.entryFor(row[1]))));
+    const meta={pk:planner.proteinKey(r),fmt:formatKey(r),img:visualKey(r),ingredientKeys};
+    budgetCandidateMetaCache.set(r,meta);
+    return meta;
   }
   function hashJitter(id,seed){
     const str=String(id||'')+'|'+seed;let h=2166136261;
@@ -556,24 +591,26 @@ window.MW = window.MW || {};
   }
   function candidateSet(priced,count,seed,strictProtein){
     const s=MW.state.get();
-    const chosen=[];
+    const chosen=[],chosenIngredientKeys=new Set();
     while(chosen.length<count&&priced.length){
       const proteinCounts={},formatCounts={},images=new Set(chosen.map(visualKey).filter(Boolean));
-      chosen.forEach(r=>{const pk=planner.proteinKey(r);proteinCounts[pk]=(proteinCounts[pk]||0)+1;const f=formatKey(r);if(f)formatCounts[f]=(formatCounts[f]||0)+1;});
+      chosen.forEach(r=>{const meta=budgetCandidateMeta(r);proteinCounts[meta.pk]=(proteinCounts[meta.pk]||0)+1;if(meta.fmt)formatCounts[meta.fmt]=(formatCounts[meta.fmt]||0)+1;});
       const ranked=priced.filter(x=>!chosen.includes(x.r)).map(x=>{
-        const r=x.r,pk=planner.proteinKey(r),fmt=formatKey(r),img=visualKey(r);
+        const r=x.r,meta=budgetCandidateMeta(r),pk=meta.pk,fmt=meta.fmt,img=meta.img;
+        let overlap=0;for(const key of meta.ingredientKeys)if(chosenIngredientKeys.has(key))overlap++;
+        const nearClone=chosen.some(c=>planner.titleSimilarity(r,c)>=0.70);
         let score=0;
         score-=x.cost*1.4;
         score-=x.premium*3.8;
-        score+=Math.min(5,overlapCount(r,chosen))*0.75;
+        score+=Math.min(5,overlap)*0.75;
         score-=(proteinCounts[pk]||0)*(strictProtein?12:4.5);
         score-=(fmt?formatCounts[fmt]||0:0)*(strictProtein?5:3);
         if(img&&images.has(img)) score-=40;
-        if(chosen.some(c=>planner.titleSimilarity(r,c)>=0.70)) score-=45;
+        if(nearClone) score-=45;
         if(MW.food&&MW.food.score) score+=Number(MW.food.score(r,s.foodProfile)||0)*0.25;
         if(MW.learning&&MW.learning.score) score+=Number(MW.learning.score(r)||0)*0.15;
         score+=hashJitter(r.id,seed)*0.9;
-        return {r,score,pk,fmt,repeatsProtein:Boolean(proteinCounts[pk]),repeatsImage:Boolean(img&&images.has(img)),nearClone:chosen.some(c=>planner.titleSimilarity(r,c)>=0.70)};
+        return {r,score,pk,fmt,repeatsProtein:Boolean(proteinCounts[pk]),repeatsImage:Boolean(img&&images.has(img)),nearClone};
       }).sort((a,b)=>b.score-a.score);
       if(!ranked.length) break;
       const distinct=ranked.filter(x=>!x.repeatsProtein&&!x.repeatsImage&&!x.nearClone);
@@ -581,6 +618,7 @@ window.MW = window.MW || {};
       const visualDistinct=ranked.filter(x=>!x.repeatsImage&&!x.nearClone);
       const pick=strictProtein?(distinct[0]||varied[0]||visualDistinct[0]||ranked[0]):(varied[0]||visualDistinct[0]||ranked[0]);
       chosen.push(pick.r);
+      for(const key of budgetCandidateMeta(pick.r).ingredientKeys)chosenIngredientKeys.add(key);
     }
     return chosen;
   }
@@ -598,43 +636,109 @@ window.MW = window.MW || {};
     return true;
   }
 
-  function budgetRescue(days,budget,maxUnresolved){
+  function budgetRescue(days,budget,maxUnresolved,options){
+    options=options||{};
     maxUnresolved=Number.isFinite(Number(maxUnresolved))?Number(maxUnresolved):Infinity;
-    const pool=MW.RECIPES.filter(r=>planner.allowed(r))
-      .map(r=>({r,cost:valueCost(r),premium:premiumPenalty(r)}))
-      .sort((a,b)=>(a.cost+a.premium*1.8)-(b.cost+b.premium*1.8))
-      .slice(0,Math.min(100,MW.RECIPES.length)).map(x=>x.r);
-    const width=60;
-    let beam=[{recipes:[],estimate:null,score:0}];
-    const canAdd=(list,r)=>{
-      if(list.some(x=>x.id===r.id))return false;
-      const image=visualKey(r);if(image&&list.some(x=>visualKey(x)===image))return false;
-      if(list.some(x=>planner.titleSimilarity(r,x)>=0.70))return false;
-      const protein=planner.proteinKey(r);
-      if(list.filter(x=>planner.proteinKey(x)===protein).length>=3)return false;
-      if(list.length&&planner.proteinKey(list[list.length-1])===protein)return false;
-      const fmt=formatKey(r);
-      if(fmt&&list.filter(x=>formatKey(x)===fmt).length>=3)return false;
-      return true;
+    const savingMode=Boolean(options.savingMode);
+    const lunchId=Object.prototype.hasOwnProperty.call(options,'lunchId')?options.lunchId:(MW.state.get().week&&MW.state.get().week.lunchId);
+    const floor=basketEstimate([],{savingMode,lunchId});
+    if(floor.total>budget+0.001||floor.unresolved>maxUnresolved)return null;
+
+    // Rank broadly with the lightweight recipe cost model, then use exact basket
+    // pricing only for complete candidate weeks. Exact totals still decide success.
+    const priced=MW.RECIPES.filter(r=>planner.allowed(r)).map(r=>({
+      r,cost:valueCost(r),premium:premiumPenalty(r)
+    })).sort((a,b)=>(a.cost+a.premium*1.15)-(b.cost+b.premium*1.15)).slice(0,Math.min(220,MW.RECIPES.length));
+
+    let best=null;
+    const consider=recipes=>{
+      if(recipes.length!==days.length||!relaxedBudgetVariety(recipes))return;
+      const estimate=basketEstimate(days.map((d,i)=>({day:d,recipeId:recipes[i].id})),{savingMode,lunchId});
+      if(estimate.unresolved>maxUnresolved)return;
+      if(!best||estimate.total<best.estimate.total)best={recipes:recipes.slice(),estimate,lunchId};
     };
-    for(let i=0;i<days.length;i++){
-      const next=[];
-      for(const state of beam){
-        for(const r of pool){
-          if(!canAdd(state.recipes,r))continue;
-          const recipes=state.recipes.concat(r);
-          const estimate=basketEstimate(recipes.map((x,j)=>({day:days[j],recipeId:x.id})),{savingMode:true});
-          const unresolvedPenalty=Math.max(0,estimate.unresolved-maxUnresolved)*20;
-          next.push({recipes,estimate,score:estimate.total+unresolvedPenalty});
+
+    for(let seed=0;seed<18;seed++)consider(candidateSet(priced,days.length,1000+seed,seed<12));
+    if(!best)consider(priced.slice(0,days.length).map(x=>x.r));
+    if(!best)return null;
+
+    const pool=priced.slice(0,110).map(x=>x.r);
+    let working=best.recipes.slice(),workingEstimate=best.estimate;
+    for(let pass=0;pass<Math.min(8,days.length+2)&&workingEstimate.total>budget+0.001;pass++){
+      let swap=null;
+      for(let i=0;i<working.length;i++){
+        for(const candidate of pool){
+          if(candidate.id===working[i].id||working.some((r,j)=>j!==i&&r.id===candidate.id))continue;
+          const trial=working.slice();trial[i]=candidate;
+          if(!relaxedBudgetVariety(trial))continue;
+          const estimate=basketEstimate(days.map((d,j)=>({day:d,recipeId:trial[j].id})),{savingMode,lunchId});
+          if(estimate.unresolved>maxUnresolved||estimate.total+0.001>=workingEstimate.total)continue;
+          if(!swap||estimate.total<swap.estimate.total)swap={i,candidate,estimate};
         }
       }
-      if(!next.length)return null;
-      next.sort((a,b)=>a.score-b.score);
-      beam=next.slice(0,width);
+      if(!swap)break;
+      working[swap.i]=swap.candidate;workingEstimate=swap.estimate;
     }
-    const valid=beam.filter(x=>x.estimate&&x.estimate.unresolved<=maxUnresolved);
-    const chosen=(valid.length?valid:beam)[0];
-    return chosen?{recipes:chosen.recipes,estimate:chosen.estimate}:null;
+    if(workingEstimate.total<best.estimate.total)best={recipes:working,estimate:workingEstimate,lunchId};
+    return best.estimate.total<=budget+0.001?best:null;
+  }
+
+  function hardBudgetPlan(options){
+    options=options||{};
+    const s=MW.state.get();
+    const budget=Number(s.household.budget)||0;
+    if(!s.week||!budget)return {metBudget:true,changed:false,budget,candidateTotal:0,overBudgetBy:0,reason:'no-budget'};
+    if(!basketEngineAvailable())return {metBudget:true,changed:false,skipped:true,budget,candidateTotal:null,overBudgetBy:0,reason:'basket-engine-unavailable'};
+    const savingMode=options.savingMode==null?Boolean(s.plan.priceMode):Boolean(options.savingMode);
+    const currentMeals=(s.week.meals||[]).slice();
+    const currentLunchId=s.week.lunchId||null;
+    const baseline=basketEstimate(currentMeals,{savingMode,lunchId:currentLunchId});
+    if(baseline.total<=budget+0.001){
+      const ok={metBudget:true,changed:false,budget,currentTotal:baseline.total,candidateTotal:baseline.total,overBudgetBy:0,reason:'already-within-budget'};
+      s.week.budgetResult=ok;
+      return ok;
+    }
+    const days=currentMeals.map(x=>x.day);
+    if(!days.length){
+      return {metBudget:false,changed:false,budget,currentTotal:baseline.total,candidateTotal:baseline.total,overBudgetBy:round(baseline.total-budget),reason:'non-meal-costs-exceed-budget'};
+    }
+    const maxUnresolved=baseline.unresolved;
+    const lunchDays=(s.plan.lunchDays||[]).length;
+    let lunchIds=lunchDays?[currentLunchId]:[null];
+    if(lunchDays){
+      const ranked=MW.LUNCHES.filter(l=>planner.lunchAllowed(l)).map(l=>({
+        id:l.id,
+        estimate:basketEstimate([],{savingMode,lunchId:l.id})
+      })).filter(x=>x.estimate.unresolved<=maxUnresolved)
+        .sort((a,b)=>a.estimate.total-b.estimate.total)
+        .slice(0,12).map(x=>x.id);
+      lunchIds=[...new Set([currentLunchId,...ranked].filter(Boolean))];
+    }
+    let best=null;
+    for(const lunchId of lunchIds){
+      const rescue=budgetRescue(days,budget,maxUnresolved,{savingMode,lunchId});
+      if(!rescue)continue;
+      if(lunchId===currentLunchId){best=rescue;break;}
+      if(!best||rescue.estimate.total<best.estimate.total)best=rescue;
+    }
+    if(!best){
+      return {metBudget:false,changed:false,budget,currentTotal:baseline.total,candidateTotal:baseline.total,overBudgetBy:round(baseline.total-budget),reason:'no-valid-plan-under-budget'};
+    }
+    const oldIds=currentMeals.map(x=>x.recipeId);
+    const newIds=best.recipes.map(x=>x.id);
+    const lunchChanged=(best.lunchId||null)!==currentLunchId;
+    const changed=lunchChanged||newIds.some((id,i)=>id!==oldIds[i]);
+    s.week.meals=days.map((day,i)=>({day,recipeId:newIds[i]}));
+    if(lunchDays)s.week.lunchId=best.lunchId;
+    s.week.shop=null;
+    s.week.inventoryUsed=[];
+    const result={
+      metBudget:true,changed,budget,currentTotal:baseline.total,candidateTotal:best.estimate.total,
+      overBudgetBy:0,reason:'hard-budget-plan',
+      swaps:newIds.reduce((n,id,i)=>n+(id!==oldIds[i]?1:0),0),lunchChanged
+    };
+    s.week.budgetResult=result;
+    return result;
   }
 
   function optimiseForSavings(){
@@ -754,7 +858,7 @@ window.MW = window.MW || {};
       best={...best,estimate:lunchBest};
     }
     if(budget&&best.estimate.total>budget){
-      const rescue=budgetRescue(days,budget,baseline.unresolved);
+      const rescue=budgetRescue(days,budget,baseline.unresolved,{savingMode:true,lunchId:selectedLunchId});
       if(rescue&&rescue.recipes.length===days.length&&acceptable(rescue.estimate)&&rescue.estimate.total+0.01<best.estimate.total){
         best={recipes:rescue.recipes,estimate:rescue.estimate,swapCount:days.length};
         rescued=true;
@@ -803,7 +907,13 @@ window.MW = window.MW || {};
     return s.week.savingResult;
   }
 
+  function budgetFailureMessage(result){
+    const budget=Number(result&&result.budget)||Number(MW.state.get().household.budget)||0;
+    return 'My Week could not build the full plan within your £'+Math.round(budget*100)/100+' weekly budget with the current meals, lunches and weekly essentials. No over-budget week was saved. Reduce something in the plan or raise the budget, then try again.';
+  }
+
   planner.budgetRescue=budgetRescue;
+  planner.hardBudgetPlan=hardBudgetPlan;
   planner.basketEstimate=basketEstimate;
   planner.plannedBasketCost=function(savingMode){
     const s=MW.state.get();
@@ -813,11 +923,53 @@ window.MW = window.MW || {};
   planner.optimiseForSavings=optimiseForSavings;
   planner.rebuildForPriceMode=function(on){
     const s=MW.state.get();
-    if(on) return optimiseForSavings();
+    if(on){
+      const result=optimiseForSavings();
+      if(result&&result.metBudget===false){
+        const hard=hardBudgetPlan({savingMode:true});
+        if(hard.metBudget){
+          const current=Number(result.currentTotal)||Number(hard.currentTotal)||hard.candidateTotal;
+          const final=basketEstimate(s.week.meals||[],{savingMode:true}).total;
+          s.plan.priceMode=true;
+          s.week.savingMode=true;
+          s.week.savingResult={
+            ...result,
+            changed:Boolean(result.changed||hard.changed),
+            candidateTotal:final,
+            saved:round(Math.max(0,current-final)),
+            budget:hard.budget,
+            metBudget:true,
+            overBudgetBy:0,
+            swaps:Number(result.swaps||0)+Number(hard.swaps||0),
+            lunchChanged:Boolean(result.lunchChanged||hard.lunchChanged),
+            reason:hard.changed?'hard-budget-plan':result.reason
+          };
+          MW.state.log('hard_budget_applied',s.week.savingResult);
+          MW.state.save();
+          return s.week.savingResult;
+        }
+      }
+      return result;
+    }
     s.plan.priceMode=false;
     if(s.week){s.week.savingMode=false;s.week.savingResult=null;s.week.shop=null;}
     MW.state.log('lower_cost_disabled',{});MW.state.save();
     return {changed:false,reason:'disabled',currentTotal:planner.plannedBasketCost(false)};
   };
-  planner.rebuildForSavings=optimiseForSavings;
+  planner.rebuildForSavings=planner.rebuildForPriceMode.bind(planner,true);
+
+  function enforceGeneratedBudget(context){
+    const s=MW.state.get();
+    if(!basketEngineAvailable())return {metBudget:true,changed:false,skipped:true,budget:Number(s.household.budget)||0,candidateTotal:null,overBudgetBy:0,reason:'basket-engine-unavailable'};
+    const result=hardBudgetPlan({savingMode:Boolean(s.plan.priceMode)});
+    if(!result.metBudget){
+      MW.state.log('hard_budget_failed',{context,budget:result.budget,total:result.currentTotal,overBudgetBy:result.overBudgetBy,reason:result.reason});
+      throw new Error(budgetFailureMessage(result));
+    }
+    s.week.budgetResult=result;
+    MW.state.log('hard_budget_checked',{context,budget:result.budget,total:result.candidateTotal,changed:result.changed});
+    MW.state.save();
+    return result;
+  }
+  planner.enforceGeneratedBudget=enforceGeneratedBudget;
 })();

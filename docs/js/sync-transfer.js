@@ -57,11 +57,17 @@ window.MW=window.MW||{};
   }
   function apply(packet){
     packet=validate(packet);
+    const incomingState=clone(packet.state);
+    const currentWeekKey=MW.planner&&typeof MW.planner.currentWeekKey==='function'?MW.planner.currentWeekKey():'';
+    if(currentWeekKey&&incomingState.week&&incomingState.week.weekKey!==currentWeekKey){
+      incomingState.ui=incomingState.ui||{};
+      incomingState.ui.dismissedRolloverFor=currentWeekKey;
+    }
     const previousState=clone(MW.state.get());
     const previousRecipes=MW.onlineRecipes&&MW.onlineRecipes.exportData?MW.onlineRecipes.exportData():null;
     let stateApplied=false;
     try{
-      const result=MW.state.replace(packet.state);
+      const result=MW.state.replace(incomingState);
       stateApplied=true;
       if(MW.onlineRecipes&&MW.onlineRecipes.replaceData)MW.onlineRecipes.replaceData(packet.localRecipes||{recipes:[],syncedAt:null});
       return result;
@@ -76,9 +82,14 @@ window.MW=window.MW||{};
   async function shareFile(){
     const file=createFile(),plugins=window.Capacitor&&window.Capacitor.Plugins||{},fs=plugins.Filesystem,share=plugins.Share;
     if(fs&&share&&typeof fs.writeFile==='function'&&typeof share.share==='function'){
+      const transferDir='transfers',path=transferDir+'/'+file.name;
+      try{
+        const listing=await fs.readdir({path:transferDir,directory:'CACHE'});
+        for(const entry of listing.files||[]){const name=typeof entry==='string'?entry:entry&&entry.name;if(name&&name!==file.name&&/^my-week-\d{4}-\d{2}-\d{2}\.myweek$/.test(name)){try{await fs.deleteFile({path:transferDir+'/'+name,directory:'CACHE'});}catch{}}}
+      }catch{}
       const bytes=enc.encode(await file.text()),data=toB64(bytes).replace(/-/g,'+').replace(/_/g,'/');
-      const result=await fs.writeFile({path:file.name,data,directory:'CACHE'});
-      try{await share.share({title:'My Week transfer',text:'My Week device transfer',url:result.uri,dialogTitle:'Send My Week to another device'});}finally{try{await fs.deleteFile({path:file.name,directory:'CACHE'});}catch{}}
+      const result=await fs.writeFile({path,data,directory:'CACHE',recursive:true});
+      await share.share({title:'My Week transfer',text:'My Week device transfer',url:result.uri,dialogTitle:'Send My Week to another device'});
       return 'shared-native';
     }
     if(navigator.canShare&&navigator.share&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'My Week transfer'});return 'shared';}

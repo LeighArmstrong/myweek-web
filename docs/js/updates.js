@@ -60,9 +60,9 @@ window.MW=window.MW||{};
     if(!manual){
       try{
         const cached=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');
-        if(cached&&now-Number(cached.checkedAt||0)<CHECK_INTERVAL&&validManifest(cached.manifest)){
+        if(cached&&now-Number(cached.checkedAt||0)<CHECK_INTERVAL&&validManifest(cached.manifest)&&newer(cached.manifest,local)){
           const manifest=cached.manifest;
-          return {supported:true,available:newer(manifest,local),manifest,local,checkedAt:Number(cached.checkedAt||now),cached:true};
+          return {supported:true,available:true,manifest,local,checkedAt:Number(cached.checkedAt||now),cached:true};
         }
       }catch{}
     }
@@ -103,27 +103,83 @@ window.MW=window.MW||{};
     }catch{progressBound=false;}
   }
 
+  function writePending(manifest,extra={}){
+    try{
+      localStorage.setItem(PENDING_KEY,JSON.stringify({
+        versionCode:Number(manifest.versionCode),
+        versionName:String(manifest.versionName||''),
+        apkUrl:String(manifest.apkUrl||''),
+        sha256:String(manifest.sha256||'').toLowerCase(),
+        requestedAt:new Date().toISOString(),
+        awaitingPermission:false,
+        ...extra
+      }));
+      localStorage.removeItem(CACHE_KEY);
+    }catch{}
+  }
+
+  function readPending(){
+    try{return JSON.parse(localStorage.getItem(PENDING_KEY)||'null');}
+    catch{return null;}
+  }
+
   async function install(manifest){
     if(!validManifest(manifest))throw new Error('This update could not be verified from its release manifest.');
     if(!isNativeAndroid())throw new Error('The web app updates itself automatically.');
     const updater=nativeUpdater();
     if(!updater||typeof updater.installUpdate!=='function')throw new Error('This My Week build cannot install updates safely yet.');
-    try{
-      localStorage.setItem(PENDING_KEY,JSON.stringify({
-        versionCode:Number(manifest.versionCode),
-        versionName:String(manifest.versionName||''),
-        requestedAt:new Date().toISOString()
-      }));
-      localStorage.removeItem(CACHE_KEY);
-    }catch{}
+    writePending(manifest);
     await bindProgress();
     try{
-      return await updater.installUpdate({url:manifest.apkUrl,sha256:String(manifest.sha256).toLowerCase()});
+      const result=await updater.installUpdate({url:manifest.apkUrl,sha256:String(manifest.sha256).toLowerCase()});
+      if(result&&result.needsInstallPermission)writePending(manifest,{awaitingPermission:true});
+      else if(result&&result.installerOpened)writePending(manifest,{installerOpenedAt:new Date().toISOString()});
+      return result;
     }catch(error){
       try{localStorage.removeItem(PENDING_KEY);}catch{}
       throw error;
     }
   }
 
-  MW.updates={MANIFEST_URL,isNativeAndroid,appInfo,check,install,pendingStatus,validManifest,newer,bindProgress};
+  async function resumePendingPermission(){
+    if(!isNativeAndroid())return null;
+    const pending=readPending();
+    if(!pending||pending.awaitingPermission!==true)return null;
+    const local=await appInfo();
+    if(!local.canRequestPackageInstalls)return {resumed:false,waitingForPermission:true};
+    const manifest={
+      versionCode:Number(pending.versionCode),
+      versionName:String(pending.versionName||''),
+      apkUrl:String(pending.apkUrl||''),
+      sha256:String(pending.sha256||''),
+      releaseNotes:[]
+    };
+    if(!validManifest(manifest)){
+      try{localStorage.removeItem(PENDING_KEY);}catch{}
+      throw new Error('The pending update information is no longer valid.');
+    }
+    const result=await install(manifest);
+    return {resumed:true,result};
+  }
+
+  let appResumeBound=false;
+  async function bindAppResume(){
+    if(appResumeBound||!isNativeAndroid())return;
+    const app=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
+    if(!app||typeof app.addListener!=='function')return;
+    appResumeBound=true;
+    try{
+      await app.addListener('appStateChange',state=>{
+        if(!state||!state.isActive)return;
+        resumePendingPermission().then(detail=>{
+          if(detail)window.dispatchEvent(new CustomEvent('mw:update-permission-resume',{detail}));
+        }).catch(error=>{
+          window.dispatchEvent(new CustomEvent('mw:update-permission-resume',{detail:{error:String(error&&error.message||error)}}));
+        });
+      });
+    }catch{appResumeBound=false;}
+  }
+
+  bindAppResume();
+  MW.updates={MANIFEST_URL,isNativeAndroid,appInfo,check,install,pendingStatus,resumePendingPermission,validManifest,newer,bindProgress};
 })();

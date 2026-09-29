@@ -260,7 +260,24 @@ h1,h2,h3,p{margin:0}
 .empty-state>i{font-size:28px;color:#9eaaa2}
 .empty-state h2{font-size:20px;margin-top:12px}
 .empty-state p{color:var(--muted);font-size:13px;margin-top:6px}
-.bottom-nav{position:fixed;left:50%;transform:translateX(-50%);bottom:0;width:min(760px,100%);display:grid;grid-template-columns:repeat(3,1fr);background:rgba(255,255,255,.96);backdrop-filter:blur(18px);border-top:1px solid var(--line);padding:8px 12px calc(10px + var(--safe-bottom));z-index:30}
+.bottom-nav{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  width:100%;
+  transform:none;
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  justify-content:center;
+  box-sizing:border-box;
+  background:rgba(255,255,255,.96);
+  backdrop-filter:blur(18px);
+  border-top:1px solid var(--line);
+  border-radius:0;
+  padding:7px max(12px,calc((100vw - 760px)/2 + 12px)) calc(8px + var(--device-safe-bottom,var(--safe-bottom)));
+  z-index:30;
+}
 .navbtn{border:0;background:transparent;color:#929c96;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:850}
 .navicon{width:38px;height:31px;border-radius:12px;display:grid;place-items:center}
 .navicon i{font-size:17px}
@@ -503,7 +520,7 @@ html,body{background:var(--bg)}
 .home-action:active{transform:scale(.985)}
 .home-action.is-loading{pointer-events:none;opacity:.72}
 .home-action.is-loading .mw-loading-icon{animation:mwSpin .72s linear infinite}
-.bottom-nav{grid-template-columns:repeat(4,1fr);padding-top:7px;background:rgba(255,255,255,.97);box-shadow:0 -4px 20px rgba(28,61,48,.045)}
+.bottom-nav{background:rgba(255,255,255,.97);box-shadow:0 -4px 20px rgba(28,61,48,.045)}
 .navbtn{font-size:10px;color:#8794a6}
 .navbtn.active{color:var(--green)}
 .navbtn.active .navicon{background:transparent}
@@ -830,8 +847,28 @@ body.cooking-active{
   overflow-y:auto;
   overscroll-behavior:contain;
   scrollbar-width:thin;
+  scrollbar-color:#9fc8b5 transparent;
+  scrollbar-gutter:stable;
   padding:14px 18px 18px;
   scroll-padding-bottom:24px;
+}
+.cook-scroll::-webkit-scrollbar,
+.cook-instruction::-webkit-scrollbar{width:7px}
+.cook-scroll::-webkit-scrollbar-track,
+.cook-instruction::-webkit-scrollbar-track{background:transparent}
+.cook-scroll::-webkit-scrollbar-thumb,
+.cook-instruction::-webkit-scrollbar-thumb{
+  background:#9fc8b5;
+  border-radius:999px;
+  border:2px solid transparent;
+  background-clip:content-box;
+}
+.cook-scroll::-webkit-scrollbar-thumb:hover,
+.cook-instruction::-webkit-scrollbar-thumb:hover{background:#6da98d;background-clip:content-box}
+.cook-instruction{
+  scrollbar-width:thin;
+  scrollbar-color:#9fc8b5 transparent;
+  scrollbar-gutter:stable;
 }
 
 .cook-photo,
@@ -1111,15 +1148,6 @@ body.cooking-active{
     padding-right:28px;
   }
 
-  body:not(.cooking-active) .bottom-nav{
-    width:min(1120px,100%);
-    border-left:1px solid var(--line);
-    border-right:1px solid var(--line);
-    border-radius:20px 20px 0 0;
-    padding-left:28px;
-    padding-right:28px;
-  }
-
   body:not(.cooking-active) .appbar{
     padding-top:18px;
     padding-bottom:28px;
@@ -1298,8 +1326,7 @@ body.cooking-active{
 }
 
 @media(min-width:960px){
-  body:not(.cooking-active) .shell,
-  body:not(.cooking-active) .bottom-nav{
+  body:not(.cooking-active) .shell{
     width:min(1240px,100%);
   }
 
@@ -1850,12 +1877,8 @@ details[open]>*:not(summary){animation:mwReveal .2s ease both}
 details summary i:last-child{transition:transform .2s ease}
 details[open] summary i:last-child{transform:rotate(180deg)}
 .bottom-nav{
-  position:fixed!important;
-  left:50%!important;
-  bottom:0!important;
-  transform:translateX(-50%)!important;
-  visibility:visible!important;
-  opacity:1!important;
+  visibility:visible;
+  opacity:1;
   isolation:isolate;
 }
 @media(prefers-reduced-motion:reduce){
@@ -1878,7 +1901,6 @@ body.cooking-active .cook-scroll{padding-bottom:calc(160px + var(--safe-bottom))
   .home-meal-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line)}
   .home-meal-list .meal-row{border:0;min-height:92px}
   .home-quick-actions{max-width:620px}
-  .bottom-nav{width:min(1120px,100%);border-left:1px solid var(--line);border-right:1px solid var(--line);border-radius:18px 18px 0 0}
 }
 @media(min-width:960px) and (orientation:landscape){
   body:not(.cooking-active) .shell{width:min(1240px,100%)}
@@ -1987,9 +2009,11 @@ body:not(.cooking-active) .shell{padding-top:calc(var(--device-safe-top) + 10px)
   box-shadow:0 5px 18px rgba(25,63,49,.045)!important;
 }
 .bottom-nav{
-  min-height:68px!important;padding:7px 14px calc(8px + var(--device-safe-bottom))!important;
-  background:rgba(255,255,255,.94)!important;border-top:1px solid rgba(218,231,224,.9)!important;
-  box-shadow:0 -8px 28px rgba(31,65,52,.055)!important;backdrop-filter:blur(18px)!important;
+  min-height:68px;
+  background:rgba(255,255,255,.94);
+  border-top:1px solid rgba(218,231,224,.9);
+  box-shadow:0 -8px 28px rgba(31,65,52,.055);
+  backdrop-filter:blur(18px);
 }
 .navbtn{min-height:48px;border-radius:14px!important}
 .navbtn .navicon{transition:transform .22s cubic-bezier(.2,.8,.2,1),background-color .2s ease!important}
@@ -2218,7 +2242,6 @@ body.cooking-active .bottom-nav{height:auto!important;min-height:68px!important;
 
 @media(min-width:700px) and (orientation:portrait){
   body:not(.cooking-active) .shell{width:min(920px,100%)!important;padding-left:30px!important;padding-right:30px!important}
-  .bottom-nav{width:min(920px,100%)!important;border-radius:22px 22px 0 0!important}
   .onboarding-shell{width:min(880px,100%)!important}
   .onboard-welcome{padding-top:44px!important}
   .onboard-welcome-logo{width:112px!important;height:112px!important}
@@ -2255,10 +2278,6 @@ body.cooking-active .bottom-nav{height:auto!important;min-height:68px!important;
 
 @media(min-width:900px) and (orientation:landscape){
   body:not(.cooking-active) .shell{width:min(1240px,100%)!important;padding-left:34px!important;padding-right:34px!important}
-  .bottom-nav{
-    width:min(1240px,100%)!important;border-radius:22px 22px 0 0!important;
-    padding-left:80px!important;padding-right:80px!important;
-  }
   .appbar{padding-bottom:18px!important}
   .onboarding-shell{width:min(1180px,100%)!important}
   .onboard-welcome{
@@ -2402,12 +2421,6 @@ body.cooking-active .bottom-nav{height:auto!important;min-height:68px!important;
 
 /* tablet cohesion correction */
 @media(min-width:700px) and (orientation:portrait){
-  .bottom-nav{
-    width:min(720px,calc(100% - 36px))!important;
-    left:50%!important;right:auto!important;transform:translateX(-50%)!important;
-    border:1px solid rgba(218,231,224,.92)!important;border-bottom:0!important;
-    box-shadow:0 -8px 28px rgba(31,65,52,.07)!important;
-  }
   .onboarding-shell:has(.onboard-welcome){width:min(820px,100%)!important}
   .onboarding-shell:has(.onboard-welcome) .onboard-welcome{
     padding-top:34px!important;padding-bottom:18px!important;
@@ -2419,13 +2432,6 @@ body.cooking-active .bottom-nav{height:auto!important;min-height:68px!important;
 }
 
 @media(min-width:900px) and (orientation:landscape){
-  .bottom-nav{
-    width:min(760px,calc(100% - 48px))!important;
-    left:50%!important;right:auto!important;transform:translateX(-50%)!important;
-    border:1px solid rgba(218,231,224,.92)!important;border-bottom:0!important;
-    border-radius:22px 22px 0 0!important;
-    padding-left:34px!important;padding-right:34px!important;
-  }
 
   .onboarding-shell:has(.onboard-welcome){
     width:min(1080px,calc(100% - 56px))!important;
@@ -3600,7 +3606,7 @@ body:not(.cooking-active) .lunch-swap-card .alternative-photo{width:76px;height:
   body:not(.cooking-active) .account-sub{font-size:9px!important;margin-top:3px!important}
   body:not(.cooking-active) .settings-button{width:40px!important;height:40px!important}
   body:not(.cooking-active) .settings-button i{font-size:17px!important}
-  body:not(.cooking-active) .bottom-nav{min-height:54px!important;padding:2px 10px calc(3px + var(--device-safe-bottom))!important}
+  body:not(.cooking-active) .bottom-nav{min-height:54px!important;padding-top:2px!important;padding-bottom:calc(3px + var(--device-safe-bottom))!important}
   body:not(.cooking-active) .navbtn{min-height:44px!important;gap:0!important;font-size:9px!important}
   body:not(.cooking-active) .navicon{width:32px!important;height:24px!important}
   body:not(.cooking-active) .navicon i{font-size:15px!important}
