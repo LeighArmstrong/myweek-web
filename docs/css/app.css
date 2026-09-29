@@ -3646,3 +3646,24 @@ body:not(.cooking-active) .lunch-swap-card .alternative-photo{width:76px;height:
   body.cooking-active .cook-prep-card{padding:12px!important;border-radius:17px!important}
   body.cooking-active .cook-prep-list>div{padding:6px 0!important}
 }
+
+/* QA.21: give seven-day choices comfortable touch targets on narrow screens. */
+@media (max-width:600px){
+  .onboard-counts.cols-5,
+  .onboard-counts.cols-6,
+  .onboard-counts.cols-7{
+    grid-template-columns:repeat(4,minmax(44px,1fr));
+  }
+  .onboard-counts button{
+    min-width:44px;
+    min-height:44px;
+  }
+}
+@media (max-width:900px){
+  .day-toggle-row{
+    grid-template-columns:repeat(4,minmax(44px,1fr));
+  }
+  .day-toggle-row button{
+    width:100%;
+  }
+}
