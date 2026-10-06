@@ -72,7 +72,7 @@ window.MW = window.MW || {};
       if(Math.abs(factor-2)<0.01)return alt+(altUnit||baseUnit||'');
       return scaledNumber(base,factor)+(baseUnit||altUnit||'');
     });
-    text=text.replace(/\b([A-Za-z]+)\[(s|es|ves|ies)\]/g,function(_,word,suffix){
+    text=text.replace(/\b([A-Za-z]+)\[\s*(s|es|ves|ies)\s*\]/g,function(_,word,suffix){
       return shouldPluralise(word,suffix,context)?pluralWord(word,suffix):word;
     });
     return sentenceCase(restoreInstructionBoundaries(text));

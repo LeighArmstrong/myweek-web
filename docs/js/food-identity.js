@@ -102,6 +102,8 @@ window.MW=window.MW||{};
     if(learnedMap[n])return {raw:String(raw).trim(),canonical:learnedMap[n],matched:true,method:'learned'};
     const map=knownExact(),canonical=map.get(n)||map.get(singular(n));
     if(canonical)return {raw:String(raw).trim(),canonical,matched:true,method:common.has(n)?'alias':'exact'};
+    const avoidance=MW.avoidance&&typeof MW.avoidance.resolveOne==='function'?MW.avoidance.resolveOne(raw):null;
+    if(avoidance&&avoidance.matched&&avoidance.method==='category')return {raw:String(raw).trim(),canonical:avoidance.canonical,matched:true,method:'category'};
     return null;
   }
 
@@ -298,7 +300,7 @@ window.MW=window.MW||{};
       const exact=resolveExact(q);
       const rows=suggest(q,Number(opts.limit)||5);
       const html=rows.map((x,i)=>'<button type="button" role="option" data-i="'+i+'" class="food-autocomplete-option"><span><strong>'+escapeHtml(x.label)+'</strong><small>'+(normalise(x.matchedLabel)!==normalise(x.label)?'Matches “'+escapeHtml(x.matchedLabel)+'” · ':'')+'Recognised ingredient</small></span><i class="fa-solid fa-link" aria-hidden="true"></i></button>').join('')+
-        (!exact&&q.length>=2?'<button type="button" class="food-autocomplete-option custom" data-custom="1"><span><strong>Use “'+escapeHtml(q)+'”</strong><small>Custom item · Not linked to recipes</small></span><i class="fa-regular fa-circle-question" aria-hidden="true"></i></button>':'');
+        (!opts.requireMatch&&!exact&&q.length>=2?'<button type="button" class="food-autocomplete-option custom" data-custom="1"><span><strong>Use “'+escapeHtml(q)+'”</strong><small>Custom item · Not linked to recipes</small></span><i class="fa-regular fa-circle-question" aria-hidden="true"></i></button>':'');
       menu.innerHTML=html;
       menu.hidden=!html;
       menu.querySelectorAll('[data-i]').forEach(btn=>{

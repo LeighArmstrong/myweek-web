@@ -28,7 +28,7 @@ window.MW = window.MW || {};
     const s=MW.state.get(),p=MW.pricing;
     const savingMode=options.savingMode==null?Boolean(s.plan.priceMode):Boolean(options.savingMode);
     const force=new Set((s.week&&s.week.forceBuy||[]).map(norm));
-    const remaining=new Map(),buckets=new Map(),inventoryUsed=[];
+    const remaining=new Map(),buckets=new Map(),usageReasons=new Map(),inventoryUsed=[];
     let unresolved=0,matched=0;
     function add(name,amount,reason,category,buyExplicitly,fallbackCost,sourceQuantity){
       if(p.isFreeWater(name)){inventoryUsed.push({name,amountText:amount,reason,implicit:true});return;}
@@ -40,6 +40,14 @@ window.MW = window.MW || {};
         (entry.unit==='g'&&needed<=10&&/^(sesame seeds|pumpkin seeds|sunflower seeds)$/.test(garnishName))
       );
       if(tinyGarnish)return;
+      // Keep provenance for every planned recipe using this retail line, even
+      // when cupboard stock covers that recipe's own contribution.
+      const bucketKey=entry?JSON.stringify([/equivalent/i.test(entry.label)?norm(name):entry.label,entry.unit,entry.packQty,entry.price,entry.savingPrice]):'unpriced:'+norm(name);
+      if(reason){
+        const allReasons=usageReasons.get(bucketKey)||[];
+        if(!allReasons.includes(reason))allReasons.push(reason);
+        usageReasons.set(bucketKey,allReasons);
+      }
       const known=Number.isFinite(needed)&&needed>0;
       if(!known) unresolved++;
       if(known&&!buyExplicitly&&!options.ignoreInventory&&!force.has(norm(name))){

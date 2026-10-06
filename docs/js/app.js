@@ -7,6 +7,48 @@ window.MW = window.MW || {};
   let activeViewTransition=null;
   let previewRolloverFor='';
   const navStack=[];
+  let screenWakeLock=null;
+  const keepScreenAwakeEnabled=()=>Boolean(s().ui&&s().ui.keepScreenAwake);
+  const wakeLockSupported=()=>typeof navigator!=='undefined'&&navigator.wakeLock&&typeof navigator.wakeLock.request==='function';
+  async function releaseScreenWakeLock(){
+    const lock=screenWakeLock;screenWakeLock=null;
+    if(lock&&!lock.released&&typeof lock.release==='function'){try{await lock.release();}catch{}}
+  }
+  async function syncScreenWakeLock(){
+    const shouldHold=keepScreenAwakeEnabled()&&wakeLockSupported()&&!document.hidden;
+    if(!shouldHold){await releaseScreenWakeLock();return false;}
+    if(screenWakeLock&&!screenWakeLock.released)return true;
+    try{
+      const lock=await navigator.wakeLock.request('screen');
+      screenWakeLock=lock;
+      if(lock&&typeof lock.addEventListener==='function')lock.addEventListener('release',()=>{if(screenWakeLock===lock)screenWakeLock=null;});
+      return true;
+    }catch(e){screenWakeLock=null;return false;}
+  }
+  function refreshKeepAwakeControls(){
+    const enabled=keepScreenAwakeEnabled();
+    root.querySelectorAll('[data-keep-awake-toggle]').forEach(input=>{input.checked=enabled;});
+    root.querySelectorAll('.screen-awake-control,.cook-awake-toggle').forEach(row=>row.classList.toggle('is-on',enabled));
+  }
+  function setKeepScreenAwake(enabled){
+    const st=s();st.ui=st.ui||{};st.ui.keepScreenAwake=Boolean(enabled);MW.state.save();
+    refreshKeepAwakeControls();syncScreenWakeLock();
+  }
+  function keepAwakeControl(mode){
+    const enabled=keepScreenAwakeEnabled(),supported=wakeLockSupported();
+    return '<div class="screen-awake-control '+esc(mode||'')+(enabled?' is-on':'')+'">'+
+      '<span class="screen-awake-icon"><i class="fa-solid fa-sun"></i></span>'+
+      '<span class="screen-awake-copy"><strong>Keep screen awake</strong><small>'+(supported?'Only while My Week is on screen':'Not supported on this device')+'</small></span>'+
+      '<label class="toggle"><input type="checkbox" data-keep-awake-toggle '+(enabled?'checked ':'')+(supported?'':'disabled ')+'aria-label="Keep screen awake while using My Week"><span></span></label>'+
+    '</div>';
+  }
+  function keepAwakeHeader(){
+    const enabled=keepScreenAwakeEnabled(),supported=wakeLockSupported();
+    return '<label class="cook-awake-toggle'+(enabled?' is-on':'')+(supported?'':' is-unavailable')+'" title="'+(supported?'Keep screen awake while using My Week':'Screen wake lock is not supported on this device')+'">'+
+      '<span class="cook-awake-label">Keep awake</span>'+
+      '<input type="checkbox" data-keep-awake-toggle '+(enabled?'checked ':'')+(supported?'':'disabled ')+'aria-label="Keep screen awake while using My Week">'+
+      '<span class="cook-awake-switch" aria-hidden="true"></span></label>';
+  }
   const reducedMotion=()=>window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const motionClass=motion=>'motion-'+String(motion||'context').replace(/[^a-z-]/g,'');
   const clearMotionDataset=()=>{if(document.documentElement.dataset.mwMotion) delete document.documentElement.dataset.mwMotion;};
@@ -419,6 +461,31 @@ window.MW = window.MW || {};
       return shown;
     });
   }
+  function gatheredIngredients(r){
+    return MW.preparation&&MW.preparation.gathered?MW.preparation.gathered(r):{};
+  }
+  function gatherToggleButton(r,index,label,checked){
+    return '<button type="button" class="ingredient-check-toggle '+(checked?'is-checked':'')+'" data-recipe-id="'+esc(String(r.id))+'" data-gather-index="'+index+'" data-gather-label="'+esc(label)+'" aria-pressed="'+checked+'" aria-label="'+(checked?'Mark '+esc(label)+' not gathered':'Mark '+esc(label)+' gathered')+'">'+'<span class="ingredient-checkmark" aria-hidden="true">'+icon('check')+'</span></button>';
+  }
+  function updateGatherControls(recipeId,index,checked){
+    root.querySelectorAll('[data-gather-index]').forEach(control=>{
+      if(String(control.dataset.recipeId)!==String(recipeId)||Number(control.dataset.gatherIndex)!==Number(index))return;
+      control.classList.toggle('is-checked',checked);
+      control.setAttribute('aria-pressed',String(checked));
+      const label=control.dataset.gatherLabel||'ingredient';
+      control.setAttribute('aria-label','Mark '+label+(checked?' not gathered':' gathered'));
+      const row=control.closest('.ingredient-row,.cook-prep-check');
+      if(row)row.classList.toggle('is-gathered',checked);
+    });
+  }
+  function toggleGatheredIngredient(control){
+    const r=recipe(control.dataset.recipeId);if(!r)return;
+    const count=MW.preparation.portions(r);if(!count)return;
+    MW.preparation.begin(r,count);
+    const index=Number(control.dataset.gatherIndex),current=Boolean(gatheredIngredients(r)[String(index)]);
+    const checked=MW.preparation.setGathered(r,index,!current);
+    updateGatherControls(r.id,index,checked);
+  }
   function stepSubstitutionNotes(r,step,stepIndex){
     if(!(MW.shopping&&MW.shopping.substitutionForIngredient))return [];
     const notes=[],seen=new Set();
@@ -432,6 +499,34 @@ window.MW = window.MW || {};
       notes.push({originalName:original,replacementName:sub.replacementName});
     });
     return notes;
+  }
+
+  function recipeSubtitle(r){
+    const value=String(r&&r.subtitle||'').trim();if(!value)return '';
+    const lowValue=[
+      /^this .+ is inspired by .+ (?:cuisine|street food)\.?$/i,
+      /^inspired by (?:the )?(?:vibrant |bustling )?(?:streets?|markets?) of\b/i,
+      /^head to\b/i,
+      /^take a trip to\b/i,
+      /^transport (?:your|you)\b/i,
+      /^escape to\b/i,
+      /^tick .+ bucket list\b/i,
+      /^bring (?:some )?sunshine\b/i,
+      /^bring sunshine\b/i,
+      /^let the taste of\b/i,
+      /^take your tastebuds on holiday\b/i,
+      /^fill your kitchen with .+ street food flavours\b/i,
+      /^the stradas of\b/i,
+      /^this dish is inspired by .+ sunshine\.?$/i,
+      /^inspired by (?:spongebob squarepants|mean girls|dora)\.?$/i,
+      /^this is the perfect for a sunny evening\.?$/i,
+      /^nothing compares to a traditional pie/i,
+      /^add more sunshine to your plate\b/i,
+      /^bring the taste of long .+ evenings\b/i,
+      /^these .+ transport you straight to\b/i,
+      /^bite into .+ street food scene\b/i
+    ];
+    return value.split(/(?<=[.!?])\s+(?=[A-Z])/).filter(sentence=>!lowValue.some(re=>re.test(sentence))).join(' ');
   }
 
   function tipForStep(r,step){
@@ -657,6 +752,9 @@ window.MW = window.MW || {};
     document.getElementById('recoveryTitle').focus();
   }
 
+  // Native Android draws beneath its status bar; browser chrome already sits outside the page.
+  document.documentElement.classList.toggle('native-android',Boolean(window.Capacitor&&typeof window.Capacitor.isNativePlatform==='function'&&window.Capacitor.isNativePlatform()));
+
   function render(){
     if(MW.state.recoveryStatus&&MW.state.recoveryStatus().blocked)return storageRecovery();
     const st=s();
@@ -747,7 +845,7 @@ window.MW = window.MW || {};
 
     const featuredMeal=featured?'<article class="home-featured-meal">'+
       recipePhoto(featured.recipe,'home-featured-photo',featured.recipe.title)+
-      '<div class="home-featured-body"><span class="eyebrow">'+esc(day(featured.day).label+"'s dinner")+'</span><h3>'+esc(featured.recipe.title)+'</h3><p>'+esc(featured.recipe.subtitle)+'</p>'+
+      '<div class="home-featured-body"><span class="eyebrow">'+esc(day(featured.day).label+"'s dinner")+'</span><h3>'+esc(featured.recipe.title)+'</h3>'+(recipeSubtitle(featured.recipe)?'<p>'+esc(recipeSubtitle(featured.recipe))+'</p>':'')+
       '<div class="home-featured-meta"><span>'+icon('clock')+' '+esc(timeText(featured.recipe))+'</span><span>'+esc(recipeCostLabel(featured.recipe,st.household.people))+'</span></div>'+
       '<div class="home-featured-actions"><button class="btn primary featured-open" data-recipe="'+featured.recipe.id+'">View recipe</button><button class="btn secondary featured-swap" data-day="'+featured.day+'">'+icon('rotate')+' Change</button></div></div>'+
     '</article>':'';
@@ -755,7 +853,7 @@ window.MW = window.MW || {};
       recipePhoto(m.recipe,'meal-thumb',m.recipe.title)+
       '<button class="meal-open" data-recipe="'+m.recipe.id+'" aria-label="Open '+esc(m.recipe.title)+'">'+
         '<span class="meal-day">'+esc(day(m.day).short)+'</span><strong>'+esc(m.recipe.title)+'</strong>'+
-        '<small>'+esc(m.recipe.subtitle)+'</small>'+
+        (recipeSubtitle(m.recipe)?'<small>'+esc(recipeSubtitle(m.recipe))+'</small>':'')+
         '<span class="meal-meta"><span>'+icon('clock')+' '+esc(timeText(m.recipe))+'</span><span>'+esc(recipeCostLabel(m.recipe,st.household.people))+'</span></span>'+
       '</button>'+
       '<button class="row-swap swap" data-day="'+m.day+'" aria-label="Change '+esc(day(m.day).label)+' meal">'+icon('rotate')+'</button>'+
@@ -861,7 +959,7 @@ window.MW = window.MW || {};
       '<section class="subpage-head"><button class="back-button" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow">'+esc(day(dayKey).label.toUpperCase())+'</span><h1>Choose another dinner</h1></div></section>'+
       '<button class="planner-utility random-pick" id="randomPick">'+icon('shuffle')+'<span><strong>Choose one for me</strong><small>Randomly pick from all '+randomPool.length+' dinners that match your current settings</small></span><i class="fa-solid fa-chevron-right"></i></button>'+
       '<div class="choice-divider"><span>'+alts.length+' best alternative'+(alts.length===1?'':'s')+'</span></div>'+
-      '<div class="alternative-list">'+alts.map(r=>'<button class="alternative-card alt" data-id="'+r.id+'">'+recipePhoto(r,'alternative-photo',r.title)+'<span><strong>'+esc(r.title)+'</strong><small>'+esc(r.subtitle)+'</small><em>'+esc(timeText(r))+' · '+esc(recipeCostLabel(r,s().household.people))+'</em></span><i class="fa-solid fa-chevron-right"></i></button>').join('')+'</div>'+
+      '<div class="alternative-list">'+alts.map(r=>'<button class="alternative-card alt" data-id="'+r.id+'">'+recipePhoto(r,'alternative-photo',r.title)+'<span><strong>'+esc(r.title)+'</strong>'+(recipeSubtitle(r)?'<small>'+esc(recipeSubtitle(r))+'</small>':'')+'<em>'+esc(timeText(r))+' · '+esc(recipeCostLabel(r,s().household.people))+'</em></span><i class="fa-solid fa-chevron-right"></i></button>').join('')+'</div>'+
       '<button class="browse-library" id="browseLibrary">'+icon('magnifying-glass')+'<span><strong>Browse recipe library</strong><small>Search your local recipe collection</small></span><i class="fa-solid fa-chevron-right"></i></button>',
       'plan'
     );
@@ -893,7 +991,7 @@ window.MW = window.MW || {};
     const shortlist=[...practicalRanked,...ranked.filter(x=>!practicalIds.has(x.id))].slice(0,5);
     const shown=showAll?ranked:shortlist;
     const days=(st.plan.lunchDays||[]).length,eaters=Math.max(1,Number(st.plan.lunchPeople)||1),planned=days*eaters;
-    const card=r=>{const style=r.prepStyle==='no-cook'?'Prep at home':'Cook at home',meta=[r.time?r.time+' mins':'Quick prep',style].join(' · ');return '<button class="alternative-card lunch-alt lunch-swap-card" data-id="'+r.id+'">'+recipePhoto(r,'alternative-photo',r.title)+'<span class="lunch-alt-copy"><strong>'+esc(r.title)+'</strong><small>'+esc(r.subtitle)+'</small><em>'+esc(meta)+'</em></span><i class="fa-solid fa-chevron-right"></i></button>';};
+    const card=r=>{const style=r.prepStyle==='no-cook'?'Prep at home':'Cook at home',meta=[r.time?r.time+' mins':'Quick prep',style].join(' · ');return '<button class="alternative-card lunch-alt lunch-swap-card" data-id="'+r.id+'">'+recipePhoto(r,'alternative-photo',r.title)+'<span class="lunch-alt-copy"><strong>'+esc(r.title)+'</strong>'+(recipeSubtitle(r)?'<small>'+esc(recipeSubtitle(r))+'</small>':'')+'<em>'+esc(meta)+'</em></span><i class="fa-solid fa-chevron-right"></i></button>';};
     root.innerHTML=shell(
       '<section class="subpage-head lunch-swap-head"><button class="back-button" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow">CHANGE LUNCH</span><h1>Choose another lunch</h1><p>'+planned+' '+(planned===1?'lunch':'lunches')+' this week</p></div></section>'+
       '<button class="planner-utility random-pick lunch-random" id="randomLunch">'+icon('shuffle')+'<span><strong>Choose one for me</strong><small>Pick from '+randomLunchPool.length+' suitable lunches</small></span><i class="fa-solid fa-chevron-right"></i></button>'+
@@ -1054,7 +1152,7 @@ window.MW = window.MW || {};
       '<section class="shop-progress" id="shopProgress"><div><strong id="shopProgressCount">'+done+' of '+allItems.length+'</strong><span> checked off</span></div><span id="shopProgressPct">'+pct+'%</span><div class="progress"><span id="shopProgressBar" style="width:'+pct+'%"></span></div></section>'+
       (orderLocked?'':shop.savingMode?'<section class="saving-summary compact-saving"><div>'+icon('sterling-sign')+'<div><strong>Lower-price mode</strong><small>~'+money(shop.estimatedSavings)+' estimated saving</small></div></div><label class="toggle"><input id="normalPrice" type="checkbox" checked><span></span></label></section>':'<button class="saving-prompt" id="lowerShop">'+icon('sterling-sign')+'<span><strong>Try to lower the price</strong><small>Replan the week only if the corrected trolley estimate can genuinely fall.</small></span><i class="fa-solid fa-chevron-right"></i></button>')+
       '<div class="category-tabs"><button class="cat-tab active" data-group="__all">All <span>'+allItems.length+'</span></button>'+retailGroups.map(g=>'<button class="cat-tab" data-group="'+esc(g)+'">'+esc(g)+' <span>'+allItems.filter(x=>x.group===g).length+'</span></button>').join('')+'</div>'+
-      '<section class="shop-surface"><div class="shop-group show grouped-shop" data-shopgroup="__all">'+groupedHtml+'</div>'+retailGroups.map(g=>'<div class="shop-group grouped-shop" data-shopgroup="'+esc(g)+'">'+groupHtml(g)+'</div>').join('')+'</section>'+ 
+      '<section class="shop-surface"><div class="shop-group show grouped-shop" data-shopgroup="__all">'+groupedHtml+'</div>'+retailGroups.map(g=>'<div class="shop-group grouped-shop" data-shopgroup="'+esc(g)+'">'+groupHtml(g)+'</div>').join('')+'</section>'+
       postOrderActions,
       'shop'
     );
@@ -1213,7 +1311,7 @@ window.MW = window.MW || {};
       '<div class="category-tabs library-cats">'+filters.map(([key,label])=>'<button type="button" class="cat-tab '+((key==='all'?active.size===0:active.has(key))?'active ':'')+(locked.has(key)?'locked':'')+'" data-cat="'+key+'" '+(locked.has(key)?'disabled':'')+'>'+label+'</button>').join('')+'</div>'+
       (target?'<div class="library-target">'+icon('calendar-day')+' Choosing dinner for <strong>'+esc(day(target).label)+'</strong></div>':'')+'<div id="libraryResults"></div>','cook');
     const resultsHost=document.getElementById('libraryResults'),search=document.getElementById('recipeSearch');
-    const renderResults=()=>{const query=String(search.value||'').trim().toLowerCase();st.ui.libraryQuery=search.value;st.ui.libraryFilters=[...active];MW.state.save();const allResults=local.filter(r=>{const allowed=MW.planner?MW.planner.allowed(r):(!MW.food||MW.food.allowed(r,st.foodProfile));return allowed&&(!query||hay(r).includes(query))&&[...active].every(key=>filterMatch(r,key));});const limit=Math.max(80,Number(st.ui.libraryLimit)||80),results=allResults.slice(0,limit);resultsHost.innerHTML='<div class="library-count"><strong>'+results.length+'</strong> of <strong>'+allResults.length+'</strong> matching recipes shown</div><div class="library-grid">'+results.map(r=>'<button class="library-card" data-id="'+r.id+'">'+recipePhoto(r,'library-photo',r.title)+'<span><strong>'+esc(r.title)+'</strong><small>'+esc(r.subtitle||'Recipe')+'</small></span></button>').join('')+'</div>'+(!results.length?'<div class="empty-state">'+icon('magnifying-glass')+'<h2>No matches</h2><p>Try another search or filter.</p></div>':'')+(results.length<allResults.length?'<button class="refresh-library" id="loadMoreRecipes">'+icon('plus')+' Show 80 more</button>':'');resultsHost.querySelectorAll('.library-card').forEach(b=>b.onclick=()=>{if(target){if(MW.planner.replace(target,b.dataset.id)){st.ui.libraryTargetDay='';MW.state.save();go('day:'+target);}}else go('recipe:'+b.dataset.id);});const more=document.getElementById('loadMoreRecipes');if(more)more.onclick=()=>{st.ui.libraryLimit=(Number(st.ui.libraryLimit)||80)+80;MW.state.save();renderResults();};updateControlNames();};
+    const renderResults=()=>{const query=String(search.value||'').trim().toLowerCase();st.ui.libraryQuery=search.value;st.ui.libraryFilters=[...active];MW.state.save();const allResults=local.filter(r=>{const allowed=MW.planner?MW.planner.allowed(r):(!MW.food||MW.food.allowed(r,st.foodProfile));return allowed&&(!query||hay(r).includes(query))&&[...active].every(key=>filterMatch(r,key));});const limit=Math.max(80,Number(st.ui.libraryLimit)||80),results=allResults.slice(0,limit);resultsHost.innerHTML='<div class="library-count"><strong>'+results.length+'</strong> of <strong>'+allResults.length+'</strong> matching recipes shown</div><div class="library-grid">'+results.map(r=>'<button class="library-card" data-id="'+r.id+'">'+recipePhoto(r,'library-photo',r.title)+'<span><strong>'+esc(r.title)+'</strong>'+(recipeSubtitle(r)?'<small>'+esc(recipeSubtitle(r))+'</small>':'')+'</span></button>').join('')+'</div>'+(!results.length?'<div class="empty-state">'+icon('magnifying-glass')+'<h2>No matches</h2><p>Try another search or filter.</p></div>':'')+(results.length<allResults.length?'<button class="refresh-library" id="loadMoreRecipes">'+icon('plus')+' Show 80 more</button>':'');resultsHost.querySelectorAll('.library-card').forEach(b=>b.onclick=()=>{if(target){if(MW.planner.replace(target,b.dataset.id)){st.ui.libraryTargetDay='';MW.state.save();go('day:'+target);}}else go('recipe:'+b.dataset.id);});const more=document.getElementById('loadMoreRecipes');if(more)more.onclick=()=>{st.ui.libraryLimit=(Number(st.ui.libraryLimit)||80)+80;MW.state.save();renderResults();};updateControlNames();};
     const repaintFilters=()=>{root.querySelectorAll('.library-cats .cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat==='all'?active.size===0:active.has(b.dataset.cat)));document.getElementById('savedLibraryFilters').classList.toggle('is-default',savedMatch());};
     let timer;search.addEventListener('input',()=>{clearTimeout(timer);st.ui.libraryLimit=80;timer=setTimeout(renderResults,120);});document.getElementById('librarySearchForm').addEventListener('submit',e=>{e.preventDefault();clearTimeout(timer);st.ui.libraryLimit=80;renderResults();search.focus();});
     root.querySelectorAll('.library-cats .cat-tab').forEach(b=>b.onclick=()=>{const key=b.dataset.cat;if(key==='all'){active.clear();}else{if(locked.has(key))return;if(active.has(key))active.delete(key);else active.add(key);}st.ui.libraryLimit=80;repaintFilters();renderResults();});
@@ -1232,7 +1330,7 @@ window.MW = window.MW || {};
         ?'<button class="delivery-notice has-missing cook-delivery" id="recipeDelivery">'+icon('triangle-exclamation')+'<span><strong>'+delivery.missingKeys.length+' delivery item'+(delivery.missingKeys.length===1?'':'s')+' missing</strong><small>Review the delivery if anything changes.</small></span><i class="fa-solid fa-chevron-right"></i></button>'
         :'';
     const recipeContent=meals.length
-      ?'<div class="recipe-grid">'+meals.map(m=>{const labels=MW.food?MW.food.labelsFor(m.recipe):[];return '<button class="recipe-card openrecipe" data-id="'+m.recipe.id+'">'+recipePhoto(m.recipe,'recipe-card-photo',m.recipe.title)+'<div><span class="meal-day">'+esc(day(m.day).label)+'</span><h2>'+esc(m.recipe.title)+'</h2><p>'+esc(m.recipe.subtitle)+'</p>'+(labels.length?'<div class="recipe-labels">'+labels.map(x=>'<em>'+esc(x)+'</em>').join('')+'</div>':'')+'<small>'+esc(timeText(m.recipe))+' · '+(m.recipe.scaleSafe===false?'Source quantities':countLabel(st.household.people,'person','people'))+'</small></div></button>';}).join('')+'</div>'
+      ?'<div class="recipe-grid">'+meals.map(m=>{const labels=MW.food?MW.food.labelsFor(m.recipe):[];return '<button class="recipe-card openrecipe" data-id="'+m.recipe.id+'">'+recipePhoto(m.recipe,'recipe-card-photo',m.recipe.title)+'<div><span class="meal-day">'+esc(day(m.day).label)+'</span><h2>'+esc(m.recipe.title)+'</h2>'+(recipeSubtitle(m.recipe)?'<p>'+esc(recipeSubtitle(m.recipe))+'</p>':'')+(labels.length?'<div class="recipe-labels">'+labels.map(x=>'<em>'+esc(x)+'</em>').join('')+'</div>':'')+'<small>'+esc(timeText(m.recipe))+' · '+(m.recipe.scaleSafe===false?'Source quantities':countLabel(st.household.people,'person','people'))+'</small></div></button>';}).join('')+'</div>'
       :'<section class="recipes-empty-state"><span class="empty-state-icon">'+icon('utensils')+'</span><span class="eyebrow">NOTHING TO COOK YET</span><h2>Your planned dinners will appear here</h2><p>Plan this week to get your chosen recipes, ingredients and step by step cooking guides in one place.</p><div><button class="btn primary" id="planRecipesWeek">Plan this week</button><button class="btn secondary" id="browseRecipesEmpty">Browse all recipes</button></div></section>';
     root.innerHTML=shell(
       '<section class="page-head"><div><span class="eyebrow">COOK</span><h1>Your recipes</h1></div><button class="library-shortcut" id="openLibrary">'+icon('magnifying-glass')+'<span>Library'+(onlineCount?' · '+onlineCount:'')+'</span></button></section>'+
@@ -1272,16 +1370,17 @@ window.MW = window.MW || {};
     const meta=[timeText(r),r.scaleSafe===false?'Source quantities':(r.isLunch?countLabel(people,'planned lunch','planned lunches'):countLabel(people,'portion','portions')),mealCost].filter(Boolean);
     const tips=r.isLunch?[]:tipsForRecipe(r);
     const toolsNeeded=cookingEquipment(r);
+    const gathered=gatheredIngredients(r);
     const selectedAllergens=(st.foodProfile&&st.foodProfile.allergens)||[];
     root.innerHTML=shell(
-      '<section class="recipe-hero '+(r.isLunch?'lunch-recipe-hero ':'')+(!displayRecipeImage(r)?'text-only':'')+'">'+recipePhoto(r,'recipe-hero-photo',r.title)+'<div class="recipe-hero-overlay"><button class="back-on-photo" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow light">'+esc(r.online?'ONLINE RECIPE':'MY WEEK RECIPE')+'</span><h1>'+esc(r.title)+'</h1><p>'+esc(r.subtitle)+'</p><div class="hero-meta">'+meta.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div></div></div></section>'+
+      '<section class="recipe-hero '+(r.isLunch?'lunch-recipe-hero ':'')+(!displayRecipeImage(r)?'text-only':'')+'">'+recipePhoto(r,'recipe-hero-photo',r.title)+'<div class="recipe-hero-overlay"><button class="back-on-photo" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow light">'+esc(r.online?'ONLINE RECIPE':'MY WEEK RECIPE')+'</span><h1>'+esc(r.title)+'</h1>'+(recipeSubtitle(r)?'<p>'+esc(recipeSubtitle(r))+'</p>':'')+'<div class="hero-meta">'+meta.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div></div></div></section>'+
       (r.isLunch?(()=>{const q=MW.preparation.quantities(r),days=(st.plan.lunchDays||[]).length,eaters=Math.max(1,Number(st.plan.lunchPeople)||1),equation=days+' lunch day'+(days===1?'':'s')+' × '+eaters+' '+(eaters===1?'person':'people')+' = '+q.planned+' '+(q.planned===1?'lunch':'lunches');return '<section class="preparation-note lunch-plan-note lunch-plan-compact"><span class="eyebrow">YOUR LUNCH PLAN · PREP AT HOME</span><h2>'+q.planned+' '+(q.planned===1?'lunch':'lunches')+' this week</h2><div class="lunch-plan-equation">'+esc(equation)+'</div></section>';})():'')+
-      '<button class="start-cooking" id="startCooking" '+(r.isLunch&&!people?'disabled':'')+'>'+icon('play')+'<span><strong>'+(r.isLunch?'Prep at home step by step':'Cook step by step')+'</strong><small>'+(r.isLunch?'Work only needs a microwave or kettle':'Big instructions, one step at a time')+'</small></span><i class="fa-solid fa-chevron-right"></i></button>'+
+      '<button class="start-cooking" id="startCooking" '+(r.isLunch&&!people?'disabled':'')+'>'+icon('play')+'<span><strong>'+(r.isLunch?'Prep at home step by step':'Cook step by step')+'</strong></span><i class="fa-solid fa-chevron-right"></i></button>'+
       (r.online?'<div class="source-note">'+icon('circle-info')+'<span>Recipe from '+esc(r.source||'online source')+'. Ingredient quantities are kept as published.</span></div>':'')+
       ((!r.online&&r.sourcedCatalogue&&r.sourceUrl)?'<a class="photo-credit" href="'+esc(r.sourceUrl)+'" target="_blank" rel="noopener">Recipe source · '+esc(r.source||'Published recipe')+'</a>':((!r.online&&r.imageSource&&displayRecipeImage(r))?'<a class="photo-credit" href="'+esc(r.imageSource)+'" target="_blank" rel="noopener">Photo source · '+esc(r.imageLicense||'Source')+'</a>':''))+
       ((MW.equipment&&MW.equipment.requirements(r).length)?'<div class="equipment-note">'+icon('utensils')+'<span>Requires '+esc(MW.equipment.requirements(r).map(MW.equipment.label).join(', '))+'.</span></div>':'')+
       (selectedAllergens.length?'<div class="allergen-note">'+icon('triangle-exclamation')+'<span>Allergen filters use listed ingredients only. Check packets, labels and cross-contamination information.</span></div>':'')+
-      '<section class="recipe-section ingredients-section"><div class="section-title"><div><span class="eyebrow">INGREDIENTS</span><h2>What you need</h2></div></div>'+r.ingredients.map((x,ingredientIndex)=>{const practical=practicalQuantity(r,ingredientIndex,factor),planned=practical?practical.amount:(MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,x[0],x[1],factor):(r.scaleSafe===false?x[0]:MW.shopping.scaleAmount(x[0],factor))),shown=substitutedIngredient(x[1],planned),approximate=!shown.substitution&&Boolean(practical&&practical.approximate),stocked=MW.inventory&&MW.inventory.covers(shown.name,shown.amount),subNote=shown.substitution?'<small class="ingredient-substitution-note">'+icon('right-left')+' Instead of '+esc(ingredientName(shown.originalName))+' · recipe calls for '+esc(displayAmount(shown.originalAmount))+(shown.comparable?'':' · quantity comparison needs judgement')+'</small>':'';return '<div class="ingredient-row '+(stocked?'from-cupboard ':'')+(shown.substitution?'has-substitution':'')+'"><span>'+esc(ingredientName(shown.name))+(stocked?'<small>In your cupboard</small>':'')+subNote+'</span><strong>'+esc(cookingAmount(shown.amount,approximate))+'</strong><button type="button" class="ingredient-more" data-ingredient="'+esc(x[1])+'" aria-label="More options for '+esc(ingredientName(x[1]))+'">'+icon('ellipsis-vertical')+'</button></div>';}).join('')+'</section>'+
+      '<section class="recipe-section ingredients-section"><div class="section-title"><div><span class="eyebrow">INGREDIENTS</span><h2>What you need</h2></div></div>'+r.ingredients.map((x,ingredientIndex)=>{const practical=practicalQuantity(r,ingredientIndex,factor),planned=practical?practical.amount:(MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,x[0],x[1],factor):(r.scaleSafe===false?x[0]:MW.shopping.scaleAmount(x[0],factor))),shown=substitutedIngredient(x[1],planned),approximate=!shown.substitution&&Boolean(practical&&practical.approximate),stocked=MW.inventory&&MW.inventory.covers(shown.name,shown.amount),label=ingredientName(shown.name),checked=Boolean(gathered[String(ingredientIndex)]),subNote=shown.substitution?'<small class="ingredient-substitution-note">'+icon('right-left')+' Instead of '+esc(ingredientName(shown.originalName))+' · recipe calls for '+esc(displayAmount(shown.originalAmount))+(shown.comparable?'':' · quantity comparison needs judgement')+'</small>':'';return '<div class="ingredient-row '+(stocked?'from-cupboard ':'')+(shown.substitution?'has-substitution ':'')+(checked?'is-gathered':'')+'">'+gatherToggleButton(r,ingredientIndex,label,checked)+'<span>'+esc(label)+(stocked?'<small>In your cupboard</small>':'')+subNote+'</span><strong>'+esc(cookingAmount(shown.amount,approximate))+'</strong><button type="button" class="ingredient-more" data-ingredient="'+esc(x[1])+'" aria-label="More options for '+esc(ingredientName(x[1]))+'">'+icon('ellipsis-vertical')+'</button></div>';}).join('')+'</section>'+
       '<section class="recipe-section equipment-section"><div class="section-title"><div><span class="eyebrow">EQUIPMENT</span><h2>Get these ready</h2></div></div><div class="cook-equipment-list">'+toolsNeeded.map(x=>'<span>'+icon('check')+esc(x)+'</span>').join('')+'</div></section>'+
       '<section class="recipe-section method-section"><div class="section-title"><div><span class="eyebrow">METHOD</span><h2>Cook it</h2></div></div><div class="steps">'+r.steps.map((x,i)=>{const used=stepIngredients(r,x,factor,i);return '<div class="step"><span>'+(i+1)+'</span><div><p>'+esc(displayInstruction(x,r,factor,people))+'</p>'+(used.length?'<div class="step-amounts">'+used.map(v=>{const shown=substitutedIngredient(v.name,v.amount),approximate=!shown.substitution&&Boolean(v.practicalApproximate);return '<em>'+esc(cookingAmount(shown.amount,approximate))+' '+esc(ingredientName(shown.name))+(shown.substitution?' '+icon('right-left'):'')+'</em>';}).join('')+'</div>':'')+'</div></div>';}).join('')+'</div></section>'+
       (tips.length?'<section class="recipe-section tips-section"><div class="section-title"><div><span class="eyebrow">HELPFUL</span><h2>Tips & tricks</h2></div></div>'+tips.map(t=>'<div class="tip-row">'+icon('lightbulb')+'<span>'+esc(t)+'</span></div>').join('')+'</section>':''),
@@ -1302,28 +1401,28 @@ window.MW = window.MW || {};
     const factor=r.scaleSafe===false?1:people/(r.servings||2);
     const ingredients=prepIngredients(r,factor);
     const equipment=cookingEquipment(r);
+    const gathered=gatheredIngredients(r);
     root.innerHTML=
       '<main class="cook-screen cook-prep-screen">'+
         '<header class="cook-topbar">'+
-          '<button class="cook-close" id="closePrep" aria-label="Close cooking mode">'+icon('xmark')+'</button>'+
+          '<button class="cook-close" id="closePrep" aria-label="Pause cooking">'+icon('xmark')+'</button>'+
           '<div class="cook-title"><span>Before you start</span><strong>'+esc(r.title)+'</strong></div>'+
-          '<span class="cook-count prep-count">'+icon('list-check')+'</span>'+
+          '<div class="cook-header-tools"><span class="cook-count prep-count">'+icon('list-check')+'</span>'+keepAwakeHeader()+'</div>'+
         '</header>'+
         '<section class="cook-prep-scroll">'+
           '<article class="cook-prep-intro">'+
-            '<span class="cook-step-kicker">GET READY FIRST</span>'+
             '<h1>Collect everything before you cook</h1>'+
-            '<p>Get these ingredients and bits of equipment out now. Then Step 1 can start without hunting through cupboards while something is already on the heat.</p>'+
           '</article>'+
-          (r.isLunch?(()=>{const q=MW.preparation.quantities(r),days=(st.plan.lunchDays||[]).length,eaters=Math.max(1,Number(st.plan.lunchPeople)||1),equation=days+' lunch day'+(days===1?'':'s')+' × '+eaters+' '+(eaters===1?'person':'people')+' = '+q.planned+' '+(q.planned===1?'lunch':'lunches');return '<section class="preparation-note lunch-plan-note lunch-plan-compact"><span class="eyebrow">WEEKLY LUNCH PREP · AT HOME</span><h2>'+people+' '+(people===1?'lunch':'lunches')+' to prepare</h2><div class="lunch-plan-equation">'+esc(equation)+'</div>'+(q.prepared?'<p class="lunch-plan-summary">'+q.prepared+' already prepared · '+q.remaining+' remaining</p>':'')+'<details class="lunch-storage-note"><summary>Workday storage & reheating</summary><p>'+esc(r.storageNote)+'</p>'+(r.restText?'<p>'+esc(r.restText)+'</p>':'')+'</details></section>';})():'')+
           '<section class="cook-prep-card">'+
-            '<div class="cook-prep-heading">'+icon('basket-shopping')+'<div><span>Ingredients</span><strong>Get these out</strong></div></div>'+
-            '<div class="cook-prep-list">'+ingredients.map(v=>'<div class="'+(v.substitution?'has-substitution':'')+'"><span>'+esc(ingredientName(v.name))+(v.substitution?'<small>'+icon('right-left')+' Instead of '+esc(ingredientName(v.originalName))+'</small>':'')+'</span><strong>'+esc(cookingAmount(v.amount,v.practicalApproximate))+'</strong></div>').join('')+'</div>'+
+            '<div class="cook-prep-heading">'+icon('basket-shopping')+'<div><strong>Ingredients</strong></div></div>'+
+            '<div class="cook-prep-list">'+ingredients.map((v,ingredientIndex)=>{const label=ingredientName(v.name),checked=Boolean(gathered[String(ingredientIndex)]);return '<button type="button" class="cook-prep-check '+(v.substitution?'has-substitution ':'')+(checked?'is-gathered is-checked':'')+'" data-recipe-id="'+esc(String(r.id))+'" data-gather-index="'+ingredientIndex+'" data-gather-label="'+esc(label)+'" aria-pressed="'+checked+'" aria-label="'+(checked?'Mark '+esc(label)+' not gathered':'Mark '+esc(label)+' gathered')+'"><span class="cook-prep-checkmark">'+icon('check')+'</span><span class="cook-prep-name">'+esc(label)+(v.substitution?'<small>'+icon('right-left')+' Instead of '+esc(ingredientName(v.originalName))+'</small>':'')+'</span><strong>'+esc(cookingAmount(v.amount,v.practicalApproximate))+'</strong></button>';}).join('')+'</div>'+
           '</section>'+
           '<section class="cook-prep-card">'+
-            '<div class="cook-prep-heading">'+icon('utensils')+'<div><span>Equipment</span><strong>Have this ready</strong></div></div>'+
+            '<div class="cook-prep-heading">'+icon('utensils')+'<div><strong>Equipment</strong></div></div>'+
             '<div class="cook-equipment-list">'+equipment.map(x=>'<span>'+icon('check')+esc(x)+'</span>').join('')+'</div>'+
           '</section>'+
+          (r.isLunch?(()=>{const q=MW.preparation.quantities(r),days=(st.plan.lunchDays||[]).length,eaters=Math.max(1,Number(st.plan.lunchPeople)||1),equation=days+' lunch day'+(days===1?'':'s')+' × '+eaters+' '+(eaters===1?'person':'people')+' = '+q.planned+' '+(q.planned===1?'lunch':'lunches');return '<section class="preparation-note lunch-plan-note lunch-plan-compact"><span class="eyebrow">WEEKLY LUNCH PREP · AT HOME</span><h2>'+people+' '+(people===1?'lunch':'lunches')+' to prepare</h2><div class="lunch-plan-equation">'+esc(equation)+'</div>'+(q.prepared?'<p class="lunch-plan-summary">'+q.prepared+' already prepared · '+q.remaining+' remaining</p>':'')+'<details class="lunch-storage-note"><summary>Workday storage & reheating</summary><p>'+esc(r.storageNote)+'</p>'+(r.restText?'<p>'+esc(r.restText)+'</p>':'')+'</details></section>';})():'')+
+          '<button type="button" class="text-action cancel-cooking" id="cancelCooking">Cancel cooking</button>'+
         '</section>'+
         '<nav class="cook-controls prep-controls" aria-label="Start cooking">'+
           '<button class="cook-control secondary" id="backToRecipe">'+icon('arrow-left')+'<span>Recipe</span></button>'+
@@ -1332,10 +1431,45 @@ window.MW = window.MW || {};
         globalNav('cook')+
       '</main>';
     document.body.classList.add('cooking-active');
+    document.getElementById('cancelCooking').onclick=()=>{MW.preparation.cancel(r);leaveCookingFlow('recipe:'+id);};
     document.getElementById('closePrep').onclick=()=>leaveCookingFlow('recipe:'+id);
     document.getElementById('backToRecipe').onclick=()=>leaveCookingFlow('recipe:'+id);
     document.getElementById('beginSteps').onclick=()=>go('cookstep:'+id+':0');
     bindNav();
+  }
+
+  function guidedStepTitle(caption,instruction){
+    const clean=value=>String(value||'').replace(/[*#]/g,'').replace(/\[(s|es)\]/gi,'$1').replace(/\([^)]*\)/g,'').replace(/\s+/g,' ').trim();
+    const supplied=clean(caption).replace(/^(?:step|instruction)\s*\d+(?:\s*(?:of|\/)\s*\d+)?\s*[:.\-]?\s*/i,'').replace(/[.!?:]+$/,'').trim();
+    const generic=/^(?:get started|get prepping|get prepped|get chopping|get frying|get baking|prep time|finish the prep|preparation|method|all together now|all together|finishing touches|add the flavour|dinner's ready|serve up)$/i;
+    // A caption names the stage; the complete method stays in the instructions.
+    if(supplied&&supplied.length<=36&&supplied.split(/\s+/).length<=5&&!generic.test(supplied)&&!/^(?:peel|chop|dice|slice|cut|grate|crush)\b/i.test(supplied))return supplied;
+    const text=clean(instruction||caption),match=/\b(preheat|heat|boil|bring|prepare|peel|chop|dice|slice|cut|grate|crush|halve|prick|pat|wash|zest|squeeze|separate|coat|layer|top|sprinkle|dress|shred|pull|melt|warm|wrap|cover|chill|rest|put|transfer|return|share|drain|rinse|mix|combine|whisk|stir|add|cook|roast|bake|fry|brown|sear|simmer|blend|blitz|assemble|divide|serve|toss|season|spread|fluff|mash|toast|pour|place|pop|remove)\b/i.exec(text);
+    if(/^Use this time to/i.test(text)&&/clear up|set the table|cup of tea/i.test(text))return 'While it cooks';
+    if(!match)return 'Follow the method';
+    const verb=match[1].toLowerCase(),action=text.slice(match.index).split(/[.!?;]/)[0];
+    if(/^(?:heat|preheat)$/.test(verb)){const equipment=/\b(oven|pan|pot|saucepan)\b/i.exec(action);if(equipment)return equipment[1].toLowerCase()==='oven'?'Preheat the oven':'Heat the pan';if(verb==='preheat')return 'Preheat the oven';}
+    if(verb==='heat'&&/\b(?:pan|pot|saucepan)\b/i.test(action))return 'Heat the pan';
+    if(/^wash\s+(?:(?:your|the)\s+)?hands\b/i.test(action))return 'Wash your hands';
+    if(/^(?:wash|rinse)\s+(?:(?:your|the|a)\s+)?(?:pan|knife|chopping board|cutting board|equipment)\b/i.test(action))return 'Clean the equipment';
+    if(verb==='boil'&&/\bkettle\b/i.test(action))return 'Boil the kettle';
+    if(verb==='bring'&&/\bwater\b/i.test(action))return 'Boil the water';
+    if(verb==='serve'||/^(?:divide|share)$/.test(verb)&&/\b(?:plates?|serving bowls?|serve)\b/i.test(action))return 'Assemble and serve';
+    if(verb==='assemble'&&/\blasagne\b/i.test(action))return 'Assemble the lasagne';
+    if(verb==='put'&&/\boven\b/i.test(action))return 'Cook in the oven';
+    if(verb==='layer'&&/\blasagne\b/i.test(action))return 'Assemble the lasagne';
+    if(verb==='transfer'&&/\bshred\b/i.test(action)&&/\bchicken\b/i.test(action))return 'Shred the chicken';
+    const vegetables=/\b(?:onions?|garlic|carrots?|courgettes?|zucchini|aubergines?|eggplants?|tomatoes?|peppers?|leeks?|mushrooms?|broccoli|cauliflower|cabbage|kale|spinach|cucumbers?|lettuce|celery|potatoes?|ginger|vegetables?)\b/i;
+    const prep=/^(?:prepare|peel|chop|dice|slice|cut|grate|crush|halve|prick)$/.test(verb);
+    const protein=/\b(chicken|beef|pork|lamb|fish|salmon|tofu|halloumi)\b/i.exec(action);
+    if(prep&&vegetables.test(action))return protein?'Prepare the ingredients':'Prepare the vegetables';
+    const targets=[['pasta',/\bpasta\b/i],['rice',/\brice\b/i],['noodles',/\bnoodles?\b/i],['sauce',/\bsauce\b/i],['dressing',/\bdressing\b/i],['filling',/\bfilling\b/i],['chicken',/\bchicken\b/i],['beef',/\bbeef\b/i],['pork',/\bpork\b/i],['lamb',/\blamb\b/i],['fish',/\b(?:fish|salmon|cod|haddock|prawns?|tuna)\b/i],['potatoes',/\bpotatoes?\b/i],['beans',/\bbeans?\b/i],['lentils',/\blentils?\b/i],['tofu',/\btofu\b/i],['eggs',/\beggs?\b/i],['bread',/\b(?:bread|flatbreads?|ciabattas?|naans?|tortillas?)\b/i],['lemon',/\blemons?\b/i],['lime',/\blimes?\b/i],['butter',/\bbutter\b/i],['dough',/\bdough\b/i],['batter',/\bbatter\b/i],['soup',/\bsoup\b/i],['stock',/\bstock\b/i],['herbs',/\b(?:herbs?|parsley|coriander|basil|mint)\b/i],['cheese',/\b(?:cheese|feta|halloumi|cheddar|parmesan)\b/i],['salad',/\b(?:salad|lettuce)\b/i],['couscous',/\bcouscous\b/i],['bulgur',/\bbulgur\b/i],['quinoa',/\bquinoa\b/i],['oats',/\boats\b/i],['spices',/\bspices?\b/i],['bacon',/\bbacon\b/i],['tomatoes',/\btomatoes?\b/i],['vegetables',vegetables]];
+    const target=targets.map(([label,pattern])=>({label,index:action.search(pattern)})).filter(x=>x.index>=0).sort((a,b)=>a.index-b.index)[0];
+    const labels={prepare:'Prepare',peel:'Prepare',chop:'Prepare',dice:'Prepare',slice:'Prepare',cut:'Prepare',grate:'Prepare',crush:'Prepare',halve:'Prepare',prick:'Prepare',pat:'Dry',top:'Finish',pull:'Shred',layer:'Assemble',return:'Cook',bring:'Heat',stir:'Mix',blitz:'Blend',place:'Add',pop:'Add'};
+    const label=labels[verb]||verb.charAt(0).toUpperCase()+verb.slice(1);
+    if(target)return label+' the '+target.label;
+    const fallback={coat:'Coat the ingredients',cover:'Cover the dish',transfer:'Transfer the ingredients',wash:'Wash the ingredients',zest:'Prepare the citrus',separate:'Separate the eggs',top:'Finish the dish',boil:'Boil the water',heat:'Heat the pan',mix:'Mix the ingredients',combine:'Combine the ingredients',whisk:'Whisk the mixture',stir:'Stir the mixture',add:'Combine the ingredients',place:'Assemble the dish',pop:'Assemble the dish',remove:'Finish the cooking',spread:'Assemble the dish',fluff:'Fluff the grains',season:'Season the dish',pour:'Add the liquid',mash:'Mash the ingredients',blend:'Blend the mixture',blitz:'Blend the mixture'};
+    return fallback[verb]||label+' the ingredients';
   }
 
   function cookStep(id,index){
@@ -1358,7 +1492,7 @@ window.MW = window.MW || {};
     const localStep=r&&MW.sourcedImageMap&&MW.sourcedImageMap.steps&&MW.sourcedImageMap.steps[r.id]&&MW.sourcedImageMap.steps[r.id][index]||'';
     const safeStepFallback=MW.cookingVisuals&&MW.cookingVisuals.fallbackForStep?MW.cookingVisuals.fallbackForStep(currentStep,index,r):null;
     const stepCandidates=[...new Set([localStep,helloFreshMirror(exactStep,900),exactStep,helloFreshMirror(originalStep,900),originalStep,safeStepFallback&&safeStepFallback.src].filter(Boolean))];
-    const stepTitle=String(stepMeta&&stepMeta.caption||('Step '+(index+1))).trim();
+    const stepTitle=guidedStepTitle(stepMeta&&stepMeta.caption,currentStep);
     const displayedStep=displayInstruction(currentStep,r,factor,people);
     const instructionParts=String(displayedStep).split(/(?<=[.!?])\s+(?=[A-Z])/)
       .map(x=>x.trim()).filter(Boolean);
@@ -1375,14 +1509,13 @@ window.MW = window.MW || {};
     root.innerHTML=
       '<main class="cook-screen">'+
         '<header class="cook-topbar">'+
-          '<button class="cook-close" id="closeCook" aria-label="Close cooking mode">'+icon('xmark')+'</button>'+
-          '<div class="cook-title"><span>Step '+(index+1)+' of '+steps.length+'</span><strong>'+esc(r.title)+'</strong></div>'+
-          '<span class="cook-count">'+(index+1)+'/'+steps.length+'</span>'+
+          '<button class="cook-close" id="closeCook" aria-label="Pause cooking">'+icon('xmark')+'</button>'+
+          '<div class="cook-title"><strong>'+esc(r.title)+'</strong></div>'+
+          '<div class="cook-header-tools"><span class="cook-count" aria-label="Step '+(index+1)+' of '+steps.length+'">'+(index+1)+'/'+steps.length+'</span>'+keepAwakeHeader()+'</div>'+
         '</header>'+
         '<div class="cook-progress-track" aria-hidden="true"><span style="width:'+pct+'%"></span></div>'+
         '<section class="cook-scroll '+(stepCandidates.length?'has-visual':'no-visual')+'" id="cookScroll">'+
           '<article class="cook-step-summary">'+
-            '<div class="cook-step-heading"><span class="cook-step-badge">'+(index+1)+'</span><div><span class="cook-step-kicker">Do this now</span><strong>Step '+(index+1)+' of '+steps.length+'</strong></div></div>'+
             '<h1>'+esc(stepTitle)+'</h1>'+
             (stepFacts.length?'<div class="cook-step-facts">'+stepFacts.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>':'')+
           '</article>'+
@@ -1398,6 +1531,7 @@ window.MW = window.MW || {};
               '</div>'
             :'')+
             (tip?'<div class="cook-tip">'+icon('lightbulb')+'<span><strong>Top tip</strong><small>'+esc(tip)+'</small></span></div>':'')+
+            '<div class="cook-session-tools"><button type="button" class="text-action cancel-cooking" id="cancelCooking">Cancel cooking</button></div>'+
           '</article>'+
         '</section>'+
         '<nav class="cook-controls" aria-label="Cooking steps">'+
@@ -1408,6 +1542,7 @@ window.MW = window.MW || {};
       '</main>';
 
     document.body.classList.add('cooking-active');
+    document.getElementById('cancelCooking').onclick=()=>{MW.preparation.cancel(r);leaveCookingFlow('recipe:'+id);};
     document.getElementById('closeCook').onclick=()=>leaveCookingFlow('recipe:'+id);
     document.getElementById('prevStep').onclick=()=>{
       if(index>0) go('cookstep:'+id+':'+(index-1));
@@ -1436,15 +1571,16 @@ window.MW = window.MW || {};
       '<section class="settings-section"><label>First name</label><input id="profileName" value="'+esc((st.profile&&st.profile.name)||'')+'" placeholder="Your name"></section>'+
       '<section class="settings-section"><label>Supermarket</label><span class="select-control settings-select-control"><select id="retailer">'+MW.RETAILERS.map(x=>'<option '+(x===st.household.retailer?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select>'+icon('chevron-down')+'</span></section>'+
       '<section class="settings-section"><label>Weekly food budget</label><div class="prefix-input"><span>£</span><input id="budget" type="number" inputmode="decimal" min="0" step="1" value="'+st.household.budget+'"></div></section>'+
-      '<section class="settings-section food-settings"><label>Eating style</label>'+foodChoice('settingsDiet',MW.food.patterns,foodProfile().diet)+'<label class="sub-label">Meal priorities</label>'+multiFoodChoice('settingsGoals',MW.food.goals,foodProfile().goals)+'<label class="sub-label">Lunch styles you like</label>'+multiFoodChoice('settingsLunchStyles',MW.food.lunchStyles,MW.food.lunchPreferences?MW.food.lunchPreferences(foodProfile()):[foodProfile().lunchStyle||'any'])+'<small class="setting-help">Choose one or more. My Week still picks one lunch recipe for the week by default.</small><label class="sub-label">Foods you do not want</label><div class="food-autocomplete-host"><input id="avoidFoods" value="'+esc(avoidValue)+'" placeholder="Start typing a food"></div><small class="setting-help">Type a food and choose the recognised match. Add commas for more than one food.</small><span class="avoid-feedback" id="settingsAvoidFeedback"></span><details class="allergen-details compact"><summary><span><strong>Allergens</strong><small>'+((foodProfile().allergens||[]).length?foodProfile().allergens.length+' selected':'None selected')+'</small></span>'+icon('chevron-down')+'</summary>'+multiFoodChoice('settingsAllergens',MW.food.allergens,foodProfile().allergens)+'<p class="allergen-warning">Recipes without verified allergen records are excluded. Always check ingredient and product labels for your own allergies.</p></details></section>'+
+      '<section class="settings-section food-settings"><label>Eating style</label>'+foodChoice('settingsDiet',MW.food.patterns,foodProfile().diet)+'<label class="sub-label">Meal priorities</label>'+multiFoodChoice('settingsGoals',MW.food.goals,foodProfile().goals)+'<label class="sub-label">Lunch styles you like</label>'+multiFoodChoice('settingsLunchStyles',MW.food.lunchStyles,MW.food.lunchPreferences?MW.food.lunchPreferences(foodProfile()):[foodProfile().lunchStyle||'any'])+'<small class="setting-help">Choose one or more. My Week still picks one lunch recipe for the week by default.</small><label class="sub-label">Foods you do not want</label><div class="food-autocomplete-host"><input id="avoidFoods" value="'+esc(avoidValue)+'" placeholder="Start typing a food"></div><small class="setting-help">Type foods normally or choose a suggestion. Add commas for more than one. Applied filters appear below.</small><span class="avoid-feedback" id="settingsAvoidFeedback"></span><details class="allergen-details compact"><summary><span><strong>Allergens</strong><small>'+((foodProfile().allergens||[]).length?foodProfile().allergens.length+' selected':'None selected')+'</small></span>'+icon('chevron-down')+'</summary>'+multiFoodChoice('settingsAllergens',MW.food.allergens,foodProfile().allergens)+'<p class="allergen-warning">Only use allergens for genuine allergies or intolerances, not foods you simply dislike. My Week uses the meal-box source declaration and excludes recipes containing or potentially containing selected allergens. Always check the ingredient and product labels you actually receive.</p></details></section>'+
       '<section class="settings-section equipment-settings"><div class="setting-title"><div><label>Kitchen equipment</label><small>Standard oven, hob, pans and utensils are assumed. Select specialist appliances you can use.</small></div></div><div class="equipment-grid" id="settingsEquipment">'+MW.equipment.items.map(x=>'<button type="button" data-v="'+x.id+'" class="'+((st.household.equipment||[]).includes(x.id)?'active':'')+'">'+icon(x.icon||'utensils')+'<span>'+esc(x.label)+'</span></button>').join('')+'</div></section>'+
+      '<section class="settings-section cooking-display-setting">'+keepAwakeControl('settings')+'</section>'+
       '<section class="settings-section"><div class="setting-title"><div><label>Dinner days</label><small>Choose the days you want dinner planned.</small></div></div>'+dayToggles('dinnerDays',st.plan.dinnerDays)+'</section>'+
       '<section class="settings-section"><div class="setting-title"><div><label>Lunch days</label><small>Your lunch recipe scales automatically to these days.</small></div></div>'+dayToggles('lunchDays',st.plan.lunchDays)+'<label class="sub-label">People eating the planned lunch</label>'+selectionButtons('lunchPeople',[1,2,3,4].map(v=>({v,label:String(v)})),st.plan.lunchPeople,'numeric-choice-row')+'</section>'+
       '<section class="settings-section"><button class="settings-link" id="cupboard">'+icon('box-open')+'<span><strong>My cupboard</strong><small>'+Object.keys(st.inventory||{}).length+' tracked items</small></span><i class="fa-solid fa-chevron-right"></i></button></section>'+
       '<section class="settings-section"><button class="settings-link" id="deviceSync">'+icon('arrows-rotate')+'<span><strong>Device sync & transfer</strong><small>Move My Week between devices without an account or server</small></span><i class="fa-solid fa-chevron-right"></i></button></section>'+
       (MW.updates?'<section class="settings-section app-update-section" id="appUpdatePanel"><button class="settings-link" id="checkUpdates">'+icon('cloud-arrow-down')+'<span><strong>App updates</strong><small id="updateStatus">'+(MW.updates.isNativeAndroid()?'Checking installed version…':'Web app updates automatically')+'</small></span><i class="fa-solid fa-chevron-right"></i></button><div class="update-release" id="updateRelease" hidden></div></section>':'')+
       '<section class="settings-section"><div class="switch-row"><span><strong>Lower-cost planning</strong><small>Cheaper meals and more ingredient overlap.</small></span><label class="toggle"><input id="priceMode" type="checkbox" '+(st.plan.priceMode?'checked':'')+'><span></span></label></div></section>'+
-      '<div class="plan-actions single-action"><button class="btn primary" id="save">Save & rebuild week</button></div>'+ 
+      '<div class="plan-actions single-action"><button class="btn primary" id="save">Save & rebuild week</button></div>'+
       '<button class="danger-link" id="reset">Reset My Week</button>' ,
       'more'
     );
@@ -1472,13 +1608,20 @@ window.MW = window.MW || {};
     const renderAvoidFeedback=()=>{
       if(!avoidFoods||!settingsAvoidFeedback||!MW.foodIdentity) return;
       const parsed=MW.foodIdentity.parseList(avoidFoods.value);
-      const bits=[];
-      if(parsed.linked.length)bits.push('<span class="avoid-ok">'+icon('circle-check')+' Recognised: '+parsed.linked.map(x=>esc(MW.foodIdentity.canonicalLabel(x))).join(' · ')+'</span>');
-      if(parsed.custom.length)bits.push('<span class="avoid-warn">'+icon('circle-question')+' Custom, not linked: '+parsed.custom.map(esc).join(', ')+'</span>');
-      settingsAvoidFeedback.innerHTML=bits.join('');
+      if(!parsed.items.length){settingsAvoidFeedback.innerHTML='';return;}
+      const applied=parsed.items.map((item,index)=>({item,index})).filter(x=>x.item.matched);
+      const unresolved=parsed.items.map((item,index)=>({item,index})).filter(x=>!x.item.matched);
+      const chips=applied.map(({item,index})=>'<button type="button" class="avoid-applied-chip" data-avoid-remove="'+index+'" aria-label="Remove '+esc(MW.foodIdentity.canonicalLabel(item.canonical))+'"><span>'+esc(MW.foodIdentity.canonicalLabel(item.canonical))+'</span>'+icon('xmark')+'</button>').join('');
+      const unresolvedText=unresolved.length?'<span class="avoid-unresolved-note">'+icon('circle-question')+' Not applied: '+unresolved.map(x=>esc(x.item.raw)).join(', ')+'. Choose a recognised suggestion or correct the wording.</span>':'';
+      settingsAvoidFeedback.innerHTML=(chips?'<span class="avoid-feedback-label">Applied</span><span class="avoid-chip-list">'+chips+'</span>':'')+unresolvedText;
+      settingsAvoidFeedback.querySelectorAll('[data-avoid-remove]').forEach(button=>button.onclick=()=>{
+        const removeIndex=Number(button.dataset.avoidRemove);
+        avoidFoods.value=parsed.items.filter((_,index)=>index!==removeIndex).map(x=>x.raw).join(', ');
+        renderAvoidFeedback();
+      });
     };
     if(avoidFoods){
-      MW.foodIdentity&&MW.foodIdentity.attach(avoidFoods,{multi:true,limit:5,onSelect:renderAvoidFeedback});
+      MW.foodIdentity&&MW.foodIdentity.attach(avoidFoods,{multi:true,limit:5,requireMatch:true,onSelect:renderAvoidFeedback});
       avoidFoods.addEventListener('input',renderAvoidFeedback);
       avoidFoods.addEventListener('blur',renderAvoidFeedback);
       renderAvoidFeedback();
@@ -1640,8 +1783,8 @@ window.MW = window.MW || {};
     const itemRow=x=>{
       const p=MW.inventory.partsForEdit(x.amountText)||{value:'',unit:'g'},keyMatch=MW.foodIdentity&&MW.foodIdentity.resolveExact(x._key),nameMatch=MW.foodIdentity&&MW.foodIdentity.resolveExact(x.name),resolved=x.canonical||keyMatch&&keyMatch.canonical||nameMatch&&nameMatch.canonical,linked=Boolean(resolved);
       const usage=linked&&MW.inventory.plannedUsage?MW.inventory.plannedUsage(resolved):[];
-      const usageText=usage.length?('Used in '+usage.length+' '+(usage.length===1?'meal':'meals')+': '+usage.map(u=>u.label).join(' · ')):'Not used in this week’s meals';
-      return '<article class="cupboard-row cupboard-quantity-row '+(linked?'linked-food':'custom-food')+'" data-name="'+esc(x._key)+'"><div class="cupboard-item-name"><strong>'+esc(ingredientName(x.name))+'</strong><small class="cupboard-save-note">'+(linked?'Recognised ingredient':'Custom item · Not linked to recipes')+'</small>'+(linked?'<small class="cupboard-recipe-link">'+icon(usage.length?'link':'circle-minus')+' '+esc(usageText)+'</small>':'')+'</div><div class="stock-quantity cupboard-current-quantity"><input class="stock-current-amount" type="number" inputmode="decimal" min="0" step="'+(wholeStockUnits.has(p.unit)?'1':'0.1')+'" value="'+esc(p.value)+'" aria-label="Amount of '+esc(ingredientName(x.name))+'"><span class="select-control stock-unit-control"><select class="stock-current-unit" aria-label="Unit for '+esc(ingredientName(x.name))+'">'+unitOptions(p.unit)+'</select>'+icon('chevron-down')+'</span></div><button class="stock-delete" data-name="'+esc(x._key)+'" aria-label="Remove '+esc(ingredientName(x.name))+'">'+icon('trash')+'</button></article>';
+      const usageMarkup=usage.length?'<details class="cupboard-usage"><summary>'+icon('link')+'<span>Used in '+usage.length+' '+(usage.length===1?'meal':'meals')+'</span>'+icon('chevron-down')+'</summary><ul>'+usage.map(u=>'<li>'+esc(u.label)+'</li>').join('')+'</ul></details>':'<small class="cupboard-recipe-link">'+icon('circle-minus')+' Not used this week</small>';
+      return '<article class="cupboard-row cupboard-quantity-row '+(linked?'linked-food':'custom-food')+'" data-name="'+esc(x._key)+'"><div class="cupboard-item-name"><strong>'+esc(ingredientName(x.name))+'</strong><small class="cupboard-save-note">'+(linked?'Recognised ingredient':'Custom item · Not linked to recipes')+'</small>'+(linked?usageMarkup:'')+'</div><div class="stock-quantity cupboard-current-quantity"><input class="stock-current-amount" type="number" inputmode="decimal" min="0" step="'+(wholeStockUnits.has(p.unit)?'1':'0.1')+'" value="'+esc(p.value)+'" aria-label="Amount of '+esc(ingredientName(x.name))+'"><span class="select-control stock-unit-control"><select class="stock-current-unit" aria-label="Unit for '+esc(ingredientName(x.name))+'">'+unitOptions(p.unit)+'</select>'+icon('chevron-down')+'</span></div><button class="stock-delete" data-name="'+esc(x._key)+'" aria-label="Remove '+esc(ingredientName(x.name))+'">'+icon('trash')+'</button></article>';
     };
     root.innerHTML=shell(
       '<section class="subpage-head"><button class="back-button" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow">INVENTORY</span><h1>My cupboard</h1><p>Keep the real amount you have. Confirmed shopping adds what you bought and completed recipes subtract what they use.</p></div></section>'+
@@ -1709,11 +1852,17 @@ window.MW = window.MW || {};
     const app=window.Capacitor&&window.Capacitor.Plugins&&window.Capacitor.Plugins.App;
     if(!app||typeof app.addListener!=='function')return;
     app.addListener('backButton',()=>{if(window.MyWeekAndroidBack&&window.MyWeekAndroidBack())return;if(typeof app.minimizeApp==='function')app.minimizeApp();else if(typeof app.exitApp==='function')app.exitApp();});
-    app.addListener('appStateChange',state=>{if(state&&state.isActive)finishInterruptedMotion();});
+    app.addListener('appStateChange',state=>{if(state&&state.isActive){finishInterruptedMotion();syncScreenWakeLock();}else releaseScreenWakeLock();});
   }
-  root.addEventListener('click',e=>{if(e.target.closest('#openLunch')){const id=s().week&&s().week.lunchId;if(id)go('recipe:'+id);}});
+  root.addEventListener('change',e=>{const toggle=e.target.closest&&e.target.closest('[data-keep-awake-toggle]');if(toggle)setKeepScreenAwake(toggle.checked);});
+  root.addEventListener('click',e=>{
+    const gather=e.target.closest&&e.target.closest('[data-gather-index][data-recipe-id]');
+    if(gather){e.preventDefault();toggleGatheredIngredient(gather);return;}
+    if(e.target.closest('#openLunch')){const id=s().week&&s().week.lunchId;if(id)go('recipe:'+id);}
+  });
   window.addEventListener('mw:storage-error',storageRecovery);
   bindNativeBack();
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)finishInterruptedMotion();});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){finishInterruptedMotion();releaseScreenWakeLock();}else syncScreenWakeLock();});
   render();
+  syncScreenWakeLock();
 })();

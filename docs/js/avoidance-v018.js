@@ -52,6 +52,18 @@ window.MW = window.MW || {};
     return s;
   }
 
+  const broadGroups=new Map([
+    ['meat',['beef','steak','sirloin','rump steak','brisket','chicken','turkey','duck','venison','pork','bacon','ham','gammon','chorizo','pancetta','prosciutto','pepperoni','salami','nduja','lamb']],
+    ['beef',['beef','beef mince','minced beef','ground beef','beef steak','rump steak','sirloin','brisket']],
+    ['chicken',['chicken','chicken breast','chicken thigh','chicken mince','chicken fillet','chicken mini fillet']],
+    ['pork',['pork','pork mince','minced pork','ground pork','bacon','ham','gammon','chorizo','pancetta','prosciutto','pepperoni','salami','nduja']],
+    ['lamb',['lamb','lamb mince','lamb steak']],
+    ['fish',['fish','fish fillet','salmon','tuna','cod','haddock','barramundi','basa','pangasius','hake','sea bream','sea bass','seabass','trout','pollock','pollack','tilapia','monkfish','swordfish','mackerel','sardine','anchovy','fish sauce','worcester sauce','worcestershire sauce']],
+    ['shellfish',['prawn','shrimp','crab','lobster','crayfish','mussel','oyster','squid','octopus','scallop','clam']],
+    ['crustaceans',['prawn','shrimp','crab','lobster','crayfish']],
+    ['molluscs',['mussel','oyster','squid','octopus','scallop','clam']]
+  ].map(([key,values])=>[key,values.map(normalise)]));
+
   const aliasMap=new Map();
   aliasGroups.forEach(group=>{
     const canonical=singular(group[0]);
@@ -107,10 +119,12 @@ window.MW = window.MW || {};
   function resolveOne(raw){
     const input=normalise(raw);
     if(!input) return null;
-    const direct=aliasMap.get(input)||aliasMap.get(singular(input));
+    const broad=singular(input);
+    if(broadGroups.has(broad)) return {raw:String(raw).trim(),canonical:broad,matched:true,corrected:input!==broad,method:'category'};
+    const direct=aliasMap.get(input)||aliasMap.get(broad);
     if(direct) return {raw:String(raw).trim(),canonical:direct,matched:true,corrected:normalise(raw)!==direct,method:'alias'};
 
-    const target=singular(input);
+    const target=broad;
     const words=vocabulary();
     if(words.includes(target)) return {raw:String(raw).trim(),canonical:target,matched:true,corrected:input!==target,method:'exact'};
 
@@ -168,7 +182,19 @@ window.MW = window.MW || {};
     }
     const key=JSON.stringify(terms);let canonical=resolvedTermsCache.get(key);
     if(!canonical){canonical=terms.map(term=>{const resolved=resolveOne(term);return resolved&&resolved.canonical||singular(term);}).filter(Boolean);resolvedTermsCache.set(key,canonical);}
-    return canonical.some(term=>prepared.hay.includes(' '+term+' ')||prepared.words.has(term)||prepared.ingredients.has(term));
+    return canonical.some(term=>{
+      const group=broadGroups.get(term);
+      const candidates=group&&group.length?group:[term];
+      return candidates.some(candidate=>{
+        const singularCandidate=singular(candidate);
+        return prepared.hay.includes(' '+candidate+' ')
+          ||prepared.hay.includes(' '+singularCandidate+' ')
+          ||prepared.words.has(candidate)
+          ||prepared.words.has(singularCandidate)
+          ||prepared.ingredients.has(candidate)
+          ||prepared.ingredients.has(singularCandidate);
+      });
+    });
   }
 
   function display(text){

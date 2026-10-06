@@ -5,6 +5,7 @@ window.MW = window.MW || {};
 
   const patterns=[
     {id:'omnivore',label:'Anything'},
+    {id:'meat-or-fish',label:'Meat or fish'},
     {id:'vegetarian',label:'Vegetarian'},
     {id:'vegan',label:'Vegan'},
     {id:'pescatarian',label:'Pescatarian'}
@@ -59,9 +60,10 @@ window.MW = window.MW || {};
     .replace(/oat milk/g,'oatdrink')
     .replace(/soy milk/g,'soydrink')
     .replace(/soya milk/g,'soyadrink')
-    .replace(/coconut cream/g,'coconutcream')
+    .replace(/(?:coconut|oat|soy|soya) cream/g,'plantcream')
     .replace(/(?:peanut|almond|cashew) butter/g,'plantspread')
-    .replace(/(?:almond|coconut|oat|soy|soya) (?:yoghurt|yogurt)/g,'plantyoghurt');
+    .replace(/(?:almond|coconut|oat|soy|soya) (?:yoghurt|yogurt)/g,'plantyoghurt')
+    .replace(/(?:vegan|plant based|dairy free) (?:cheese|cheddar|mozzarella|parmesan|feta|cream|butter|mayo|mayonnaise|pesto|yoghurt|yogurt)/g,'plant substitute');
 
   function analyse(recipe){
     if(recipe&&typeof recipe==='object'&&analysisCache.has(recipe)) return analysisCache.get(recipe);
@@ -73,7 +75,9 @@ window.MW = window.MW || {};
       ...(recipe&&recipe.ingredients||[]).map(x=>x[1])
     ].filter(Boolean).join(' '));
     const plantSafe=plantMilkSafeText(text);
-    const proteinText=text.replace(/vegan (?:fish sauce|nduja|xo sauce)/g,'plant substitute');
+    const proteinText=text
+      .replace(/vegan (?:fish sauce|nduja|xo sauce)/g,'plant substitute')
+      .replace(/(?:vegan|vegetarian|veggie|plant based|meat free|meatless) (?:chicken|beef|pork|lamb|turkey|duck|bacon|ham|sausage|sausages|meatball|meatballs|fish|tuna|salmon|prawn|prawns)/g,'plant substitute');
     const data={
       text,
       plantSafe,
@@ -89,10 +93,26 @@ window.MW = window.MW || {};
   }
 
   function dietAllows(recipe,diet){
-    const a=analyse(recipe);
-    if(diet==='vegetarian') return !a.hasMeat&&!a.hasFish&&!a.hasAnimalRennet;
-    if(diet==='pescatarian') return !a.hasMeat&&!a.hasAnimalRennet;
-    if(diet==='vegan') return !a.hasMeat&&!a.hasFish&&!a.hasAnimalDairy&&!a.hasAnimal&&!a.hasAnimalRennet;
+    const a=analyse(recipe),e=recipe&&recipe.dietEvidence;
+    const verified=Boolean(e&&e.status==='verified');
+    const noMeatFish=!a.hasMeat&&!a.hasFish;
+    const veganSafe=noMeatFish&&!a.hasAnimalDairy&&!a.hasAnimal&&!a.hasAnimalRennet;
+    if(diet==='meat-or-fish'){
+      if(verified&&(e.vegan||e.vegetarian)&&noMeatFish)return false;
+      return a.hasMeat||a.hasFish;
+    }
+    if(diet==='vegetarian'){
+      if(verified&&(e.vegan||e.vegetarian)&&noMeatFish&&!a.hasAnimalRennet)return true;
+      return noMeatFish&&!a.hasAnimalRennet;
+    }
+    if(diet==='pescatarian'){
+      if(verified&&(e.vegan||e.vegetarian)&&!a.hasMeat&&!a.hasAnimalRennet)return true;
+      return !a.hasMeat&&!a.hasAnimalRennet;
+    }
+    if(diet==='vegan'){
+      if(verified&&e.vegan===true&&veganSafe)return true;
+      return veganSafe;
+    }
     return true;
   }
 

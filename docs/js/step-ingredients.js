@@ -7,7 +7,7 @@ window.MW=window.MW||{};
   const generic=new Set(['sauce','paste','mix','seasoning','bread']);
   const safeGeneric=new Set(['oil','water','cheese','stock']);
   const rootGeneric=new Set([...generic,...safeGeneric]);
-  const pluralMap=new Map(Object.entries({leaves:'leaf',potatoes:'potato',tomatoes:'tomato',peas:'pea',beans:'bean',lentils:'lentil',peanuts:'peanut',breadcrumbs:'breadcrumb',olives:'olive',cloves:'clove',breasts:'breast',thighs:'thigh',portions:'portion',strips:'strip',samosas:'samosa',baguettes:'baguette',cubes:'cube',pods:'pod',herbs:'herb',sausages:'sausage',greens:'green'}));
+  const pluralMap=new Map(Object.entries({rotis:'roti',leaves:'leaf',potatoes:'potato',tomatoes:'tomato',peas:'pea',beans:'bean',lentils:'lentil',peanuts:'peanut',breadcrumbs:'breadcrumb',olives:'olive',cloves:'clove',breasts:'breast',thighs:'thigh',portions:'portion',strips:'strip',samosas:'samosa',baguettes:'baguette',cubes:'cube',pods:'pod',herbs:'herb',sausages:'sausage',greens:'green'}));
   function singular(word){if(pluralMap.has(word))return pluralMap.get(word);if(/(?:ss|us|is|ous)$/.test(word))return word;if(word.length>4&&/ies$/.test(word))return word.slice(0,-3)+'y';if(word.length>4&&/sses$/.test(word))return word.slice(0,-2);if(word.length>3&&/s$/.test(word))return word.slice(0,-1);return word;}
   const tokenCache=new Map();
   function tokens(value){const key=normalise(value);if(tokenCache.has(key))return tokenCache.get(key);const result=key.split(' ').map(singular).filter(x=>x.length>=3&&!ignored.has(x));if(tokenCache.size<100000)tokenCache.set(key,result);return result;}
@@ -73,7 +73,9 @@ window.MW=window.MW||{};
     if(/\b(?:mature )?cheddar cheese\b/.test(n)){a.add('cheddar');a.add('cheddar cheese');}
     if(/\bred leicester\b/.test(n))a.add('red leicester');
     if(/\b(?:grated )?(?:hard italian|italian hard|italian style) (?:style )?cheese\b/.test(n)){a.add('parmesan');a.add('italian cheese');a.add('hard cheese');a.add('hard italian style cheese');a.add('italian hard cheese');}
-    if(/\bgreek style salad cheese\b/.test(n)){a.add('feta');a.add('salad cheese');}
+    if(/\bgreek (?:style )?salad cheese\b/.test(n)){a.add('feta');a.add('salad cheese');a.add('greek cheese');}
+    if(n==='cashew nuts'){a.add('cashew');a.add('cashews');}
+    if(/^finely chopped tomatoes(?: with basil)?$/.test(n))a.add('chopped tomatoes');
     if(/\b(?:greek (?:style )?(?:natural )?|low fat natural |natural )?yoghurt\b/.test(n))a.add('yoghurt');
     if(/\bbulgur wheat\b/.test(n))a.add('bulgur');
     if(/\btortilla wrap\b/.test(n)){a.add('tortilla');a.add('wrap');}
@@ -95,7 +97,7 @@ window.MW=window.MW||{};
     if(/\bcheese and jalapeno hot link sausage\b/.test(n))a.add('sausage');
     if(/\bcured ham tortelloni\b/.test(n)){a.add('tortelloni');a.add('pasta');}
     if(/\bpremium tomato mix\b/.test(n)){a.add('tomatoes');a.add('tomato mix');}
-    if(/\b(?:wholewheat |wholemeal |fresh )?(?:spaghetti|tortiglioni|farfalle|orzo|linguine|tagliatelle|penne|tortelloni)\b/.test(n))a.add('pasta');
+    if(/\b(?:wholewheat |wholemeal |fresh )?(?:macaroni|spaghetti|tortiglioni|farfalle|orzo|linguine|tagliatelle|penne|tortelloni)\b/.test(n))a.add('pasta');
     const result=[...a];aliasCache.set(n,result);return result;
   }
   function specialEvidence(recipe,name,stepText){
@@ -132,7 +134,7 @@ window.MW=window.MW||{};
     if(n==='ranch dressing')return /\branch(?: dressing)?\b/.test(t);
     if(/\bdiced butternut squash\b/.test(n))return /\bbutternut(?: squash)?\b|\bsquash\b/.test(t);
     if(/\b(?:basmati|jasmine|sushi|steamed basmati) rice\b/.test(n)){const c=countMatchingIngredients(recipe,x=>!/^water for\b/.test(x)&&(/(?:^| )rice$/.test(x)||/\b(?:basmati|jasmine|sushi|steamed basmati) rice\b/.test(x)));return /\brice\b/.test(t)&&c===1;}
-    if(/\b(?:spaghetti|tortiglioni|farfalle|orzo|linguine|tagliatelle|penne|tortelloni)\b/.test(n)){const c=countMatchingIngredients(recipe,x=>/\b(?:spaghetti|tortiglioni|farfalle|orzo|linguine|tagliatelle|penne|tortelloni|pasta)\b/.test(x));return tokens(n).some(x=>new RegExp('\\b'+x+'\\b').test(t))||(c===1&&/\bpasta\b/.test(t));}
+    if(/\b(?:macaroni|spaghetti|tortiglioni|farfalle|orzo|linguine|tagliatelle|penne|tortelloni)\b/.test(n)){const c=countMatchingIngredients(recipe,x=>/\b(?:macaroni|spaghetti|tortiglioni|farfalle|orzo|linguine|tagliatelle|penne|tortelloni|pasta)\b/.test(x));return tokens(n).some(x=>new RegExp('\\b'+x+'\\b').test(t))||(c===1&&/\bpasta\b/.test(t));}
     if(/\b(?:mature cheddar cheese|cheddar cheese|red leicester|hard italian|italian hard|greek style salad cheese)\b/.test(n)){if(aliasPhrases(n).some(a=>hasPhrase(t,a)))return true;const c=countMatchingIngredients(recipe,x=>/\bcheese\b|\bred leicester\b/.test(x));return c===1&&/\b(?:remaining )?cheese\b/.test(t);}
     if(/\b(?:rocket|wild rocket)\b/.test(n))return /\brocket\b/.test(t);
     if(/\bfinely chopped tomatoes?\b/.test(n)){const fresh=countMatchingIngredients(recipe,x=>/\b(?:intense tomato|plum tomatoes?|medium tomato|premium tomato mix|chopped tomatoes?)\b/.test(x));return /\b(?:chopped )?tomatoes?\b/.test(t)&&!/\btomato (?:paste|puree|concentrate)\b/.test(t)&&(fresh===1||hasPhrase(t,n));}
@@ -168,7 +170,7 @@ window.MW=window.MW||{};
     }
     return unique[0]||base.find(t=>!rootGeneric.has(t))||base[0]||'';
   }
-  const interactionAction='(?:add|stir(?: in| through)?|mix(?: in| through)?|combine|fold|toss|stir fry|fry|cook|roast|bake|simmer|boil|pour|scatter|spread|drizzl(?:e|ing|ed)|coat|dip|top|season|melt|whisk|sprinkl(?:e|ing|ed)|crumbl(?:e|ing|ed)|squeeze|dissolve|put|pop|place|lay|transfer|arrange|return|tip|heat|warm|brush|rub|marinate|peel|chop|dice|slice|cut|halve|quarter|grate|crush|mince|trim|drain|rinse|zest|juice|shred|tear|pick|pat dry|pat|wash|soak|toast|reserve|set aside|spoon|dollop|smear|swirl|dress|garnish|pack|fill|stuff|wrap|roll|shape|press|glaze|dust|remove|bring|pile|break(?: up)?|divide|butter|crack)';
+  const interactionAction='(?:mash|add|stir(?: in| through)?|mix(?: in| through)?|combine|fold|toss|stir fry|fry|cook|roast|bake|simmer|boil|pour|scatter|spread|drizzl(?:e|ing|ed)|coat|dip|top|season|melt|whisk|sprinkl(?:e|ing|ed)|crumbl(?:e|ing|ed)|squeeze|dissolve|put|pop|place|lay|transfer|arrange|return|tip|heat|warm|brush|rub|marinate|peel|chop|dice|slice|cut|halve|quarter|grate|crush|mince|trim|drain|rinse|zest|juice|shred|tear|pick|pat dry|pat|wash|soak|toast|reserve|set aside|spoon|dollop|smear|swirl|dress|garnish|pack|fill|stuff|wrap|roll|shape|press|glaze|dust|remove|bring|pile|break(?: up)?|divide|butter|crack)';
   const clauseCache=new Map(),activeRegexCache=new Map(),purposeRegexCache=new Map(),rootRegexCache=new Map();
   function stepClauses(step){const raw=String(step||'');if(clauseCache.has(raw))return clauseCache.get(raw);const interactionText=raw.replace(/\([^)]*[?!][^)]*\)/g,' ');const result=interactionText.split(/[!?;]+|\.(?!\d)/).map(matchText).filter(Boolean);if(clauseCache.size<50000)clauseCache.set(raw,result);return result;}
   function activePhrase(step,phrase){
@@ -230,7 +232,9 @@ window.MW=window.MW||{};
     const measuredSeasoning=/^(?:salt|black pepper)$/.test(n)&&!openEndedAmount(row[0]);
     if(measuredSeasoning){const t=normalise(step),quantityCue=/use (?:the )?quantit(?:y|ies) listed in the ingredients|use the quantities listed|as listed in the ingredients/.test(t),named=n==='salt'?/\bsalt\b/.test(t):/\bblack pepper\b/.test(t);return Boolean(quantityCue&&named);}
     let probe=String(step||'');
-    if(/\b(?:spaghetti|tortiglioni|farfalle|orzo|linguine|tagliatelle|penne|tortelloni)\b/.test(n))probe=probe.replace(/\b(?:starchy\s+)?pasta water\b/gi,'starchy water');
+    if(n==='chipotle paste')probe=probe.replace(/\bchipotle (?:dressing|tofu)\b/gi,'prepared component');
+    if(n==='toasted sesame oil')return /\b(?:toasted )?sesame oil\b/.test(normalise(probe))&&activePhrase(probe,'sesame oil');
+    if(/\b(?:macaroni|spaghetti|tortiglioni|farfalle|orzo|linguine|tagliatelle|penne|tortelloni)\b/.test(n))probe=probe.replace(/\b(?:starchy\s+)?pasta water\b/gi,'starchy water');
     if(/\bchicken\b/.test(n)&&!/\bstock\b/.test(n))probe=probe.replace(/\bchicken stock(?: paste| mix| cubes?)?\b/gi,'stock');
     if(n==='butter'){probe=probe.replace(/\bbutter beans?\b/gi,'beans');if(/\bbutter\s+(?:the\s+)?(?:bread|bun|roll|toast)\b/i.test(probe))return true;}
     if(n==='peas')probe=probe.replace(/\bpea pods?\b/gi,'pods');
@@ -260,7 +264,7 @@ window.MW=window.MW||{};
     return [...phrases].some(phrase=>activePhrase(probe,phrase));
   }
   const preparationAction=/\b(?:peel|chop|dice|slice|cut|halve|quarter|grate|crush|mince|trim|drain|rinse|zest|juice|shred|tear|pick|pat|wash|reserve|set aside)\b/;
-  const useAction=/\b(?:add|stir|mix|combine|fold|toss|fry|cook|roast|bake|simmer|boil|pour|scatter|spread|drizzle|coat|dip|top|season|melt|whisk|sprinkle|crumble|squeeze|dissolve|put|pop|place|lay|transfer|arrange|return|tip|heat|warm|brush|rub|marinate|toast|spoon|dollop|smear|swirl|dress|garnish|pack|fill|stuff|wrap|roll|shape|press|glaze|dust|bring|pile|butter|crack|serve)\b/;
+  const useAction=/\b(?:mash|add|stir|mix|combine|fold|toss|fry|cook|roast|bake|simmer|boil|pour|scatter|spread|drizzle|coat|dip|top|season|melt|whisk|sprinkle|crumble|squeeze|dissolve|put|pop|place|lay|transfer|arrange|return|tip|heat|warm|brush|rub|marinate|toast|spoon|dollop|smear|swirl|dress|garnish|pack|fill|stuff|wrap|roll|shape|press|glaze|dust|bring|pile|butter|crack|serve)\b/;
   function preparationOnlyEvidence(recipe,ingredientIndex,step){
     const row=(recipe.ingredients||[])[ingredientIndex];if(!row)return false;
     const phrases=new Set(aliasPhrases(row[1])),root=rootToken(recipe,ingredientIndex,step);if(root)phrases.add(root);

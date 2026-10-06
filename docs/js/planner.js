@@ -59,7 +59,7 @@ window.MW = window.MW || {};
 
   function allowed(recipe){
     const s=MW.state.get();
-    const avoid=['mushroom',...(s.household.restrictions||[])].filter(Boolean);
+    const avoid=[...(s.household.restrictions||[])].filter(Boolean);
     const basic=MW.avoidance
       ?!MW.avoidance.recipeContains(recipe,avoid)
       :!avoid.some(x=>(recipe.title+' '+recipe.subtitle+' '+recipe.ingredients.map(y=>y[1]).join(' ')).toLowerCase().includes(String(x).toLowerCase()));
@@ -212,7 +212,7 @@ window.MW = window.MW || {};
 
   function lunchAllowed(recipe){
     const s=MW.state.get();
-    const avoid=['mushroom',...(s.household.restrictions||[])].filter(Boolean);
+    const avoid=[...(s.household.restrictions||[])].filter(Boolean);
     const basic=MW.avoidance
       ?!MW.avoidance.recipeContains(recipe,avoid)
       :!avoid.some(x=>(recipe.title+' '+recipe.subtitle+' '+recipe.ingredients.map(y=>y[1]).join(' ')).toLowerCase().includes(String(x).toLowerCase()));
@@ -302,6 +302,29 @@ window.MW = window.MW || {};
     return typeof enforce==='function'?enforce(context):null;
   }
 
+  function constraintSummary(){
+    const s=MW.state.get(),parts=[];
+    const profile=s.foodProfile||{};
+    if(profile.diet&&profile.diet!=='omnivore'){
+      const pattern=MW.food&&MW.food.patterns&&MW.food.patterns.find(x=>x.id===profile.diet);
+      parts.push((pattern&&pattern.label)||'eating style');
+    }
+    if((s.household.restrictions||[]).length||(s.household.dislikes||[]).length)parts.push('foods you do not want');
+    if((profile.allergens||[]).length)parts.push('allergies');
+    if((s.household.equipment||[]).length)parts.push('kitchen equipment');
+    return parts;
+  }
+
+  function eligibilityFailureMessage(required,found){
+    const parts=constraintSummary(),why=parts.length?' with your current '+parts.join(', '):' with your current planner choices';
+    return 'My Week could only find '+found+' suitable dinner'+(found===1?'':'s')+' for '+required+' planned dinner'+(required===1?'':'s')+why+'. No empty or partial week was saved. Review those choices and try again.';
+  }
+
+  function lunchEligibilityFailureMessage(){
+    const parts=constraintSummary(),why=parts.length?' with your current '+parts.join(', '):' with your current planner choices';
+    return 'My Week could not find a suitable lunch recipe'+why+'. No partial week was saved. Review those choices and try again.';
+  }
+
   function regenerateAll(opts){
     const s=MW.state.get(),snapshot=snapshotPlanningState(s);
     opts=opts||{};
@@ -316,7 +339,9 @@ window.MW = window.MW || {};
         excludeIds:previousIds,
         randomise:true
       });
+      if(chosen.length!==dinnerDays.length) throw new Error(eligibilityFailureMessage(dinnerDays.length,chosen.length));
       const lunch=randomLunchAlternative(previous.lunchId);
+      if((s.plan.lunchDays||[]).length&&!lunch) throw new Error(lunchEligibilityFailureMessage());
       const hadShop=Boolean(previous.shop);
 
       s.week={
@@ -370,11 +395,13 @@ window.MW = window.MW || {};
       const configured=Array.isArray(opts.dinnerDaysOverride)?opts.dinnerDaysOverride:(s.plan.dinnerDays||[]);
       const dinnerDays=[...new Set(configured.filter(x=>validDays.has(x)))];
       const chosen=choose(dinnerDays.length,Boolean(s.plan.priceMode));
+      if(chosen.length!==dinnerDays.length) throw new Error(eligibilityFailureMessage(dinnerDays.length,chosen.length));
       const previous=s.week||{};
       if(previous.weekKey&&previous.weekKey!==currentWeekKey()){s.weekHistory=Array.isArray(s.weekHistory)?s.weekHistory:[];s.weekHistory.push(JSON.parse(JSON.stringify(previous)));}
       const lunchPool=MW.LUNCHES.filter(lunchAllowed);
       const existingLunch=lunchPool.find(x=>x.id===previous.lunchId);
       const lunch=existingLunch||randomLunchAlternative(null)||null;
+      if((s.plan.lunchDays||[]).length&&!lunch) throw new Error(lunchEligibilityFailureMessage());
 
       s.week={
         createdAt:new Date().toISOString(),

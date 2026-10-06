@@ -58,7 +58,7 @@ window.MW = window.MW || {};
     ],
     week:null,
     events:[],
-    ui:{screen:'welcome',shopChecks:{},dismissedRolloverFor:''}
+    ui:{screen:'welcome',shopChecks:{},dismissedRolloverFor:'',keepScreenAwake:false}
   });
     const bp=MW.BUILD_PROFILE||{};
     if(bp.clearDefaultInventory) state.inventory={};
@@ -150,6 +150,7 @@ window.MW = window.MW || {};
     x.ui=x.ui||{screen:x.onboarded?'week':'welcome'};
     x.ui.shopChecks=x.ui.shopChecks||{};
     x.ui.dismissedRolloverFor=String(x.ui.dismissedRolloverFor||'');
+    x.ui.keepScreenAwake=Boolean(x.ui.keepScreenAwake);
     return x;
   }
 

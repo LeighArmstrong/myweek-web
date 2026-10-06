@@ -42,9 +42,37 @@ window.MW=window.MW||{};
     return MW.state.transaction(st=>{
       if(!st.week)throw new Error('Create a week before cooking.');
       const old=st.week.preparation;
-      if(old&&old.recipeId===recipe.id&&old.portions===count&&!old.finished)return old;
-      st.week.preparation={id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),recipeId:recipe.id,portions:count,finished:false};
+      if(old&&old.recipeId===recipe.id&&old.portions===count&&!old.finished){
+        old.gatheredIngredients=old.gatheredIngredients&&typeof old.gatheredIngredients==='object'?old.gatheredIngredients:{};
+        return old;
+      }
+      const gathered={};
+      st.week.preparation={id:Date.now().toString(36)+'-'+Math.random().toString(36).slice(2),recipeId:recipe.id,portions:count,finished:false,gatheredIngredients:{...gathered}};
       return st.week.preparation;
+    });
+  }
+  function gathered(recipe){
+    const st=MW.state.get(),a=st.week&&st.week.preparation;
+    if(!a||a.recipeId!==recipe.id||a.finished||!a.gatheredIngredients||typeof a.gatheredIngredients!=='object')return {};
+    return {...a.gatheredIngredients};
+  }
+  function setGathered(recipe,index,checked){
+    if(!Number.isInteger(index)||index<0||index>=(recipe.ingredients||[]).length)throw new Error('Choose a valid ingredient.');
+    return MW.state.transaction(st=>{
+      const a=st.week&&st.week.preparation;
+      if(!a||a.recipeId!==recipe.id||a.finished)throw new Error('Open this recipe before changing the gathering checklist.');
+      a.gatheredIngredients=a.gatheredIngredients&&typeof a.gatheredIngredients==='object'?a.gatheredIngredients:{};
+      const key=String(index);
+      if(checked)a.gatheredIngredients[key]=true;else delete a.gatheredIngredients[key];
+      a.updatedAt=new Date().toISOString();
+      return Boolean(a.gatheredIngredients[key]);
+    });
+  }
+  function cancel(recipe){
+    return MW.state.transaction(st=>{
+      const a=st.week&&st.week.preparation;
+      if(!a||a.recipeId!==recipe.id||a.finished)return false;
+      st.week.preparation=null;return true;
     });
   }
   function finish(recipe){
@@ -53,7 +81,7 @@ window.MW=window.MW||{};
       if(!a||a.recipeId!==recipe.id)throw new Error('Open the preparation screen before finishing this recipe.');
       if(a.finished)return false;
       st.week.completedRecipes=st.week.completedRecipes||[];
-      if(!recipe.isLunch&&st.week.completedRecipes.includes(recipe.id)){a.finished=true;return false;}
+      if(!recipe.isLunch&&st.week.completedRecipes.includes(recipe.id)){a.finished=true;a.gatheredIngredients={};return false;}
       const f=recipe.scaleSafe===false?1:a.portions/(recipe.servings||2);
       const rows=MW.pricing.rowsForRecipe(recipe),uses=[],substitutionUncertain=[];
       for(const [amount,name] of rows){
@@ -73,10 +101,10 @@ window.MW=window.MW||{};
         st.week.preparedLunchPortions=st.week.preparedLunchPortions||{};
         st.week.preparedLunchPortions[recipe.id]=(Number(st.week.preparedLunchPortions[recipe.id])||0)+a.portions;
       }else st.week.completedRecipes.push(recipe.id);
-      a.finished=true;a.finishedAt=new Date().toISOString();
+      a.finished=true;a.gatheredIngredients={};a.finishedAt=new Date().toISOString();
       st.events.push({at:a.finishedAt,type:'preparation_finished',data:{recipeId:recipe.id,portions:a.portions,uncertain,substitutionUncertain}});
       st.events=st.events.slice(-500);return true;
     });
   }
-  MW.preparation={quantities,portions,scaleAmount,begin,finish};
+  MW.preparation={quantities,portions,scaleAmount,begin,gathered,setGathered,cancel,finish};
 })();

@@ -167,7 +167,11 @@ window.MW = window.MW || {};
     }
     if(/^tins?$|^cans?$/.test(unit)) return entry.unit==='tin'?value:null;
     if(/^cloves?$/.test(unit)) return entry.unit==='clove'?value:null;
-    if(/^nests?$/.test(unit)) return entry.unit==='nest'?value:null;
+    if(/^nests?$/.test(unit)){
+      if(entry.unit==='nest') return value;
+      if(entry.unit==='g'&&entry.nestWeight) return value*entry.nestWeight;
+      return null;
+    }
     if(/^(cartons?|bottles?)$/.test(unit)) return ['carton','bottle'].includes(entry.unit)?value:null;
     if(/^packs?$/.test(unit)) return entry.unit==='pack'?value:null;
     if(/^(sachets?|bunch(?:es)?|balls?|rashers?|slices?|pouches?|fillets?|wraps?|tortillas?|sticks?|bananas?)$/.test(unit)) return entry.unit==='each'?value:null;
@@ -536,6 +540,8 @@ window.MW = window.MW || {};
     [/british cumberland sausages|british hickory smoked sausages/i,'pork sausage','pork sausages equivalent'],
     [/white cumin seeds/i,'ground cumin','cumin equivalent'],
     [/dried thyme|dill|tarragon|thyme|sage/i,'oregano','herb equivalent'],
+    [/^dried bay (?:leaf|leaves)$/i,'oregano','dried herb equivalent'],
+    [/^ground allspice$/i,'ground cinnamon','ground spice equivalent'],
     [/red kidney beans|mixed beans|borlotti beans/i,'black beans','beans equivalent'],
     [/black olives|capers/i,'green pesto','jarred savoury ingredient equivalent'],
     [/lamb steaks/i,'lamb mince','lamb equivalent'],
@@ -553,8 +559,32 @@ window.MW = window.MW || {};
     [/oil for the chicken|oil for cooking/i,'cooking oil','cooking oil'],
     [/instant gravy powder/i,'beef stock','gravy equivalent'],
     [/diced sweet potato/i,'sweet potatoes','sweet potato'],
-    [/burrata/i,'feta','soft cheese equivalent']
+    [/burrata/i,'feta','soft cheese equivalent'],
+    [/^vegetable oil$/i,'cooking oil','vegetable oil 1 litre equivalent'],
+    [/^sliced mushrooms$/i,'mushrooms','sliced mushrooms 400g equivalent'],
+    [/^plain tortillas?$/i,'small tortillas','plain tortillas x8 equivalent'],
+    [/^cooked white long grain rice$/i,'steamed basmati rice','cooked long grain rice pouch equivalent'],
+    [/^cannellini beans$/i,'butter beans','cannellini beans 400g tin equivalent'],
+    [/^wholemeal pittas?$/i,'pitta bread','wholemeal pittas equivalent'],
+    [/^five[- ]spice mix$/i,'chinese five spice','five-spice mix equivalent'],
+    [/^spring greens$/i,'kale','spring greens 200g equivalent']
   ].forEach(x=>cloneAlias(x[0],x[1],x[2]));
+
+  explicit(/^wholewheat noodle nests?$/i,4,'nest',0.94,'wholewheat noodle nests x4 equivalent',{nestWeight:62.5});
+  explicit(/^creamy single soy$/i,250,'ml',1.50,'soy single cream 250ml equivalent');
+  cloneAlias(/^5 bean medley$/i,'mixed beans','5 bean medley equivalent');
+  cloneAlias(/^coconut flakes$/i,'desiccated coconut','coconut flakes equivalent');
+  cloneAlias(/^wholemeal tortillas?$/i,'small tortillas','wholemeal tortillas x8 equivalent');
+  explicit(/^pistachios?$/i,150,'g',3.00,'pistachios 150g equivalent');
+
+  // QA25 plant-expansion retail checks, refreshed 2026-10-06.
+  add(/^quinoa$/i,300,'g',3.10,'quinoa 300g',stores(3.10,3.10,undefined,undefined),'Current normal shelf price at Sainsbury\'s and Tesco; promotional prices excluded.');
+  add(/^dried bay (?:leaf|leaves)$/i,3,'g',1.00,'dried bay leaves 3g',stores(undefined,1.00,undefined,undefined),'Current Tesco own-brand dried bay leaves 3g normal shelf price.');
+  add(/^mangetout$/i,80,'g',1.00,'mangetout 80g',stores(undefined,1.00,undefined,undefined),'Current Tesco mangetout 80g normal shelf price.');
+  add(/^gram flour$/i,2000,'g',4.50,'gram flour 2kg',stores(undefined,4.50,undefined,undefined),'Current Tesco-listed Virani gram flour 2kg normal shelf price; promotional price excluded.');
+  add(/^seasonal squash$/i,1,'each',1.50,'seasonal squash each',stores(undefined,1.50,undefined,undefined),'Current Tesco autumnal squash normal shelf price used for the provider\'s generic seasonal squash.');
+  add(/^hazelnuts?$/i,250,'g',3.25,'hazelnuts 250g',stores(undefined,3.25,undefined,undefined),'Current Tesco hazelnuts 250g normal shelf price.');
+  add(/^onion bhajis?$/i,10,'each',1.75,'onion bhajis 10 pack 200g',stores(undefined,1.75,undefined,undefined),'Current Tesco frozen onion bhajis 10 pack 200g normal shelf price.',{eachWeight:20});
 
   // QA.10 sourced-catalogue market gaps checked 2026-09-26.
   add(/^kumato tomato$/i,6,'each',2.00,'premium tomatoes pack',stores(undefined,2.00,undefined,undefined),'Tesco Finest Rossafina tomatoes used as the current premium tomato equivalent where Kumato is not listed directly.');
@@ -914,6 +944,18 @@ window.MW = window.MW || {};
   put('diced chorizo',current(1,'pack',2.55,'diced chorizo 130g pack',{packWeight:130}));
   put('red kidney beans',current(1,'tin',0.60,'red kidney beans 400g tin',{tinWeight:400}));
 
+  // QA25 expansion identities. Preserve the meal-box ingredient name; these
+  // entries exist only so quantity conversion and retail-pack pricing use the
+  // correct physical unit.
+  put('cannellini beans',calibrated(400,'g',0.65,'cannellini beans 400g tin equivalent'));
+  put('5 bean medley',calibrated(400,'g',0.75,'5 bean medley 400g tin equivalent'));
+  put('black bean paste',calibrated(200,'g',2.00,'black bean paste 200g',{tbspWeight:18,tspWeight:6}));
+  put('wholewheat noodle nests',calibrated(4,'nest',1.50,'wholewheat noodle nests x4',{nestWeight:62.5}));
+  put('Grilling Cheese',calibrated(225,'g',1.99,'grilling cheese 225g'));
+  put('Maple Syrup',calibrated(250,'ml',2.50,'maple syrup 250ml',{sachetWeight:15}));
+  put('Steamed Brown Basmati Rice',calibrated(250,'g',0.75,'steamed brown basmati rice pouch 250g',{pouchWeight:250}));
+  put('KNORR Vegetable Stock',calibrated(4,'each',1.50,'vegetable stock pots x4'));
+
   // Additional sourced lunch identities. Pricing only; no ingredient substitution is performed.
   put('flame-baked pizza bases',calibrated(2,'each',2.00,'flame-baked pizza bases x2',{eachWeight:220}));
   put('Wildfarmed pizza bases',calibrated(2,'each',2.50,'Wildfarmed pizza bases x2',{eachWeight:220}));
@@ -931,6 +973,10 @@ window.MW = window.MW || {};
   put('ground cumin',current(40,'g',1.25,'ground cumin 40g',{tspWeight:2.2,eachWeight:4}));
   put('canned sweetcorn',current(1,'tin',0.65,'sweetcorn 200g tin',{tinWeight:200}));
   put('THIS plant based sausages',current(1,'pack',3.00,'THIS plant based sausages pack'));
+  put(['Meatless Farm mince','meat free mince','meat-free mince','plant-based mince','plant based mince'],calibrated(454,'g',1.58,'plant-based mince 454g'));
+  put(['flat white mushrooms','baby button mushrooms','chestnut mushrooms','white cup mushrooms'],calibrated(400,'g',1.29,'closed cup mushrooms 400g'));
+  from(['shredded kale','cavolo nero'],'kale 200g');
+  put(['pineapple slices'],calibrated(1,'tin',0.95,'pineapple rings tin',{tinWeight:260}));
 
   // Public retail snapshots: a price observation is not whole-recipe verification.
   const retailSnapshots=[{"aliases":["British Cumberland Sausages","Cumberland sausages"],"entry":{"packQty":8,"unit":"each","price":1.79,"label":"Cumberland sausages x8 454g","eachWeight":56.75,"savingPrice":1.79,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-butcher-s-choice-cumberland-british-pork-sausage-x8-454g","note":"Butcher's Choice range, not premium sausages. Average piece weight: 454 g divided by eight.","price":1.79}}},{"aliases":["pork sausages","sausages"],"entry":{"packQty":8,"unit":"each","price":1.79,"label":"pork sausages x8 454g","eachWeight":56.75,"savingPrice":1.79,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-butcher-s-choice-british-pork-sausage-x8-454g","note":"Butcher's Choice range, not premium sausages.","price":1.79}}},{"aliases":["TenderstemÂ® Broccoli","Tenderstem Broccoli"],"entry":{"packQty":200,"unit":"g","price":1.6,"label":"Tenderstem broccoli 200g","savingPrice":1.6,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-tenderstem-broccoli-200g","note":"Correct vegetable identity. Temporary GBP 1.25 Nectar price not assumed.","price":1.6}}},{"aliases":["butter","salted butter"],"entry":{"packQty":250,"unit":"g","price":1.85,"label":"salted butter 250g","savingPrice":1.85,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-british-butter-salted-250g","note":"Actual retail pack, not a normalised 500 g equivalent.","price":1.85}}},{"aliases":["Potatoes","Maris Piper potatoes"],"entry":{"packQty":2000,"unit":"g","price":1.8,"label":"Maris Piper potatoes 2kg","savingPrice":1.8,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-maris-piper-potatoes-2kg","note":"Not automatically applied to salad or specialist varieties.","price":1.8}}},{"aliases":["Carrot","carrots"],"entry":{"packQty":1000,"unit":"g","price":0.69,"label":"carrots 1kg","eachWeight":80,"savingPrice":0.69,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-1kg-carrots","note":"80 g per medium carrot is a sizing estimate; weights vary.","price":0.69}}},{"aliases":["Garlic Clove","garlic","garlic cloves"],"entry":{"packQty":40,"unit":"clove","price":0.87,"label":"garlic x4 bulbs (about 40 cloves)","savingPrice":0.87,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-garlic-x4","note":"Four bulbs sold. Ten cloves per bulb is an estimate, not a retailer guarantee.","price":0.87}}},{"aliases":["milk","skimmed milk"],"entry":{"packQty":2270,"unit":"ml","cartonWeight":2270,"price":1.65,"label":"skimmed milk 2.27 litres (4 pints)","savingPrice":1.65,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-british-skimmed-milk-2-27l-4-pint","note":"Published 2.27 litre pack size; not used for whole milk.","price":1.65}}},{"aliases":["Green Beans","fine green beans"],"entry":{"packQty":200,"unit":"g","price":1.4,"label":"fine green beans 200g","eachWeight":8,"savingPrice":1.4,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-fine-green-beans-200g","note":"Piece weight, when needed, remains an estimate.","price":1.4}}},{"aliases":["Leek","leeks"],"entry":{"packQty":500,"unit":"g","price":1.37,"label":"leeks 500g","eachWeight":180,"savingPrice":1.37,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-leeks-500g","note":"180 g per leek is a sizing estimate.","price":1.37}}},{"aliases":["chicken breast","British Chicken Breasts"],"entry":{"packQty":1000,"unit":"g","price":6.69,"label":"British skinless chicken breast fillets 1kg","eachWeight":180,"savingPrice":6.69,"confidence":"unverified-benchmark","marketChecked":false,"marketAverage":false,"marketEvidence":[],"observedRetail":{"retailer":"Sainsbury's","date":"2026-09-25","url":"https://www.sainsburys.co.uk/groceries/product/sainsburys-1kg-british-fresh-skinless-boneless-chicken-breast-fillets","note":"Skinless boneless raw chicken; not proof for skin-on, prepared or frozen chicken.","price":6.69}}}];
@@ -978,6 +1024,7 @@ window.MW = window.MW || {};
     if(/^tortillas?$/.test(u)) return 'tortilla';
     if(/^sticks?$/.test(u)) return 'stick';
     if(/^bananas?$/.test(u)) return 'banana';
+    if(/^pots?$/.test(u)) return 'each';
     return u;
   };
   const pieceWeight=(entry,unit)=>{
@@ -987,14 +1034,14 @@ window.MW = window.MW || {};
 
   function amountFor(text,entry){
     if(!entry) return null;
-    let raw=String(text||'').trim().toLowerCase().replace(/,/g,'');
+    let raw=String(text||'').trim().toLowerCase().replace(/,/g,'').replace(/pot\(s\)/g,'pot');
     if(!raw) return null;
     if(raw==='to taste'||raw==='as needed'){
       const fallback={g:10,ml:50,each:1,tin:1,pack:1,carton:1,bottle:1,clove:1,nest:1,fillet:1,wrap:1,tortilla:1,stick:1,banana:1,sachet:1,bunch:1,ball:1,rasher:1,slice:1,pouch:1};
       return Number(entry.defaultUsage)||fallback[entry.unit]||null;
     }
     raw=raw.replace(/^Â½\s*/,'0.5 ').replace(/^Â¼\s*/,'0.25 ').replace(/^Â¾\s*/,'0.75 ');
-    const m=raw.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kg|g|ml|l|tbsp|tsp|tins?|cans?|cloves?|nests?|fillets?|wraps?|tortillas?|sticks?|cartons?|bottles?|packs?|bananas?|sachets?|bunch(?:es)?|balls?|rashers?|slices?|pouch(?:es)?)?\s*$/);
+    const m=raw.match(/^([0-9]+(?:\.[0-9]+)?)\s*(kg|g|ml|l|tbsp|tsp|tins?|cans?|cloves?|nests?|fillets?|wraps?|tortillas?|sticks?|cartons?|bottles?|packs?|bananas?|sachets?|bunch(?:es)?|balls?|rashers?|slices?|pouch(?:es)?|pots?)?\s*$/);
     if(!m) return null;
     const value=Number(m[1]);
     let unit=unitAlias(m[2]||'');

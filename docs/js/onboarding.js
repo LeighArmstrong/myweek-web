@@ -99,9 +99,9 @@ window.MW = window.MW || {};
   }
 
   function allergens(){
-    return '<section class="onboard-heading"><span>4 · ALLERGIES & RESTRICTIONS</span><h1>Any allergies we should be aware of?</h1><p>Select every allergen that should be excluded from recipe suggestions, or continue with none.</p></section><section class="onboard-card">'+
+    return '<section class="onboard-heading"><span>4 · ALLERGIES & RESTRICTIONS</span><h1>Any genuine allergies or intolerances?</h1><p>Only use this section for genuine allergies or intolerances. If you simply dislike a food, add it under “Foods you simply do not want” on the previous screen.</p></section><section class="onboard-card">'+
       chipRow('obAllergens',MW.food.allergens,draft.allergens,true)+
-      '<div class="onboard-safety">'+icon('triangle-exclamation')+'<p>Recipes without verified allergen records are excluded. This catalogue does not yet have those records, so selecting an allergy will leave no recipe suggestions. Always check ingredient and product labels yourself; My Week is not a substitute for medical or product-label advice.</p></div>'+
+      '<div class="onboard-safety">'+icon('triangle-exclamation')+'<p>My Week excludes recipes declared by the meal-box source as containing, or potentially containing, your selected allergens. Always check the ingredient and product labels you actually receive; My Week is not a substitute for medical or product-label advice.</p></div>'+
       '</section>'+nextButton();
   }
 
@@ -207,10 +207,18 @@ window.MW = window.MW || {};
     if(!input||!out||!MW.foodIdentity) return;
     const parsed=MW.foodIdentity.parseList(input.value);
     if(!parsed.items.length){out.innerHTML='';return;}
-    const bits=[];
-    if(parsed.linked.length)bits.push('<span class="avoid-ok">'+icon('circle-check')+' Recognised: '+parsed.linked.map(x=>esc(MW.foodIdentity.canonicalLabel(x))).join(' · ')+'</span>');
-    if(parsed.custom.length)bits.push('<span class="avoid-warn">'+icon('circle-question')+' Custom, not linked: '+parsed.custom.map(esc).join(', ')+'</span>');
-    out.innerHTML=bits.join('');
+    const applied=parsed.items.map((item,index)=>({item,index})).filter(x=>x.item.matched);
+    const unresolved=parsed.items.map((item,index)=>({item,index})).filter(x=>!x.item.matched);
+    const chips=applied.map(({item,index})=>'<button type="button" class="avoid-applied-chip" data-avoid-remove="'+index+'" aria-label="Remove '+esc(MW.foodIdentity.canonicalLabel(item.canonical))+'"><span>'+esc(MW.foodIdentity.canonicalLabel(item.canonical))+'</span>'+icon('xmark')+'</button>').join('');
+    const unresolvedText=unresolved.length?'<span class="avoid-unresolved-note">'+icon('circle-question')+' Not applied: '+unresolved.map(x=>esc(x.item.raw)).join(', ')+'. Choose a recognised suggestion or correct the wording.</span>':'';
+    out.innerHTML=(chips?'<span class="avoid-feedback-label">Applied</span><span class="avoid-chip-list">'+chips+'</span>':'')+unresolvedText;
+    out.querySelectorAll('[data-avoid-remove]').forEach(button=>button.onclick=()=>{
+      const removeIndex=Number(button.dataset.avoidRemove);
+      input.value=parsed.items.filter((_,index)=>index!==removeIndex).map(x=>x.raw).join(', ');
+      draft.avoid=input.value;
+      rememberProgress();
+      updateAvoidFeedback(root);
+    });
   }
 
   function captureInputs(root){
@@ -254,7 +262,7 @@ window.MW = window.MW || {};
     }
     const avoidInput=root.querySelector('#obAvoid');
     if(avoidInput){
-      if(MW.foodIdentity)MW.foodIdentity.attach(avoidInput,{multi:true,limit:5,onSelect:()=>updateAvoidFeedback(root)});
+      if(MW.foodIdentity)MW.foodIdentity.attach(avoidInput,{multi:true,limit:5,requireMatch:true,onSelect:()=>updateAvoidFeedback(root)});
       avoidInput.addEventListener('input',()=>updateAvoidFeedback(root));
       avoidInput.addEventListener('blur',()=>updateAvoidFeedback(root));
       updateAvoidFeedback(root);
