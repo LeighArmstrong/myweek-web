@@ -3,6 +3,7 @@ window.MW = window.MW || {};
   const root=document.getElementById('app');
   const s=()=>MW.state.get();
   let animateNextPage=true;
+  let accountEntryChosen=false;
   let pendingMotion='context';
   let activeViewTransition=null;
   let previewRolloverFor='';
@@ -142,7 +143,7 @@ window.MW = window.MW || {};
   function updateControlNames(){
     root.querySelectorAll('.back-button,.back-on-photo').forEach(b=>b.setAttribute('aria-label','Go back'));
     root.querySelectorAll('.stock-delete').forEach(b=>b.setAttribute('aria-label','Delete '+(b.dataset.name||'cupboard item')));
-    const labelled={savingToggle:'Lower-price mode',homeSavingToggle:'Lower-cost planning',normalPrice:'Lower-price mode',profileName:'First name',retailer:'Supermarket',budget:'Weekly food budget',avoidFoods:'Foods to exclude',priceMode:'Lower-price planning',stockName:'Cupboard item name',stockAmount:'Cupboard quantity',stockUnit:'Cupboard unit',addStock:'Add cupboard item',lunchToggle:'Plan lunch on this day',dinnerToggle:'Plan dinner on this day',recipeSearch:'Search recipes'};
+    const labelled={savingToggle:'Lower-cost planning',homeSavingToggle:'Lower-cost planning',normalPrice:'Lower-cost planning',profileName:'First name',retailer:'Supermarket',budget:'Weekly food budget',avoidFoods:'Foods to exclude',priceMode:'Lower-cost planning',stockName:'Cupboard item name',stockAmount:'Cupboard quantity',stockUnit:'Cupboard unit',addStock:'Add cupboard item',lunchToggle:'Plan lunch on this day',dinnerToggle:'Plan dinner on this day',recipeSearch:'Search recipes'};
     Object.entries(labelled).forEach(([id,label])=>{const el=document.getElementById(id);if(el) el.setAttribute('aria-label',label);});
     root.querySelectorAll('.food-choice button,.onboard-chips button,.equipment-grid button,.day-toggle-row button,.numeric-choice-row button,.stock-state button[data-action],.cat-tab').forEach(b=>{
       const value=String(b.classList.contains('active')||b.classList.contains('selected'));
@@ -670,13 +671,15 @@ window.MW = window.MW || {};
     const sub=st.onboarded?weekRange():'Simple meals. Happier weeks.';
     const nav=st.onboarded?globalNav(active):'';
     const header='<header class="appbar"><button class="account-link '+(st.onboarded?'':'static')+'" id="accountButton"><span class="account-name">'+esc(title)+'</span><span class="account-sub">'+esc(sub)+'</span></button>'+
-      (st.onboarded?'<button class="settings-button" id="settingsButton" aria-label="Settings">'+icon('gear')+'</button>':'')+
+      (st.onboarded?'<div class="appbar-actions"><button type="button" class="account-shortcut" id="accountTopButton" aria-label="'+(MW.accounts.status().user?'Account & sync':'Sign in')+'" title="Account">'+icon('circle-user')+'</button><button type="button" class="settings-button" id="settingsButton" aria-label="Settings">'+icon('gear')+'</button></div>':'')+
     '</header>';
-    const allergyNotice=(st.foodProfile&&st.foodProfile.allergens||[]).length?'<section class="allergen-note" role="status"><span>Allergy matching is unavailable for recipes without verified allergen records. These recipes are excluded from suggestions. Do not rely on My Week alone for allergy safety; always check ingredient labels and cross-contamination advice.</span></section>':'';
+    const selected=(st.foodProfile&&st.foodProfile.allergens||[]).slice().sort(),noticeKey=JSON.stringify(selected);
+    const allergyNotice=selected.length&&st.ui.dismissedAllergyNoticeFor!==noticeKey?'<section class="allergy-notice"><button type="button" class="allergy-notice-close" aria-label="Dismiss allergy reminder">'+icon('xmark')+'</button><strong>Allergy filters are on</strong><p>Check product labels and cross-contamination warnings.</p><details><summary>How filters work '+icon('chevron-down')+'</summary><p>Recipes with selected allergens, “may contain” warnings or missing verified records are excluded.</p></details></section>':'';
     return '<main class="shell">'+header+allergyNotice+body+nav+'</main>';
   }
 
   function bindNav(){
+    const dismiss=root.querySelector('.allergy-notice-close');if(dismiss)dismiss.onclick=()=>{const notice=dismiss.closest('.allergy-notice');s().ui.dismissedAllergyNoticeFor=JSON.stringify((foodProfile().allergens||[]).slice().sort());MW.state.save();notice.remove();};
     root.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{
       const target=b.dataset.nav;
       if(target==='shopreview'&&(!s().week||!s().week.shop)) return go('check',{motion:'context'});
@@ -685,7 +688,8 @@ window.MW = window.MW || {};
     const settings=document.getElementById('settingsButton');
     if(settings) settings.onclick=()=>go('settings',{motion:'drill-forward'});
     const account=document.getElementById('accountButton');
-    if(account&&s().onboarded) account.onclick=()=>go('settings',{motion:'drill-forward'});
+    if(account&&s().onboarded) account.onclick=()=>go('account',{motion:'drill-forward'});
+    const shortcut=document.getElementById('accountTopButton');if(shortcut)shortcut.onclick=()=>go('account',{motion:'drill-forward'});
   }
 
   function go(screen,options){
@@ -761,7 +765,7 @@ window.MW = window.MW || {};
     const st=s();
     if(!st.onboarded){
       document.body.classList.remove('cooking-active');
-      if(MW.accounts&&!MW.accounts.status().user)return accountScreen(true);
+      if(MW.accounts&&!MW.accounts.status().user){if(!accountEntryChosen&&MW.onboarding.intro)return MW.onboarding.intro(root,()=>{accountEntryChosen=true;accountScreen(true,'create');window.scrollTo(0,0);},()=>{accountEntryChosen=true;accountScreen(true,'signin');window.scrollTo(0,0);});return accountScreen(true);}
       return welcome();
     }
     const screen=st.ui.screen||'week';
@@ -791,7 +795,7 @@ window.MW = window.MW || {};
 
   function welcome(){
     if(MW.onboarding){
-      MW.onboarding.render(root,()=>{render();window.scrollTo({top:0,behavior:'instant'});});
+      MW.onboarding.render(root,()=>{render();window.scrollTo({top:0,behavior:'instant'});},{skipWelcome:accountEntryChosen});
       return;
     }
   }
@@ -822,11 +826,11 @@ window.MW = window.MW || {};
     const savingResult=st.week&&st.week.savingResult;
     const savingCopy=st.plan.priceMode&&savingResult
       ?(savingResult.changed
-        ?(savingResult.metBudget?'Estimated trolley '+money(savingResult.candidateTotal)+' · about '+money(savingResult.saved)+' lower than the previous plan.':'No suitable plan could be found within your '+money(budget)+' weekly budget, so My Week kept the previous meals.')
-        :'No genuinely cheaper suitable plan was found, so your meals were left unchanged.')
-      :'Prioritise cheaper meals, sensible own-brand swaps and more shared ingredients.';
+        ?(savingResult.metBudget?'Estimated trolley '+money(savingResult.candidateTotal)+' · about '+money(savingResult.saved)+' lower than the previous plan.':'No matching plan fits '+money(budget)+'. Your meals are unchanged.')
+        :'No cheaper matching plan found. Your meals are unchanged.')
+      :'Choose cheaper meals and share ingredients across the week.';
     const budgetWarning=st.plan.priceMode&&savingResult&&savingResult.metBudget===false
-      ?'<section class="budget-over-note">'+icon('triangle-exclamation')+'<div><strong>'+money(savingResult.overBudgetBy)+' above your weekly budget</strong><small>My Week will not generate a new week above '+money(budget)+'. Change this manually edited plan or regenerate it to bring the estimate back within budget.</small></div></section>'
+      ?'<section class="budget-over-note">'+icon('triangle-exclamation')+'<div><strong>'+money(savingResult.overBudgetBy)+' above your weekly budget</strong><small>Change a meal or regenerate to fit your '+money(budget)+' budget.</small></div></section>'
       :'';
 
     const homeDelivery=st.week&&st.week.delivery;
@@ -868,7 +872,7 @@ window.MW = window.MW || {};
       :'';
 
     root.innerHTML=shell(
-      '<section class="home-intro"><div><span class="eyebrow">THIS WEEK</span><h1>Your week at a glance</h1><p>'+countLabel(meals.length,'dinner','dinners')+' · '+countLabel((st.plan.lunchDays||[]).length,'lunch day','lunch days')+' · '+esc(st.household.retailer)+'</p></div><div class="budget-text"><strong>£'+Math.round(budget)+'</strong><span>budget</span></div></section>'+
+      '<section class="home-intro"><div><h1>This week</h1><p>'+countLabel(meals.length,'dinner','dinners')+' · '+countLabel((st.plan.lunchDays||[]).length,'lunch day','lunch days')+' · '+esc(st.household.retailer)+'</p></div><div class="budget-text"><strong>£'+Math.round(budget)+'</strong><span>budget</span></div></section>'+
       rolloverNotice+
       dayStrip+
       homeDeliveryNotice+
@@ -1034,7 +1038,7 @@ window.MW = window.MW || {};
       '<section class="check-budget"><span><strong>'+money(st.household.budget)+'</strong> weekly budget</span><small>Meals, lunches and anything you add here count towards the weekly budget estimate.</small></section>'+
       '<section class="check-section"><div class="section-title"><div><span class="eyebrow">WEEKLY ESSENTIALS</span><h2>Add what you need</h2></div></div><div class="essential-list" id="regulars">'+st.regulars.map(x=>'<div class="essential-row '+(x.selected?'active':'')+'" data-id="'+x.id+'"><div class="essential-name"><strong>'+esc(ingredientName(x.name))+'</strong><small>'+(x.selected?'Added to this shop':'Not added')+'</small></div><label class="toggle"><input class="regular-toggle" data-id="'+x.id+'" type="checkbox" '+(x.selected?'checked':'')+'><span></span></label>'+(x.selected?'<div class="qty-stepper"><button class="qty-minus" data-id="'+x.id+'" aria-label="Reduce '+esc(ingredientName(x.name))+'">'+icon('minus')+'</button><strong>'+esc(regularQty(x))+'</strong><button class="qty-plus" data-id="'+x.id+'" aria-label="Increase '+esc(ingredientName(x.name))+'">'+icon('plus')+'</button></div>':'')+'</div>').join('')+'</div></section>'+
       '<section class="check-section"><div class="section-title"><div><span class="eyebrow">ANYTHING ELSE</span><h2>Add extras</h2></div></div><span class="mini-label">Popular</span><div class="quick-adds">'+MW.EXTRA_SUGGESTIONS.map((x,i)=>'<button class="quick-add" data-index="'+i+'">'+icon('plus')+' '+esc(ingredientName(x.name))+'</button>').join('')+'</div><span class="mini-label custom-label">Something else</span><div class="add-custom"><input id="extra" placeholder="e.g. coffee, shampoo, pet food"><button id="addExtra">'+icon('plus')+' Add</button></div><div class="extras-list">'+(extras.length?'<span class="mini-label added-label">Added to this shop</span>'+extras.map((x,i)=>'<div class="extra-row"><span><strong>'+esc(ingredientName(x.name))+'</strong><small>'+esc(x.category||'Extras')+'</small></span><button class="remove-extra" data-index="'+i+'" aria-label="Remove">'+icon('trash')+'</button></div>').join(''):'')+'</div></section>'+
-      '<section class="saving-toggle '+(st.plan.priceMode?'active':'')+'"><div><span class="saving-icon">'+icon('sterling-sign')+'</span><div><strong>Lower-price mode</strong><small>'+(st.week.savingResult&&st.week.savingResult.changed?'About '+money(st.week.savingResult.saved)+' lower than the previous plan.':'Replans only when the corrected trolley estimate is genuinely lower.')+'</small></div></div><label class="toggle"><input id="savingToggle" type="checkbox" '+(st.plan.priceMode?'checked':'')+'><span></span></label></section>'+
+      '<section class="saving-toggle '+(st.plan.priceMode?'active':'')+'"><div><span class="saving-icon">'+icon('sterling-sign')+'</span><div><strong>Lower-cost planning</strong><small>'+(st.week.savingResult&&st.week.savingResult.changed?'About '+money(st.week.savingResult.saved)+' lower than the previous plan.':'Changes meals only when the trolley estimate is lower.')+'</small></div></div><label class="toggle"><input id="savingToggle" type="checkbox" '+(st.plan.priceMode?'checked':'')+'><span></span></label></section>'+
       '<div class="plan-actions"><button class="btn secondary" id="back">Back to meals</button><button class="btn primary" id="build">Build my shop</button></div>',
       'shop'
     );
@@ -1154,7 +1158,7 @@ window.MW = window.MW || {};
       '<section class="page-head shop-head"><div><span class="eyebrow">'+(orderLocked?'YOUR ORDER':'YOUR SHOP')+'</span><h1>'+shop.itemCount+' things</h1><p>'+(orderLocked?'Original shopping list kept for this week':esc(shop.priceRetailer||st.household.retailer)+' · price estimate'+(shop.priceAsOf?' · updated '+esc(shop.priceAsOf):''))+'</p></div><div class="shop-total"><strong>'+money(totalValue)+'</strong><span>'+esc(totalMeta)+'</span></div></section>'+
       deliveryNotice+
       '<section class="shop-progress" id="shopProgress"><div><strong id="shopProgressCount">'+done+' of '+allItems.length+'</strong><span> checked off</span></div><span id="shopProgressPct">'+pct+'%</span><div class="progress"><span id="shopProgressBar" style="width:'+pct+'%"></span></div></section>'+
-      (orderLocked?'':shop.savingMode?'<section class="saving-summary compact-saving"><div>'+icon('sterling-sign')+'<div><strong>Lower-price mode</strong><small>~'+money(shop.estimatedSavings)+' estimated saving</small></div></div><label class="toggle"><input id="normalPrice" type="checkbox" checked><span></span></label></section>':'<button class="saving-prompt" id="lowerShop">'+icon('sterling-sign')+'<span><strong>Try to lower the price</strong><small>Replan the week only if the corrected trolley estimate can genuinely fall.</small></span><i class="fa-solid fa-chevron-right"></i></button>')+
+      (orderLocked?'':shop.savingMode?'<section class="saving-summary compact-saving"><div>'+icon('sterling-sign')+'<div><strong>Lower-cost planning</strong><small>~'+money(shop.estimatedSavings)+' estimated saving</small></div></div><label class="toggle"><input id="normalPrice" type="checkbox" checked><span></span></label></section>':'<button class="saving-prompt" id="lowerShop">'+icon('sterling-sign')+'<span><strong>Try to lower the price</strong><small>Change meals only if the trolley estimate is lower.</small></span><i class="fa-solid fa-chevron-right"></i></button>')+
       '<div class="category-tabs"><button class="cat-tab active" data-group="__all">All <span>'+allItems.length+'</span></button>'+retailGroups.map(g=>'<button class="cat-tab" data-group="'+esc(g)+'">'+esc(g)+' <span>'+allItems.filter(x=>x.group===g).length+'</span></button>').join('')+'</div>'+
       '<section class="shop-surface"><div class="shop-group show grouped-shop" data-shopgroup="__all">'+groupedHtml+'</div>'+retailGroups.map(g=>'<div class="shop-group grouped-shop" data-shopgroup="'+esc(g)+'">'+groupHtml(g)+'</div>').join('')+'</section>'+
       postOrderActions,
@@ -1326,9 +1330,10 @@ window.MW = window.MW || {};
 
   function myRecipes(){
     const st=s(),target=st.ui.libraryTargetDay||'';
-    root.innerHTML=shell('<section class="subpage-head"><button class="back-button" id="personalBack" aria-label="Back">'+icon('arrow-left')+'</button><div><span class="eyebrow">YOUR COLLECTION</span><h1>My Recipes</h1></div></section><div class="personal-actions"><button class="btn primary" id="importRecipe">'+icon('link')+' Add a recipe</button></div><form class="library-search" id="personalSearchForm"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="personalSearch" placeholder="Search your recipes or ingredients" aria-label="Search My Recipes" inputmode="search" enterkeyhint="search"></form><div id="personalResults"></div>','cook');
+    root.innerHTML=shell('<section class="subpage-head"><button class="back-button" id="personalBack" aria-label="Back">'+icon('arrow-left')+'</button><div><span class="eyebrow">YOUR COLLECTION</span><h1>My Recipes</h1></div></section><div class="personal-actions"><button class="btn primary" id="importRecipe">'+icon('link')+' Add a recipe</button></div><form class="library-search" id="personalSearchForm"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="personalSearch" placeholder="Search your recipes or ingredients" aria-label="Search My Recipes" inputmode="search" enterkeyhint="search"></form><div class="personal-sync-row"><span id="personalSyncStatus" role="status" aria-live="polite"></span><button type="button" class="text-action" id="personalSyncNow">Sync now</button></div><div id="personalResults"></div>','cook');
     const host=document.getElementById('personalResults'),search=document.getElementById('personalSearch');
     const paint=()=>{try{const query=search.value.trim().toLowerCase(),items=MW.personalRecipes.all().filter(r=>!query||[r.title,...r.ingredients.map(x=>x[1])].join(' ').toLowerCase().includes(query));host.innerHTML=items.length?'<div class="library-grid">'+items.map(r=>'<article class="personal-card"><button class="library-card" data-open="'+esc(r.id)+'">'+recipePhoto(r,'library-photo',r.title)+'<span><strong>'+esc(r.title)+'</strong><small>'+esc(r.source)+'</small></span></button><button class="personal-edit" data-edit="'+esc(r.id)+'" aria-label="Edit '+esc(r.title)+'">'+icon('pen')+' Edit</button></article>').join('')+'</div>':'<div class="empty-state">'+icon('bookmark')+'<h2>'+(query?'No matches':'Save recipes you love')+'</h2><p>'+(query?'Try another search.':'Paste a recipe link to start your collection.')+'</p></div>';host.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{if(target){if(MW.planner.replace(target,b.dataset.open)){st.ui.libraryTargetDay='';MW.state.save();go('day:'+target);}}else go('recipe:'+b.dataset.open);});host.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>personalEditor(MW.personalRecipes.byId(b.dataset.edit)));}catch(error){host.innerHTML='<p class="operation-error" role="alert">'+esc(error.message)+'</p>';}};
+    document.getElementById('personalSyncNow').onclick=e=>{if(!MW.accounts.status().user||MW.accounts.status().status==='conflict')return go('account');return withLoading(e.currentTarget,async()=>{await MW.accounts.sync();paintPersonalSyncStatus();});};paintPersonalSyncStatus();
     search.oninput=paint;document.getElementById('personalSearchForm').onsubmit=e=>{e.preventDefault();paint();};document.getElementById('importRecipe').onclick=()=>personalEditor();document.getElementById('personalBack').onclick=()=>go(target?'library':'recipes');paint();bindNav();
   }
   function personalEditor(existing){
@@ -1380,8 +1385,13 @@ window.MW = window.MW || {};
 
   function recipeBlocked(r){
     if(!MW.planner.allowed(r)){
-      root.innerHTML=shell('<section class="empty-state"><h1>This recipe does not match your current settings</h1><p>Food exclusions, diet, allergy verification or equipment requirements prevent it being recommended. Your settings have not been relaxed.</p><button class="btn primary" id="blockedBack">Back to your week</button></section>','cook');
-      document.getElementById('blockedBack').onclick=()=>go('week');bindNav();return true;
+      const selected=foodProfile().allergens||[];
+      const verified=r.allergenEvidence&&r.allergenEvidence.status==='verified'&&Array.isArray(r.allergenEvidence.reviewedAllergens)&&selected.every(id=>r.allergenEvidence.reviewedAllergens.includes(id))&&Array.isArray(r.allergens);
+      let reason='This recipe does not match your food or equipment settings.';
+      if(selected.length&&!verified)reason='This recipe has no verified allergy information for your selection.';
+      else if(selected.length&&(selected.some(id=>r.allergens.includes(id))||MW.food.allergenHits(r,selected).length))reason='This recipe lists an allergen you avoid.';
+      root.innerHTML=shell('<section class="empty-state recipe-unavailable"><span class="empty-state-icon">'+icon('sliders')+'</span><h1>Recipe unavailable</h1><p>'+esc(reason)+'</p><div class="empty-state-actions"><button class="btn primary" id="blockedBack">Back to your week</button><button class="btn secondary" id="blockedSettings">Review settings</button></div></section>','cook');
+      document.getElementById('blockedBack').onclick=()=>go('week');document.getElementById('blockedSettings').onclick=()=>go('settings');bindNav();return true;
     }
     return false;
   }
@@ -1403,7 +1413,7 @@ window.MW = window.MW || {};
       (r.online?'<div class="source-note">'+icon('circle-info')+'<span>Recipe from '+esc(r.source||'online source')+'. Ingredient quantities are kept as published.</span></div>':'')+
       ((!r.online&&r.sourcedCatalogue&&r.sourceUrl)?'<a class="photo-credit" href="'+esc(r.sourceUrl)+'" target="_blank" rel="noopener">Recipe source · '+esc(r.source||'Published recipe')+'</a>':((!r.online&&r.imageSource&&displayRecipeImage(r))?'<a class="photo-credit" href="'+esc(r.imageSource)+'" target="_blank" rel="noopener">Photo source · '+esc(r.imageLicense||'Source')+'</a>':''))+
       ((MW.equipment&&MW.equipment.requirements(r).length)?'<div class="equipment-note">'+icon('utensils')+'<span>Requires '+esc(MW.equipment.requirements(r).map(MW.equipment.label).join(', '))+'.</span></div>':'')+
-      (selectedAllergens.length?'<div class="allergen-note">'+icon('triangle-exclamation')+'<span>Allergen filters use listed ingredients only. Check packets, labels and cross-contamination information.</span></div>':'')+
+      (selectedAllergens.length?'<details class="allergy-guidance"><summary>'+icon('circle-info')+'<span>Check ingredient labels</span>'+icon('chevron-down')+'</summary><p>Filters use the recipe source’s allergen records. Recipes without verified records are excluded. Always check product labels and cross-contamination warnings.</p></details>':'')+
       '<section class="recipe-section ingredients-section"><div class="section-title"><div><span class="eyebrow">INGREDIENTS</span><h2>What you need</h2></div></div>'+r.ingredients.map((x,ingredientIndex)=>{const practical=practicalQuantity(r,ingredientIndex,factor),planned=practical?practical.amount:(MW.preparation&&MW.preparation.scaleAmount?MW.preparation.scaleAmount(r,x[0],x[1],factor):(r.scaleSafe===false?x[0]:MW.shopping.scaleAmount(x[0],factor))),shown=substitutedIngredient(x[1],planned),approximate=!shown.substitution&&Boolean(practical&&practical.approximate),stocked=MW.inventory&&MW.inventory.covers(shown.name,shown.amount),label=ingredientName(shown.name),checked=Boolean(gathered[String(ingredientIndex)]),subNote=shown.substitution?'<small class="ingredient-substitution-note">'+icon('right-left')+' Instead of '+esc(ingredientName(shown.originalName))+' · recipe calls for '+esc(displayAmount(shown.originalAmount))+(shown.comparable?'':' · quantity comparison needs judgement')+'</small>':'';return '<div class="ingredient-row '+(stocked?'from-cupboard ':'')+(shown.substitution?'has-substitution ':'')+(checked?'is-gathered':'')+'">'+gatherToggleButton(r,ingredientIndex,label,checked)+'<span>'+esc(label)+(stocked?'<small>In your cupboard</small>':'')+subNote+'</span><strong>'+esc(cookingAmount(shown.amount,approximate))+'</strong><button type="button" class="ingredient-more" data-ingredient="'+esc(x[1])+'" aria-label="More options for '+esc(ingredientName(x[1]))+'">'+icon('ellipsis-vertical')+'</button></div>';}).join('')+'</section>'+
       '<section class="recipe-section equipment-section"><div class="section-title"><div><span class="eyebrow">EQUIPMENT</span><h2>Get these ready</h2></div></div><div class="cook-equipment-list">'+toolsNeeded.map(x=>'<span>'+icon('check')+esc(x)+'</span>').join('')+'</div></section>'+
       '<section class="recipe-section method-section"><div class="section-title"><div><span class="eyebrow">METHOD</span><h2>Cook it</h2></div></div><div class="steps">'+r.steps.map((x,i)=>{const used=stepIngredients(r,x,factor,i);return '<div class="step"><span>'+(i+1)+'</span><div><p>'+esc(displayInstruction(x,r,factor,people))+'</p>'+(used.length?'<div class="step-amounts">'+used.map(v=>{const shown=substitutedIngredient(v.name,v.amount),approximate=!shown.substitution&&Boolean(v.practicalApproximate);return '<em>'+esc(cookingAmount(shown.amount,approximate))+' '+esc(ingredientName(shown.name))+(shown.substitution?' '+icon('right-left'):'')+'</em>';}).join('')+'</div>':'')+'</div></div>';}).join('')+'</div></section>'+
@@ -1467,13 +1477,13 @@ window.MW = window.MW || {};
     const supplied=clean(caption).replace(/^(?:step|instruction)\s*\d+(?:\s*(?:of|\/)\s*\d+)?\s*[:.\-]?\s*/i,'').replace(/[.!?:]+$/,'').trim();
     const generic=/^(?:get started|get prepping|get prepped|get chopping|get frying|get baking|prep time|finish the prep|preparation|method|all together now|all together|finishing touches|add the flavour|dinner's ready|serve up)$/i;
     // A caption names the stage; the complete method stays in the instructions.
-    if(supplied&&supplied.length<=36&&supplied.split(/\s+/).length<=5&&!generic.test(supplied)&&!/^(?:peel|chop|dice|slice|cut|grate|crush)\b/i.test(supplied))return supplied;
+    if(/^(?:prepare|preheat|heat|cook|roast|bake|fry|brown|sear|simmer|boil|mix|combine|make|assemble|serve|finish|coat|layer|add|stir|whisk|blend|dress|toast|fluff|mash|knead|roll|shape|rest|cool|rinse|drain|soak|cover|chill|season|wrap|melt)\b/i.test(supplied)&&supplied&&supplied.length<=36&&supplied.split(/\s+/).length<=5&&!generic.test(supplied)&&!/^(?:peel|chop|dice|slice|cut|grate|crush)\b/i.test(supplied))return supplied;
     const text=clean(instruction||caption),match=/\b(preheat|heat|boil|bring|prepare|peel|chop|dice|slice|cut|grate|crush|halve|prick|pat|wash|zest|squeeze|separate|coat|layer|top|sprinkle|dress|shred|pull|melt|warm|wrap|cover|chill|rest|put|transfer|return|share|drain|rinse|mix|combine|whisk|stir|add|cook|roast|bake|fry|brown|sear|simmer|blend|blitz|assemble|divide|serve|toss|season|spread|fluff|mash|toast|pour|place|pop|remove)\b/i.exec(text);
     if(/^Use this time to/i.test(text)&&/clear up|set the table|cup of tea/i.test(text))return 'While it cooks';
     if(!match)return 'Follow the method';
     const verb=match[1].toLowerCase(),action=text.slice(match.index).split(/[.!?;]/)[0];
     if(/^(?:heat|preheat)$/.test(verb)){const equipment=/\b(oven|pan|pot|saucepan)\b/i.exec(action);if(equipment)return equipment[1].toLowerCase()==='oven'?'Preheat the oven':'Heat the pan';if(verb==='preheat')return 'Preheat the oven';}
-    if(verb==='heat'&&/\b(?:pan|pot|saucepan)\b/i.test(action))return 'Heat the pan';
+    if(/^(?:heat|pop|return)$/.test(verb)&&/\b(?:pan|pot|saucepan|heat)\b/i.test(action))return 'Heat the pan';
     if(/^wash\s+(?:(?:your|the)\s+)?hands\b/i.test(action))return 'Wash your hands';
     if(/^(?:wash|rinse)\s+(?:(?:your|the|a)\s+)?(?:pan|knife|chopping board|cutting board|equipment)\b/i.test(action))return 'Clean the equipment';
     if(verb==='boil'&&/\bkettle\b/i.test(action))return 'Boil the kettle';
@@ -1546,7 +1556,7 @@ window.MW = window.MW || {};
           (stepCandidates.length?
             '<aside class="cook-visual-panel">'+photo(stepCandidates[0],'cook-photo',stepTitle,stepCandidates.slice(1))+'</aside>'
           :'')+
-          '<article class="cook-instruction">'+
+          '<article class="cook-instruction"><div class="cook-instruction-scroll" tabindex="0" aria-label="Cooking instructions">'+
             (stepSwapNotes.length?'<div class="cook-substitution-banner">'+icon('right-left')+'<div><strong>Your shop swap applies here</strong>'+stepSwapNotes.map(x=>'<small>Use '+esc(ingredientName(x.replacementName))+' instead of '+esc(ingredientName(x.originalName))+'.</small>').join('')+'</div></div>':'')+
             '<div class="cook-action-list">'+instructionParts.map((part,i)=>'<div><span>'+(i+1)+'</span><p>'+esc(part)+'</p></div>').join('')+'</div>'+
             (used.length?
@@ -1556,7 +1566,7 @@ window.MW = window.MW || {};
             :'')+
             (tip?'<div class="cook-tip">'+icon('lightbulb')+'<span><strong>Top tip</strong><small>'+esc(tip)+'</small></span></div>':'')+
             '<div class="cook-session-tools"><button type="button" class="text-action cancel-cooking" id="cancelCooking">Cancel cooking</button></div>'+
-          '</article>'+
+          '</div></article>'+
         '</section>'+
         '<nav class="cook-controls" aria-label="Cooking steps">'+
           '<button class="cook-control secondary" id="prevStep" '+(index===0?'disabled':'')+'>'+icon('arrow-left')+'<span>Previous</span></button>'+
@@ -1588,10 +1598,11 @@ window.MW = window.MW || {};
 
   function accountScreen(onboarding=false,mode='signin'){
     const account=MW.accounts.status(),user=account.user;
-    root.innerHTML=shell('<section class="subpage-head">'+(!onboarding?'<button class="back-button" id="accountBack" aria-label="Back to Settings">'+icon('arrow-left')+'</button>':'')+'<div><span class="eyebrow">MY WEEK ACCOUNT</span><h1>'+(user?'Your account':onboarding?'Welcome to My Week':mode==='create'?'Create an account':'Sign in')+'</h1></div></section>'+(user?'<section class="settings-section account-summary"><h2>'+esc(user.email)+'</h2><p id="accountSyncStatus" role="status" aria-live="polite"></p><div id="accountConflict"></div><button class="btn primary" id="accountSyncNow">Sync now</button><button class="btn secondary" id="accountSignOut">Sign out</button><div id="accountError" role="alert"></div></section>':'<section class="settings-section account-auth"><p class="setting-help">Sign in on your devices to sync your week, cupboard and My Recipes.</p><div class="category-tabs"><button class="cat-tab '+(mode==='signin'?'active':'')+'" id="accountSignInTab">Sign in</button><button class="cat-tab '+(mode==='create'?'active':'')+'" id="accountCreateTab">Create account</button></div><form id="accountAuthForm"><label class="personal-label" for="accountEmail">Email address</label><input id="accountEmail" type="email" required autocomplete="email" inputmode="email"><label class="personal-label" for="accountPassword">Password</label><div class="account-password"><input id="accountPassword" type="password" required minlength="'+(mode==='create'?8:1)+'" autocomplete="'+(mode==='create'?'new-password':'current-password')+'"><button type="button" id="showAccountPassword" aria-label="Show password">'+icon('eye')+'</button></div>'+(mode==='create'?'<p class="setting-help">At least 8 characters.</p><label class="personal-label" for="accountConfirmPassword">Confirm password</label><input id="accountConfirmPassword" type="password" required minlength="8" autocomplete="new-password">':'')+'<div id="accountError" role="alert"></div><button class="btn primary" type="submit" id="accountAuthSubmit">'+(mode==='create'?'Create account':'Sign in')+'</button>'+((mode==='signin')?'<button type="button" class="text-action" id="accountForgotPassword">Forgot password?</button>':'')+'</form><div id="accountDataChoice"></div></section>')+(!onboarding?'<section class="settings-section"><button class="settings-link" id="accountTransfer">'+icon('file-export')+'<span><strong>Manual transfer & backup</strong></span><i class="fa-solid fa-chevron-right"></i></button></section>':''),'more');
+    root.innerHTML=shell('<section class="subpage-head">'+'<button class="back-button" id="accountBack" aria-label="'+(onboarding?'Back to welcome':'Go back')+'">'+icon('arrow-left')+'</button>'+'<div><span class="eyebrow">MY WEEK ACCOUNT</span><h1>'+(user?'Your account':mode==='create'?'Create an account':'Sign in')+'</h1></div></section>'+(user?'<section class="settings-section account-summary"><h2>'+esc(user.email)+'</h2><p id="accountSyncStatus" role="status" aria-live="polite"></p><div id="accountConflict"></div><button class="btn primary" id="accountSyncNow">Sync now</button><button class="btn secondary" id="accountSignOut">Sign out</button><div id="accountError" role="alert"></div></section>':'<section class="settings-section account-auth"><p class="setting-help">Sign in on your devices to sync your week, cupboard and My Recipes.</p><div class="category-tabs"><button class="cat-tab '+(mode==='signin'?'active':'')+'" id="accountSignInTab">Sign in</button><button class="cat-tab '+(mode==='create'?'active':'')+'" id="accountCreateTab">Create account</button></div><form id="accountAuthForm"><label class="personal-label" for="accountEmail">Email address</label><input id="accountEmail" type="email" required autocomplete="email" inputmode="email"><label class="personal-label" for="accountPassword">Password</label><div class="account-password"><input id="accountPassword" type="password" required minlength="'+(mode==='create'?8:1)+'" autocomplete="'+(mode==='create'?'new-password':'current-password')+'"><button type="button" id="showAccountPassword" aria-label="Show password">'+icon('eye')+'</button></div>'+(mode==='create'?'<p class="setting-help">At least 8 characters.</p><label class="personal-label" for="accountConfirmPassword">Confirm password</label><input id="accountConfirmPassword" type="password" required minlength="8" autocomplete="new-password">':'')+'<div id="accountError" role="alert"></div><button class="btn primary" type="submit" id="accountAuthSubmit">'+(mode==='create'?'Create account':'Sign in')+'</button>'+((mode==='signin')?'<button type="button" class="text-action" id="accountForgotPassword">Forgot password?</button>':'')+'</form><div id="accountDataChoice"></div></section>')+(!onboarding?'<section class="settings-section"><button class="settings-link" id="accountTransfer">'+icon('file-export')+'<span><strong>Manual transfer & backup</strong></span><i class="fa-solid fa-chevron-right"></i></button></section>':''),'more');
     const errorHost=document.getElementById('accountError'),fail=error=>{errorHost.textContent=error.message||'This action could not be completed.';};
-    if(!onboarding){document.getElementById('accountBack').onclick=()=>go('settings');document.getElementById('accountTransfer').onclick=()=>go('sync');}
-    if(user){paintAccountStatus();document.getElementById('accountSyncNow').onclick=e=>withLoading(e.currentTarget,async()=>{await MW.accounts.sync();paintAccountStatus();});document.getElementById('accountSignOut').onclick=async()=>{const status=MW.accounts.status();if(status.status!=='synced'&&!await confirmAction({title:'Sign out with unsynced changes?',message:'Changes will stay on this device for this account. They will sync after you sign in here again.',confirmLabel:'Sign out'}))return;try{await MW.accounts.signOut();render();window.scrollTo(0,0);}catch(error){fail(error);}};}
+    document.getElementById('accountBack').onclick=()=>{if(onboarding){accountEntryChosen=false;render();window.scrollTo(0,0);}else window.MyWeekAndroidBack();};
+    if(!onboarding)document.getElementById('accountTransfer').onclick=()=>go('sync');
+    if(user){paintAccountStatus();document.getElementById('accountSyncNow').onclick=e=>withLoading(e.currentTarget,async()=>{await MW.accounts.sync();paintAccountStatus();});document.getElementById('accountSignOut').onclick=async()=>{const status=MW.accounts.status();if(status.status!=='synced'&&!await confirmAction({title:'Sign out with unsynced changes?',message:'Changes will stay on this device for this account. They will sync after you sign in here again.',confirmLabel:'Sign out'}))return;try{await MW.accounts.signOut();accountEntryChosen=false;render();window.scrollTo(0,0);}catch(error){fail(error);}};}
     else{
       document.getElementById('accountSignInTab').onclick=()=>accountScreen(onboarding,'signin');document.getElementById('accountCreateTab').onclick=()=>accountScreen(onboarding,'create');
       document.getElementById('showAccountPassword').onclick=e=>{const input=document.getElementById('accountPassword'),show=input.type==='password';input.type=show?'text':'password';e.currentTarget.setAttribute('aria-label',show?'Hide password':'Show password');};
@@ -1600,7 +1611,14 @@ window.MW = window.MW || {};
     }
     bindNav();
   }
+  function paintPersonalSyncStatus(){
+    const host=document.getElementById('personalSyncStatus');if(!host)return;const a=MW.accounts.status();
+    const labels={synced:'Recipes up to date',pending:'Recipes waiting to sync',syncing:'Syncing recipes…',offline:'Saved here · sync unavailable',conflict:'Sync needs your choice'};
+    host.textContent=a.user?(labels[a.status]||'Recipes saved on this device'):'Sign in to sync your recipes';
+    const button=document.getElementById('personalSyncNow');if(button){button.textContent=!a.user?'Sign in':a.status==='conflict'?'Review sync':'Sync now';button.disabled=a.status==='syncing';}
+  }
   function paintAccountStatus(){
+    paintPersonalSyncStatus();
     const host=document.getElementById('accountSyncStatus');if(!host)return;const a=MW.accounts.status(),labels={synced:'Up to date',pending:'Changes waiting to sync',syncing:'Syncing…',offline:'Offline · changes saved on this device',conflict:'Choose which changes to keep'};host.textContent=(labels[a.status]||a.status)+(a.detail?' · '+a.detail:'');const conflict=document.getElementById('accountConflict');if(a.status==='conflict'&&!conflict.querySelector('button')){conflict.innerHTML='<p>Both devices edited the same data. A backup of both versions will be kept.</p><button class="btn primary" id="keepDeviceChanges">Keep this device’s changes</button><button class="btn secondary" id="keepAccountChanges">Use account changes</button>';for(const [id,choice] of [['keepDeviceChanges','device'],['keepAccountChanges','cloud']])document.getElementById(id).onclick=async()=>{try{await MW.accounts.resolve(choice);paintAccountStatus();}catch(error){document.getElementById('accountError').textContent=error.message;}};}else if(a.status!=='conflict')conflict.innerHTML='';
   }
 
@@ -1613,7 +1631,7 @@ window.MW = window.MW || {};
       '<section class="settings-section"><label>First name</label><input id="profileName" value="'+esc((st.profile&&st.profile.name)||'')+'" placeholder="Your name"></section>'+
       '<section class="settings-section"><label>Supermarket</label><span class="select-control settings-select-control"><select id="retailer">'+MW.RETAILERS.map(x=>'<option '+(x===st.household.retailer?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select>'+icon('chevron-down')+'</span></section>'+
       '<section class="settings-section"><label>Weekly food budget</label><div class="prefix-input"><span>£</span><input id="budget" type="number" inputmode="decimal" min="0" step="1" value="'+st.household.budget+'"></div></section>'+
-      '<section class="settings-section food-settings"><label>Eating style</label>'+foodChoice('settingsDiet',MW.food.patterns,foodProfile().diet)+'<label class="sub-label">Meal priorities</label>'+multiFoodChoice('settingsGoals',MW.food.goals,foodProfile().goals)+'<label class="sub-label">Lunch styles you like</label>'+multiFoodChoice('settingsLunchStyles',MW.food.lunchStyles,MW.food.lunchPreferences?MW.food.lunchPreferences(foodProfile()):[foodProfile().lunchStyle||'any'])+'<small class="setting-help">Choose one or more. My Week still picks one lunch recipe for the week by default.</small><label class="sub-label">Foods you do not want</label><div class="food-autocomplete-host"><input id="avoidFoods" value="'+esc(avoidValue)+'" placeholder="Start typing a food"></div><small class="setting-help">Type foods normally or choose a suggestion. Add commas for more than one. Applied filters appear below.</small><span class="avoid-feedback" id="settingsAvoidFeedback"></span><details class="allergen-details compact"><summary><span><strong>Allergens</strong><small>'+((foodProfile().allergens||[]).length?foodProfile().allergens.length+' selected':'None selected')+'</small></span>'+icon('chevron-down')+'</summary>'+multiFoodChoice('settingsAllergens',MW.food.allergens,foodProfile().allergens)+'<p class="allergen-warning">Only use allergens for genuine allergies or intolerances, not foods you simply dislike. My Week uses the meal-box source declaration and excludes recipes containing or potentially containing selected allergens. Always check the ingredient and product labels you actually receive.</p></details></section>'+
+      '<section class="settings-section food-settings"><label>Eating style</label>'+foodChoice('settingsDiet',MW.food.patterns,foodProfile().diet)+'<label class="sub-label">Meal priorities</label>'+multiFoodChoice('settingsGoals',MW.food.goals,foodProfile().goals)+'<label class="sub-label">Lunch styles you like</label>'+multiFoodChoice('settingsLunchStyles',MW.food.lunchStyles,MW.food.lunchPreferences?MW.food.lunchPreferences(foodProfile()):[foodProfile().lunchStyle||'any'])+'<small class="setting-help">Choose one or more. My Week still picks one lunch recipe for the week by default.</small><label class="sub-label">Foods you do not want</label><div class="food-autocomplete-host"><input id="avoidFoods" value="'+esc(avoidValue)+'" placeholder="Start typing a food"></div><small class="setting-help">Type foods normally or choose a suggestion. Add commas for more than one. Applied filters appear below.</small><span class="avoid-feedback" id="settingsAvoidFeedback"></span><details class="allergen-details compact"><summary><span><strong>Allergens</strong><small>'+((foodProfile().allergens||[]).length?foodProfile().allergens.length+' selected':'None selected')+'</small></span>'+icon('chevron-down')+'</summary>'+multiFoodChoice('settingsAllergens',MW.food.allergens,foodProfile().allergens)+'<p class="allergen-warning">Excludes selected allergens and “may contain” warnings from the recipe source. Always check product labels and cross-contamination warnings. For disliked foods, use “Foods you do not want”.</p></details></section>'+
       '<section class="settings-section equipment-settings"><div class="setting-title"><div><label>Kitchen equipment</label><small>Standard oven, hob, pans and utensils are assumed. Select specialist appliances you can use.</small></div></div><div class="equipment-grid" id="settingsEquipment">'+MW.equipment.items.map(x=>'<button type="button" data-v="'+x.id+'" class="'+((st.household.equipment||[]).includes(x.id)?'active':'')+'">'+icon(x.icon||'utensils')+'<span>'+esc(x.label)+'</span></button>').join('')+'</div></section>'+
       '<section class="settings-section cooking-display-setting">'+keepAwakeControl('settings')+'</section>'+
       '<section class="settings-section"><div class="setting-title"><div><label>Dinner days</label><small>Choose the days you want dinner planned.</small></div></div>'+dayToggles('dinnerDays',st.plan.dinnerDays)+'</section>'+
@@ -1906,6 +1924,8 @@ window.MW = window.MW || {};
   bindNativeBack();
   document.addEventListener('visibilitychange',()=>{if(document.hidden){finishInterruptedMotion();releaseScreenWakeLock();}else syncScreenWakeLock();});
   window.addEventListener('myweek:account-data-changed',()=>{
+    // Update collection results without replacing a focused search or its query.
+    const search=root.querySelector('#personalSearch');if(search){search.dispatchEvent(new Event('input'));paintPersonalSyncStatus();return;}
     // Keep in-progress form entries and the current cooking scroll position.
     if(root.querySelector('#personalRecipeForm,#accountAuthForm,#onboardNext')||document.body.classList.contains('cooking-active')||document.activeElement&&document.activeElement.matches('input,textarea,select'))return;
     render();

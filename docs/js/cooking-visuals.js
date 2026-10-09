@@ -93,6 +93,9 @@ window.MW = window.MW || {};
         imageProvenance:'Exact step photograph from the recipe source used by this private build'
       };
     }
+    // Chia thickens during cold soaking; that is not a simmering instruction.
+    const coldText=String(step||'').toLowerCase();
+    if(/chill|overnight|refrigerat|fridge/.test(coldText)&&/oats|chia/.test(context(recipe)+' '+coldText)&&!/\b(?:cook|heat|boil|simmer|warm|bake|roast|fry)\b/.test(coldText))return null;
     const match=detect(recipe,step);
     const ctx=context(recipe);
     const text=String(step||'').toLowerCase();

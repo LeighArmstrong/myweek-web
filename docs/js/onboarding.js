@@ -99,9 +99,9 @@ window.MW = window.MW || {};
   }
 
   function allergens(){
-    return '<section class="onboard-heading"><span>4 · ALLERGIES & RESTRICTIONS</span><h1>Any genuine allergies or intolerances?</h1><p>Only use this section for genuine allergies or intolerances. If you simply dislike a food, add it under “Foods you simply do not want” on the previous screen.</p></section><section class="onboard-card">'+
+    return '<section class="onboard-heading"><span>4 · ALLERGIES & RESTRICTIONS</span><h1>Any genuine allergies or intolerances?</h1><p>For disliked foods, use the food preferences on the previous screen.</p></section><section class="onboard-card">'+
       chipRow('obAllergens',MW.food.allergens,draft.allergens,true)+
-      '<div class="onboard-safety">'+icon('triangle-exclamation')+'<p>My Week excludes recipes declared by the meal-box source as containing, or potentially containing, your selected allergens. Always check the ingredient and product labels you actually receive; My Week is not a substitute for medical or product-label advice.</p></div>'+
+      '<div class="onboard-safety">'+icon('triangle-exclamation')+'<p>Excludes recipes with selected allergens, “may contain” warnings or missing verified records. Always check product labels and cross-contamination warnings.</p></div>'+
       '</section>'+nextButton();
   }
 
@@ -228,7 +228,7 @@ window.MW = window.MW || {};
     const avoid=root.querySelector('#obAvoid'); if(avoid) draft.avoid=avoid.value;
   }
 
-  function render(root,onFinish){
+  function render(root,onFinish,options={}){
     MW.onboarding._finish=onFinish;
     if(!draft){
       try{if(!restoreProgress())draft=initial();}
@@ -241,6 +241,7 @@ window.MW = window.MW || {};
         return;
       }
     }
+    if(options.skipWelcome&&step===0)step=1;
     const screens=[hero,household,rhythm,food,allergens,equipment,ready];
     if(step>=screens.length) step=screens.length-1;
     root.innerHTML=chrome(screens[step]());
@@ -297,5 +298,9 @@ window.MW = window.MW || {};
   }
 
   function reset(){draft=null;step=0;}
-  MW.onboarding={render,reset,_finish:null};
+  function intro(root,onStart,onSignIn){
+    const content=hero().replace('Simple meals. Happier weeks.','Plan, shop and cook with My Week.').replace('<div class="onboard-actions hero-actions">','<div class="onboard-actions hero-actions intro-actions">');
+    root.innerHTML=chrome(content).replace('shell onboarding-shell','shell onboarding-shell intro-shell').replace(progress(),'<button type="button" class="text-action" id="introSignIn">Sign in</button>');root.querySelector('#onboardNext').onclick=onStart;root.querySelector('#introSignIn').onclick=onSignIn;
+  }
+  MW.onboarding={render,intro,reset,_finish:null};
 })();

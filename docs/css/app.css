@@ -155,15 +155,17 @@ h1,h2,h3,p{margin:0}
 .remove-extra{width:34px;height:34px;border:0;border-radius:11px;background:#f7e8e5;color:var(--danger)}
 .empty-note{font-size:12px;color:var(--muted);padding-top:8px}
 .saving-toggle,.saving-summary,.saving-prompt{margin-top:12px;border:1px solid var(--line);border-radius:20px;background:var(--surface);padding:15px}
-.saving-toggle>div,.saving-summary>div{display:flex;align-items:center;gap:11px}
+.saving-toggle>div,.saving-summary>div{display:flex;align-items:center;gap:12px;min-width:0}
+.saving-toggle>div>div,.saving-summary>div>div,.home-saving-switch>div>div{min-width:0}
+.saving-toggle .toggle,.saving-summary .toggle,.home-saving-switch .toggle,.switch-row .toggle{min-height:48px;min-width:50px;justify-content:center}
 .saving-toggle{display:flex;justify-content:space-between;align-items:center;gap:12px}
-.saving-toggle.active{background:#f5f8e5;border-color:#d7e297}
-.saving-icon{width:38px;height:38px;border-radius:13px;background:var(--lime);display:grid;place-items:center}
+.saving-toggle.active{background:var(--green-soft);border-color:#c3ded1}
+.saving-icon{width:32px;height:40px;flex:0 0 32px;display:grid;place-items:center;background:transparent;color:var(--green-deep);font-size:23px}
 .saving-toggle strong,.saving-toggle small,.saving-summary strong,.saving-summary small{display:block}
 .saving-toggle small,.saving-summary small{font-size:11px;color:var(--muted);margin-top:3px;line-height:1.35}
 .saving-toggle>button,.saving-summary>button{border:0;border-radius:12px;background:var(--green-deep);color:#fff;padding:9px 11px;font-weight:850}
-.saving-prompt{width:100%;display:grid;grid-template-columns:38px 1fr 18px;gap:11px;align-items:center;text-align:left;color:var(--ink)}
-.saving-prompt>i:first-child{width:38px;height:38px;border-radius:13px;background:var(--lime);display:grid;place-items:center}
+.saving-prompt{width:100%;display:grid;grid-template-columns:32px minmax(0,1fr) 18px;gap:12px;align-items:center;text-align:left;color:var(--ink)}
+.saving-prompt>i:first-child,.saving-summary>div>i:first-child{width:32px;height:40px;flex:0 0 32px;display:grid;place-items:center;background:transparent;color:var(--green-deep);font-size:23px}
 .saving-prompt strong,.saving-prompt small{display:block}
 .saving-prompt small{color:var(--muted);font-size:11px;margin-top:3px}
 .shop-progress{display:grid;grid-template-columns:1fr auto;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:10px}
@@ -259,7 +261,13 @@ h1,h2,h3,p{margin:0}
 .empty-state{text-align:center;padding:34px 20px;background:var(--surface);border:1px solid var(--line);border-radius:22px}
 .empty-state>i{font-size:28px;color:#9eaaa2}
 .empty-state h2{font-size:20px;margin-top:12px}
-.empty-state p{color:var(--muted);font-size:13px;margin-top:6px}
+.empty-state p{color:var(--muted);font-size:14px;line-height:1.55;margin-top:12px}
+.empty-state>button{margin-top:20px}
+.empty-state-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:24px}
+.empty-state-actions .btn{min-height:48px;flex:1 1 170px;max-width:280px}
+.recipe-unavailable{max-width:560px;margin:8px auto 24px;padding:28px 22px}
+.recipe-unavailable h1{font-size:26px;line-height:1.2;letter-spacing:-.025em;margin-top:16px}
+.recipe-unavailable .empty-state-icon{width:48px;height:48px;margin:0 auto;display:grid;place-items:center;border-radius:16px;background:var(--green-soft);color:var(--green-deep)}
 .bottom-nav{
   position:fixed;
   left:0;
@@ -430,7 +438,14 @@ h1,h2,h3,p{margin:0}
 .start-cooking strong,.start-cooking small{display:block}
 .start-cooking strong{font-size:15px}
 .start-cooking small{font-size:11px;color:rgba(255,255,255,.72);margin-top:3px}
-.allergen-note{display:flex;gap:9px;align-items:flex-start;background:#fff1e8;border:1px solid #f1d8c9;border-radius:14px;padding:11px 13px;margin-top:10px;color:#7b594d;font-size:11px;line-height:1.4}
+.allergy-guidance{margin:16px 0;color:var(--muted);font-size:13px;line-height:1.5}
+.allergy-guidance summary{list-style:none;display:flex;align-items:center;gap:10px;min-height:48px;cursor:pointer;color:var(--green-deep);font-weight:750}
+.allergy-guidance summary::-webkit-details-marker{display:none}
+.allergy-guidance summary>span{flex:1}
+.allergy-guidance summary>i:last-child{font-size:11px}
+.allergy-guidance[open] summary>i:last-child{transform:rotate(180deg)}
+.allergy-guidance p{margin:4px 0 12px;padding:0 0 0 24px}
+.allergy-guidance summary:focus-visible{outline:3px solid #0b7a59;outline-offset:3px;border-radius:8px}
 .step>div{min-width:0}
 .step-amounts{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .step-amounts em{font-style:normal;font-size:10px;font-weight:800;color:var(--green-deep);background:var(--green-soft);border-radius:999px;padding:5px 8px}
@@ -725,7 +740,7 @@ html,body{background:var(--bg)}
 /* v0.13 feature styles. Kept separate to avoid continuing the app.css patch chain. */
 .full-action{width:100%;margin-top:11px}
 .home-saving-switch{display:flex;align-items:center;justify-content:space-between;gap:15px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:14px 15px;margin-top:10px}
-.home-saving-switch.active{background:#f5f8e6;border-color:#d7e297}
+.home-saving-switch.active{background:var(--green-soft);border-color:#c3ded1}
 .home-saving-switch>div{display:flex;align-items:center;gap:11px;min-width:0}
 .home-saving-switch strong,.home-saving-switch small{display:block}
 .home-saving-switch small{font-size:11px;color:var(--muted);line-height:1.35;margin-top:3px}
@@ -2291,7 +2306,7 @@ body.cooking-active .bottom-nav{height:auto!important;min-height:68px!important;
   .shell:has(.settings-planner-note)>.settings-planner-note,
   .shell:has(.settings-planner-note)>.plan-actions,
   .shell:has(.settings-planner-note)>.danger-link{grid-column:1/-1}
-  .shell:has(.settings-planner-note)>.settings-section{margin:0!important;height:100%}
+  .shell:has(.settings-planner-note)>.settings-section{margin:0!important;height:auto}
   .shell:has(.cupboard-add) .cupboard-list{grid-template-columns:repeat(2,minmax(0,1fr))}
   .cook-screen{inset:0 0 calc(68px + var(--device-safe-bottom)) 0!important}
   .cook-topbar{width:min(100%,920px)!important;padding:12px 30px 10px!important}
@@ -2349,7 +2364,7 @@ body.cooking-active .bottom-nav{height:auto!important;min-height:68px!important;
   .shell:has(.settings-planner-note)>.settings-planner-note,
   .shell:has(.settings-planner-note)>.plan-actions,
   .shell:has(.settings-planner-note)>.danger-link{grid-column:1/-1}
-  .shell:has(.settings-planner-note)>.settings-section{margin:0!important;height:100%}
+  .shell:has(.settings-planner-note)>.settings-section{margin:0!important;height:auto}
   .equipment-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 
   .shell:has(.cupboard-add) .cupboard-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
@@ -3961,3 +3976,52 @@ body.cooking-active .cook-screen.page-enter>.cook-topbar{animation:none!importan
 
 /* Keep shopping quantities and price guidance readable on small phones. */
 @media(max-width:480px){.shop-head{display:block}.shop-head>div{min-width:0}.shop-head .shop-total{margin-top:14px;flex-direction:row;align-items:baseline;justify-content:space-between;gap:16px;white-space:normal}.shop-head .shop-total span{max-width:220px;text-align:right;line-height:1.4}}
+
+/* Shared notice, collection feedback and inset instruction scrolling. */
+.allergy-notice{position:relative;margin:0 0 20px;padding:16px 52px 14px 16px;border:1px solid #ecdcd0;border-radius:18px;background:#fffaf6;color:var(--ink);font-size:13px;line-height:1.5}
+.allergy-notice>strong{display:block;font-size:14px;margin-bottom:4px}
+.allergy-notice>p{color:#755e51}
+.allergy-notice-close{position:absolute;right:5px;top:5px;width:44px;height:44px;border:0;border-radius:12px;background:transparent;color:#755e51;font-size:15px;display:grid;place-items:center}
+.allergy-notice details{margin-top:6px;color:var(--muted)}
+.allergy-notice summary{list-style:none;min-height:36px;display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:750;color:var(--green-deep)}
+.allergy-notice summary::-webkit-details-marker{display:none}
+.allergy-notice summary i{font-size:10px}
+.allergy-notice details[open] summary i{transform:rotate(180deg)}
+.allergy-notice details p{padding-top:4px}
+.personal-sync-row{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:0 2px 14px;color:var(--muted);font-size:12px;line-height:1.4}
+.personal-sync-row .text-action{flex-shrink:0;margin:0;min-height:44px;padding:8px;color:var(--green-deep)}
+.intro-actions{grid-template-columns:minmax(0,1fr)!important;gap:12px!important}
+.intro-actions .btn{width:100%;min-height:48px}
+body.cooking-active .cook-scroll.has-visual .cook-instruction,body.cooking-active .cook-scroll.no-visual .cook-instruction{overflow:hidden!important;display:flex!important;flex-direction:column!important;min-height:0!important}
+.cook-instruction-scroll{min-width:0;min-height:0;width:100%;flex:1 1 auto;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#bbcfc3 transparent;scrollbar-gutter:stable;padding:3px 12px 3px 3px}
+.cook-instruction-scroll::-webkit-scrollbar{width:6px}
+.cook-instruction-scroll::-webkit-scrollbar-track{background:transparent;margin:4px 0}
+.cook-instruction-scroll::-webkit-scrollbar-thumb{background:#bbcfc3;border-radius:999px}
+.cook-instruction-scroll:focus-visible{outline:2px solid var(--green);outline-offset:3px;border-radius:4px}
+
+/* Welcome keeps returning-user sign-in visible above the introduction. */
+.intro-shell #introSignIn{min-height:44px;padding:8px 12px}
+@media(max-width:699px) and (orientation:portrait){
+ body .intro-shell:has(.onboard-welcome) .onboard-hero-art{height:clamp(150px,29vh,260px)!important;aspect-ratio:auto!important}
+ body .intro-shell:has(.onboard-welcome) .onboard-benefits{transform:none!important}
+ body .intro-shell:has(.onboard-welcome) .hero-actions{margin-top:24px!important}
+}
+
+.appbar{gap:12px}
+.appbar>.account-link{min-width:0;flex:1 1 auto}
+.appbar .account-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.appbar-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.appbar-actions .settings-button{width:48px;height:48px;flex:0 0 48px}
+
+.appbar-actions .account-shortcut,.appbar-actions .settings-button{width:48px;height:48px;flex:0 0 48px;display:grid;place-items:center;border:1px solid #e0eae5!important;border-radius:50%;background:rgba(255,255,255,.92)!important;color:var(--ink);box-shadow:0 5px 18px rgba(25,63,49,.045)!important}
+.appbar-actions .account-shortcut i{font-size:19px}
+
+body:not(.cooking-active) .appbar .appbar-actions>button{width:48px!important;height:48px!important;min-width:48px!important;min-height:48px!important}
+body:not(.cooking-active) .appbar .appbar-actions>button i{font-size:19px!important}
+
+/* Both account controls use the same shape as the existing app header. */
+.appbar-actions .account-shortcut,.appbar-actions .settings-button{border-radius:14px!important}
+
+@media(min-width:700px){
+ .shell:has(.settings-planner-note)>.food-settings,.shell:has(.settings-planner-note)>.settings-section:has(#budget),.shell:has(.settings-planner-note)>.allergy-notice,.shell:has(.check-budget)>.allergy-notice{grid-column:1/-1}
+}
