@@ -243,9 +243,11 @@ window.MW = window.MW || {};
     lastRaw=raw;committed=clone(candidate);
   }
 
+  const commitListeners=new Set();
+  function publishCommit(){for(const callback of commitListeners){try{callback();}catch{}}}
   function save(){
     ensureWritable();
-    try{writeCandidate(state);}
+    try{writeCandidate(state);publishCommit();}
     catch(e){
       // Older callers edit get() before saving. Restore the published state on failure.
       if(committed)state=clone(committed);
@@ -300,7 +302,7 @@ window.MW = window.MW || {};
       localStorage.removeItem(BACKUP_KEY);localStorage.removeItem(RECOVERY_KEY);
       localStorage.setItem(KEY,raw);
     }catch(e){signalRecovery('write-failed');throw storageError('Reset could not be saved. The current saved record has been kept.','MW_STORAGE_WRITE_FAILED');}
-    lastRaw=raw;committed=clone(candidate);state=candidate;recovery=null;return state;
+    lastRaw=raw;committed=clone(candidate);state=candidate;recovery=null;publishCommit();return state;
   }
 
   function recoveryExport(){
@@ -314,19 +316,20 @@ window.MW = window.MW || {};
 
   MW.state={
     get:()=>state,
+    onCommit(callback){commitListeners.add(callback);return ()=>commitListeners.delete(callback);},
     save,
     transaction(action){
       ensureWritable();
       if(typeof action!=='function')throw new TypeError('A transaction needs a function.');
       const draft=clone(state),result=action(draft);
       if(result&&typeof result.then==='function')throw new TypeError('State transactions must be synchronous.');
-      writeCandidate(draft);state=draft;return result;
+      writeCandidate(draft);state=draft;publishCommit();return result;
     },
     log,reset,
     replace(value){
       ensureWritable();
       const candidate=migrate(validateSaved(clone(value)));
-      writeCandidate(candidate);state=candidate;return state;
+      writeCandidate(candidate);state=candidate;publishCommit();return state;
     },
     recoveryStatus,retryLoad,restoreBackup,recoveryExport
   };

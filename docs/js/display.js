@@ -6,7 +6,22 @@ window.MW = window.MW || {};
     return text.replace(/^([^A-Za-z]*)([A-Za-z])/,function(_,prefix,letter){return prefix+letter.toUpperCase();});
   }
 
-  function ingredient(value){return sentenceCase(value);}
+  // Source records retain their original names. These labels work with supermarket ingredients.
+  const ingredientLabels=[
+    [/\bTenderstem[™®]?\s+Broccoli\b/gi,'long-stem broccoli'],
+    [/\bintense[™®]?\s+tomato\b/gi,'tomato'],
+    [/\bintense[™®]?\s+(chicken|vegetable|beef) stock mix\b/gi,'$1 stock mix'],
+    [/\bSlooOW Stone Oven White Baguette\b/gi,'white baguette'],
+    [/\bJolly Hog\s+pork sausagemeat\b/gi,'pork sausagemeat'],
+    [/\bKNORR\s+Vegetable Stock\b/gi,'vegetable stock'],
+    [/\bTHIS[™®]?\s+Isn['’]t Pork Sausages\b/gi,'plant-based sausages'],
+    [/\bUnconventional Plant-Based Burgers\b/gi,'plant-based burgers'],
+    [/\bTABASCO[™®]?\s+Original Red Sauce\b/gi,'red hot pepper sauce'],
+    [/\bGuinness[™®]?\s+Paste\b/gi,'stout paste']
+  ];
+  function plainIngredientNames(value){let text=String(value==null?'':value);for(const [pattern,replacement] of ingredientLabels)text=text.replace(pattern,replacement);return text.replace(/[™®]/g,'').replace(/\s{2,}/g,' ').trim();}
+  function ingredient(value){return sentenceCase(plainIngredientNames(value));}
+
   function amount(value){
     let text=String(value==null?'':value).trim();
     const m=text.match(/^([0-9]+(?:\.[0-9]+)?)\s+(slice|pack|tin|can|carton|bottle|clove|nest|fillet|wrap|tortilla|stick|banana|sachet|bunch|ball|rasher|pouch)$/i);
@@ -66,7 +81,7 @@ window.MW = window.MW || {};
     return text;
   }
   function instruction(value,context){
-    let text=plain(value),factor=Number(context&&context.factor);
+    let text=plainIngredientNames(plain(value)),factor=Number(context&&context.factor);
     if(!Number.isFinite(factor)||factor<=0)factor=1;
     text=text.replace(/\b(\d+(?:\.\d+)?)(\s*(?:tsp|tbsp|g|kg|ml|l|cm|mm)?)\s*\[(\d+(?:\.\d+)?)(\s*(?:tsp|tbsp|g|kg|ml|l|cm|mm)?)\]/gi,function(_,base,baseUnit,alt,altUnit){
       if(Math.abs(factor-2)<0.01)return alt+(altUnit||baseUnit||'');
@@ -78,5 +93,5 @@ window.MW = window.MW || {};
     return sentenceCase(restoreInstructionBoundaries(text));
   }
 
-  MW.display={sentenceCase,ingredient,amount,equipment,instruction,restoreInstructionBoundaries,actionStarters:[...instructionActionStarters]};
+  MW.display={sentenceCase,ingredient,plainIngredientNames,amount,equipment,instruction,restoreInstructionBoundaries,actionStarters:[...instructionActionStarters]};
 })();

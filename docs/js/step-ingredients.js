@@ -170,13 +170,17 @@ window.MW=window.MW||{};
     }
     return unique[0]||base.find(t=>!rootGeneric.has(t))||base[0]||'';
   }
-  const interactionAction='(?:mash|add|stir(?: in| through)?|mix(?: in| through)?|combine|fold|toss|stir fry|fry|cook|roast|bake|simmer|boil|pour|scatter|spread|drizzl(?:e|ing|ed)|coat|dip|top|season|melt|whisk|sprinkl(?:e|ing|ed)|crumbl(?:e|ing|ed)|squeeze|dissolve|put|pop|place|lay|transfer|arrange|return|tip|heat|warm|brush|rub|marinate|peel|chop|dice|slice|cut|halve|quarter|grate|crush|mince|trim|drain|rinse|zest|juice|shred|tear|pick|pat dry|pat|wash|soak|toast|reserve|set aside|spoon|dollop|smear|swirl|dress|garnish|pack|fill|stuff|wrap|roll|shape|press|glaze|dust|remove|bring|pile|break(?: up)?|divide|butter|crack)';
+  const interactionAction='(?:mash|add|stir(?: in| through)?|mix(?: in| through)?|combine|fold|toss|stir fry|fry|cook|roast|bake|simmer|boil|pour|scatter|spread|drizzl(?:e|ing|ed)|coat|dip|top|season|melt|whisk|sprinkl(?:e|ing|ed)|crumbl(?:e|ing|ed)|squeeze|dissolve|put|pop|place|lay|transfer|arrange|return|tip|heat|warm|brush|rub|marinate|peel|deseed|chop|dice|slice|cut|halve|quarter|grate|crush|mince|trim|drain|rinse|zest|juice|shred|tear|pick|pat dry|pat|wash|soak|toast|reserve|set aside|spoon|dollop|smear|swirl|dress|garnish|pack|fill|stuff|wrap|roll|shape|press|glaze|dust|remove|bring|pile|break(?: up)?|divide|butter|crack)';
   const clauseCache=new Map(),activeRegexCache=new Map(),purposeRegexCache=new Map(),rootRegexCache=new Map();
   function stepClauses(step){const raw=String(step||'');if(clauseCache.has(raw))return clauseCache.get(raw);const interactionText=raw.replace(/\([^)]*[?!][^)]*\)/g,' ');const result=interactionText.split(/[!?;]+|\.(?!\d)/).map(matchText).filter(Boolean);if(clauseCache.size<50000)clauseCache.set(raw,result);return result;}
   function activePhrase(step,phrase){
     const words=tokens(phrase);if(!words.length)return false;
-    const root=[...words].reverse().find(word=>!rootGeneric.has(word))||words[words.length-1];let before=activeRegexCache.get(root);if(!before){before=new RegExp(interactionAction+'[a-z0-9 ]{0,240}\\b'+root+'\\b');activeRegexCache.set(root,before);}let rootRe=rootRegexCache.get(root);if(!rootRe){rootRe=new RegExp('\\b'+root+'\\b');rootRegexCache.set(root,rootRe);}let purpose=purposeRegexCache.get(root);if(!purpose){purpose=new RegExp('\\bfor (?:the )?'+root+'\\b','g');purposeRegexCache.set(root,purpose);}
-    return stepClauses(step).some(part=>{if(!rootRe.test(part))return false;purpose.lastIndex=0;const withoutPurpose=part.replace(purpose,' ');return rootRe.test(withoutPurpose)&&before.test(withoutPurpose);});
+    // Keep the identity of compound ingredients, rather than matching their shared food root.
+    const target=words.join('\\b[a-z0-9 ]{0,24}\\b'),key=words.join(' ');
+    let before=activeRegexCache.get(key);if(!before){before=new RegExp(interactionAction+'[a-z0-9 ]{0,240}\\b'+target+'\\b');activeRegexCache.set(key,before);}
+    let phraseRe=rootRegexCache.get(key);if(!phraseRe){phraseRe=new RegExp('\\b'+target+'\\b');rootRegexCache.set(key,phraseRe);}
+    let purpose=purposeRegexCache.get(key);if(!purpose){purpose=new RegExp('\\bfor (?:the )?'+target+'\\b','g');purposeRegexCache.set(key,purpose);}
+    return stepClauses(step).some(part=>{if(!phraseRe.test(part))return false;purpose.lastIndex=0;const direct=part.replace(purpose,' ');return phraseRe.test(direct)&&before.test(direct);});
   }
   const splitDescriptors=new Set(['of','the','your','our','remaining','rest','prepared','cooked','drained','chopped','diced','sliced','grated','crushed','minced','roasted','toasted','mixed','reserved']);
   const splitDerivatives=new Set(['zest','juice','wedge']);
@@ -226,6 +230,7 @@ window.MW=window.MW||{};
     }
     return false;
   }
+  function compoundIngredientName(n){return /\b(?:sauce|paste|dressing|stock|mix)\b/.test(n);}
   function usageEvidence(recipe,ingredientIndex,step){
     const row=(recipe.ingredients||[])[ingredientIndex];if(!row)return false;
     const n=normalise(row[1]);
@@ -240,7 +245,7 @@ window.MW=window.MW||{};
     if(n==='peas')probe=probe.replace(/\bpea pods?\b/gi,'pods');
     if(/\b(?:cooking oil|oil for cooking)\b/.test(n))probe=probe.replace(/\bolive oil\b/gi,'olive');
     if(/\b(?:red|yellow|green|bell) pepper\b/.test(n))probe=probe.replace(/\bblack pepper\b|\bsalt and pepper\b/gi,'seasoning');
-    if(/\b(?:intense tomato|medium tomato|baby plum tomatoes?|premium tomato mix)\b/.test(n)||n==='tomato')probe=probe.replace(/\b(?:sun[- ]dried )?tomato (?:paste|puree|sauce|stock|concentrate)\b/gi,'prepared sauce').replace(/\bpassata\b/gi,'prepared sauce');
+    if(/\b(?:intense tomato|medium tomato|baby plum tomatoes?|premium tomato mix)\b/.test(n)||/\btomato(?:es)?\b/.test(n)&&!/\b(?:paste|puree|sauce|stock|concentrate|ketchup|dressing|powder|passata)\b/.test(n))probe=probe.replace(/\b(?:sun[- ]dried )?tomato (?:paste|puree|sauce|stock|concentrate|ketchup)\b/gi,'prepared sauce').replace(/\bpassata\b/gi,'prepared sauce');
     if(isQualified(row[1])&&hasPhrase(probe,row[1])&&activePhrase(probe,row[1]))return true;
     if(hasPhrase(probe,row[1])&&/\b(?:spread|coat|rub|marinat)\w*\b/.test(normalise(probe)))return true;
     const semantic=specialEvidence(recipe,row[1],probe);
@@ -248,14 +253,32 @@ window.MW=window.MW||{};
     if(isQualified(row[1]))return semantic||qualifiedReference(recipe,row[1],probe);
     if(n==='salt'||n==='black pepper'||(n==='pepper'&&openEndedAmount(row[0])))return semantic;
     const phrases=new Set(aliasPhrases(row[1]));
-    const root=rootToken(recipe,ingredientIndex,probe);if(root)phrases.add(root);
+    if(n==='black olives')phrases.add('olive');
+    if(/\bmushroom/.test(n)&&!compoundIngredientName(n))phrases.add('mushroom');
+    if(/\bplant based burger/.test(n)||/\bplant-based burger/.test(String(row[1]).toLowerCase())){probe=probe.replace(/\bburger buns?\b/gi,'buns');phrases.add('burger');phrases.add('veggie burger');}
+    if(n==='free range egg'){probe=probe.replace(/\begg noodles?\b/gi,'noodles');phrases.add('egg');}
+    if(n==='whole cloves'){probe=probe.replace(/\bgarlic cloves?\b/gi,'garlic');phrases.add('clove');}
+    if(/\b(?:red|yellow|green|bell|pointed) pepper/.test(n)){
+      const pluralPrep=/\b(?:deseed|halve|slice|cut|chop|add|roast|fry)\b[^.!?]{0,100}\b(?:your |the |sliced |chopped )?peppers\b/i.test(String(step));
+      if(pluralPrep)phrases.add('pepper');
+    }
+    const root=rootToken(recipe,ingredientIndex,probe);
+    const compound=/\b(?:paste|puree|concentrate|sauce|dressing|stock|vinegar|ketchup|jam|dip|bread|ciabatta|baguette)\b/.test(n);
+    const ambiguousRoot=/^(?:tomato|chicken|garlic|apple|peanut|pepper|onion|butter|lemon|lime|ginger|sesame|cider)$/.test(root);
+    if(root&&(!compound||!ambiguousRoot))phrases.add(root);
+    if(!compound&&/\btomato(?:es)?\b/.test(n))phrases.add('tomato');
+    if(/\bsalted peanut/.test(n)){probe=probe.replace(/\bpeanut butter\b/gi,'prepared spread');phrases.add('peanut');}
+    if(/\b(?:red|yellow|green|bell) pepper\b/.test(n)&&countMatchingIngredients(recipe,x=>/\b(?:red|yellow|green|bell) pepper\b/.test(x))===1)phrases.add('pepper');
+
+    if(/\btomato (?:paste|puree|concentrate)\b/.test(n)){phrases.add('tomato paste');phrases.add('tomato puree');phrases.add('tomato concentrate');}
+
     if(/^(?:wild )?rocket$/.test(n)&&countMatchingIngredients(recipe,x=>/\b(?:rocket|baby leaf|salad leaves|seasonal salad)\b/.test(x))===1)phrases.add('salad');
     if(semantic){
       if(/\b(?:basa|cod|pollock)\b/.test(n))phrases.add('fish');
       if(/\b(?:goat|red leicester|cheddar|hard italian|italian hard|salad cheese)\b/.test(n))phrases.add('cheese');
       if(/\bchicken\b/.test(n)&&!/\bstock\b/.test(n))phrases.add('chicken');
       if(/\brice\b/.test(n)&&!/\bvinegar\b/.test(n))phrases.add('rice');
-      if(/\btomato\b/.test(n))phrases.add('tomato');
+      if(/\btomato\b/.test(n)&&!compound)phrases.add('tomato');
       if(/\b(?:red|yellow|green|bell) pepper\b/.test(n))phrases.add('pepper');
       if(/^water\b/.test(n))phrases.add('water');
       if(/\bstock\b/.test(n))phrases.add('stock');

@@ -133,7 +133,7 @@ window.MW = window.MW || {};
   function clear(){cache={recipes:[],syncedAt:null};try{localStorage.removeItem(KEY);}catch(e){}}
 
   function exportData(){const x=load();return JSON.parse(JSON.stringify(x));}
-  function replaceData(value){const safe=value&&Array.isArray(value.recipes)?{recipes:value.recipes,syncedAt:value.syncedAt||null}:{recipes:[],syncedAt:null};cache=safe;localStorage.setItem(KEY,JSON.stringify(safe));return exportData();}
+  function replaceData(value){const safe=value&&Array.isArray(value.recipes)?{recipes:value.recipes,syncedAt:value.syncedAt||null}:{recipes:[],syncedAt:null};localStorage.setItem(KEY,JSON.stringify(safe));cache=safe;return exportData();}
   MW.onlineRecipes={load,all,byId,categories,search,sync,clear,normaliseMeal,exportData,replaceData};
   MW.catalog={
     get(id){return MW.RECIPES.find(x=>x.id===id)||byId(id);},

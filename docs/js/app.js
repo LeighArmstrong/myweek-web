@@ -156,10 +156,10 @@ window.MW = window.MW || {};
     screen=String(screen||'');
     if(screen.indexOf('day:')===0) return 'week';
     if(screen.indexOf('recipe:')===0) return 'recipes';
-    if(screen==='library') return 'recipes';
+    if((screen==='library'||screen==='myrecipes')) return 'recipes';
     if(screen.indexOf('cookprep:')===0) return 'recipe:'+screen.slice(9);
     if(screen.indexOf('cookstep:')===0){const p=screen.split(':');return 'cookprep:'+p[1];}
-    if(screen==='cupboard'||screen==='sync') return 'settings';
+    if(screen==='cupboard'||screen==='sync'||screen==='account') return 'settings';
     if(screen==='settings'||screen==='recipes') return 'week';
     if(screen==='delivery') return 'shopreview';
     if(screen==='shopping') return 'shopreview';
@@ -170,9 +170,9 @@ window.MW = window.MW || {};
   const screenFamily=screen=>{
     screen=String(screen||'');
     if(screen.indexOf('day:')===0) return 'week';
-    if(screen.indexOf('recipe:')===0||screen.indexOf('cookprep:')===0||screen.indexOf('cookstep:')===0||screen==='library') return 'recipes';
+    if(screen.indexOf('recipe:')===0||screen.indexOf('cookprep:')===0||screen.indexOf('cookstep:')===0||screen==='library'||screen==='myrecipes') return 'recipes';
     if(['check','shopreview','shopping','delivery'].includes(screen)) return 'shop';
-    if(['settings','cupboard','sync'].includes(screen)) return 'more';
+    if(['settings','cupboard','sync','account'].includes(screen)) return 'more';
     return screen;
   };
   const motionFor=(from,to)=>{
@@ -373,6 +373,7 @@ window.MW = window.MW || {};
   };
   const sourceImageCandidates=r=>{
     if(!r||r.imageQa&&r.imageQa.status!=='verified') return [];
+    if(r.personal)return r.sourceImageUrl?[r.sourceImageUrl]:[];
     if(!r.sourcedCatalogue) return [fallbackRecipeImage(r)].filter(Boolean);
     const remote=String(r.sourceImageUrl||'');
     const original=String(r.sourceImageOriginalUrl||'');
@@ -760,6 +761,7 @@ window.MW = window.MW || {};
     const st=s();
     if(!st.onboarded){
       document.body.classList.remove('cooking-active');
+      if(MW.accounts&&!MW.accounts.status().user)return accountScreen(true);
       return welcome();
     }
     const screen=st.ui.screen||'week';
@@ -771,6 +773,7 @@ window.MW = window.MW || {};
     if(screen==='delivery') return deliveryCheck();
     if(screen==='recipes') return recipes();
     if(screen==='library') return library();
+    if(screen==='myrecipes') return myRecipes();
     if(screen.indexOf('cookprep:')===0) return cookPrep(screen.slice(9));
     if(screen.indexOf('cookstep:')===0){const parts=screen.split(':');return cookStep(parts[1],Number(parts[2])||0);}
     if(screen.indexOf('recipe:')===0) return recipeView(screen.slice(7));
@@ -778,6 +781,7 @@ window.MW = window.MW || {};
     if(screen==='settings') return settings();
     if(screen==='cupboard') return cupboard();
     if(screen==='sync') return syncScreen();
+    if(screen==='account') return accountScreen();
     return week();
   }
 
@@ -1307,9 +1311,10 @@ window.MW = window.MW || {};
     const savedMatch=()=>active.size===defaults.length&&defaults.every(x=>active.has(x));
     root.innerHTML=shell('<section class="subpage-head library-head"><button class="back-button" id="libraryBack">'+icon('arrow-left')+'</button><div><span class="eyebrow">RECIPE LIBRARY</span><h1>'+local.length+' recipes</h1><p>Published recipes with finished dish photography</p></div></section>'+
       '<form class="library-search" id="librarySearchForm"><i class="fa-solid fa-magnifying-glass"></i><input id="recipeSearch" value="'+esc(st.ui.libraryQuery||'')+'" placeholder="Search recipes or ingredients" inputmode="search" enterkeyhint="search"></form>'+
-      '<div class="library-filter-head"><span class="eyebrow">FILTERS</span><button type="button" id="savedLibraryFilters" class="saved-filter-reset '+(savedMatch()?'is-default':'')+'">'+icon('sliders')+' Saved preferences</button></div>'+
+      '<button class="btn secondary" id="chooseMyRecipes">'+icon('bookmark')+' My Recipes</button>'+'<div class="library-filter-head"><span class="eyebrow">FILTERS</span><button type="button" id="savedLibraryFilters" class="saved-filter-reset '+(savedMatch()?'is-default':'')+'">'+icon('sliders')+' Saved preferences</button></div>'+
       '<div class="category-tabs library-cats">'+filters.map(([key,label])=>'<button type="button" class="cat-tab '+((key==='all'?active.size===0:active.has(key))?'active ':'')+(locked.has(key)?'locked':'')+'" data-cat="'+key+'" '+(locked.has(key)?'disabled':'')+'>'+label+'</button>').join('')+'</div>'+
       (target?'<div class="library-target">'+icon('calendar-day')+' Choosing dinner for <strong>'+esc(day(target).label)+'</strong></div>':'')+'<div id="libraryResults"></div>','cook');
+    document.getElementById('chooseMyRecipes').onclick=()=>go('myrecipes');
     const resultsHost=document.getElementById('libraryResults'),search=document.getElementById('recipeSearch');
     const renderResults=()=>{const query=String(search.value||'').trim().toLowerCase();st.ui.libraryQuery=search.value;st.ui.libraryFilters=[...active];MW.state.save();const allResults=local.filter(r=>{const allowed=MW.planner?MW.planner.allowed(r):(!MW.food||MW.food.allowed(r,st.foodProfile));return allowed&&(!query||hay(r).includes(query))&&[...active].every(key=>filterMatch(r,key));});const limit=Math.max(80,Number(st.ui.libraryLimit)||80),results=allResults.slice(0,limit);resultsHost.innerHTML='<div class="library-count"><strong>'+results.length+'</strong> of <strong>'+allResults.length+'</strong> matching recipes shown</div><div class="library-grid">'+results.map(r=>'<button class="library-card" data-id="'+r.id+'">'+recipePhoto(r,'library-photo',r.title)+'<span><strong>'+esc(r.title)+'</strong>'+(recipeSubtitle(r)?'<small>'+esc(recipeSubtitle(r))+'</small>':'')+'</span></button>').join('')+'</div>'+(!results.length?'<div class="empty-state">'+icon('magnifying-glass')+'<h2>No matches</h2><p>Try another search or filter.</p></div>':'')+(results.length<allResults.length?'<button class="refresh-library" id="loadMoreRecipes">'+icon('plus')+' Show 80 more</button>':'');resultsHost.querySelectorAll('.library-card').forEach(b=>b.onclick=()=>{if(target){if(MW.planner.replace(target,b.dataset.id)){st.ui.libraryTargetDay='';MW.state.save();go('day:'+target);}}else go('recipe:'+b.dataset.id);});const more=document.getElementById('loadMoreRecipes');if(more)more.onclick=()=>{st.ui.libraryLimit=(Number(st.ui.libraryLimit)||80)+80;MW.state.save();renderResults();};updateControlNames();};
     const repaintFilters=()=>{root.querySelectorAll('.library-cats .cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat==='all'?active.size===0:active.has(b.dataset.cat)));document.getElementById('savedLibraryFilters').classList.toggle('is-default',savedMatch());};
@@ -1317,6 +1322,24 @@ window.MW = window.MW || {};
     root.querySelectorAll('.library-cats .cat-tab').forEach(b=>b.onclick=()=>{const key=b.dataset.cat;if(key==='all'){active.clear();}else{if(locked.has(key))return;if(active.has(key))active.delete(key);else active.add(key);}st.ui.libraryLimit=80;repaintFilters();renderResults();});
     document.getElementById('savedLibraryFilters').onclick=()=>{active.clear();defaults.forEach(x=>active.add(x));st.ui.libraryLimit=80;repaintFilters();renderResults();};
     document.getElementById('libraryBack').onclick=()=>{st.ui.libraryTargetDay='';MW.state.save();go(target?'day:'+target:'recipes',{motion:'drill-back'});};renderResults();bindNav();
+  }
+
+  function myRecipes(){
+    const st=s(),target=st.ui.libraryTargetDay||'';
+    root.innerHTML=shell('<section class="subpage-head"><button class="back-button" id="personalBack" aria-label="Back">'+icon('arrow-left')+'</button><div><span class="eyebrow">YOUR COLLECTION</span><h1>My Recipes</h1></div></section><div class="personal-actions"><button class="btn primary" id="importRecipe">'+icon('link')+' Add a recipe</button></div><form class="library-search" id="personalSearchForm"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="personalSearch" placeholder="Search your recipes or ingredients" aria-label="Search My Recipes" inputmode="search" enterkeyhint="search"></form><div id="personalResults"></div>','cook');
+    const host=document.getElementById('personalResults'),search=document.getElementById('personalSearch');
+    const paint=()=>{try{const query=search.value.trim().toLowerCase(),items=MW.personalRecipes.all().filter(r=>!query||[r.title,...r.ingredients.map(x=>x[1])].join(' ').toLowerCase().includes(query));host.innerHTML=items.length?'<div class="library-grid">'+items.map(r=>'<article class="personal-card"><button class="library-card" data-open="'+esc(r.id)+'">'+recipePhoto(r,'library-photo',r.title)+'<span><strong>'+esc(r.title)+'</strong><small>'+esc(r.source)+'</small></span></button><button class="personal-edit" data-edit="'+esc(r.id)+'" aria-label="Edit '+esc(r.title)+'">'+icon('pen')+' Edit</button></article>').join('')+'</div>':'<div class="empty-state">'+icon('bookmark')+'<h2>'+(query?'No matches':'Save recipes you love')+'</h2><p>'+(query?'Try another search.':'Paste a recipe link to start your collection.')+'</p></div>';host.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>{if(target){if(MW.planner.replace(target,b.dataset.open)){st.ui.libraryTargetDay='';MW.state.save();go('day:'+target);}}else go('recipe:'+b.dataset.open);});host.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>personalEditor(MW.personalRecipes.byId(b.dataset.edit)));}catch(error){host.innerHTML='<p class="operation-error" role="alert">'+esc(error.message)+'</p>';}};
+    search.oninput=paint;document.getElementById('personalSearchForm').onsubmit=e=>{e.preventDefault();paint();};document.getElementById('importRecipe').onclick=()=>personalEditor();document.getElementById('personalBack').onclick=()=>go(target?'library':'recipes');paint();bindNav();
+  }
+  function personalEditor(existing){
+    let draft=existing?JSON.parse(JSON.stringify(existing)):null;
+    root.innerHTML=shell('<section class="subpage-head"><button class="back-button" id="personalEditorBack" aria-label="Back to My Recipes">'+icon('arrow-left')+'</button><div><span class="eyebrow">MY RECIPES</span><h1>'+(existing?'Edit recipe':'Add a recipe')+'</h1></div></section><section class="settings-section personal-import"><form id="recipeLinkForm"><label class="personal-label" for="recipeLink">Recipe link</label><input id="recipeLink" type="url" placeholder="https://…" value="'+esc(existing&&existing.sourceUrl||'')+'" autocomplete="url"><button class="btn primary" id="readRecipeLink" type="submit">'+icon('link')+' Read recipe</button></form><p class="setting-help">Or paste the ingredients and method below.</p><div id="recipeImportStatus" role="status" aria-live="polite"></div><div id="recipeImportChoices"></div></section><form id="personalRecipeForm" class="settings-section personal-form"><label class="personal-label" for="personalTitle">Recipe name</label><input id="personalTitle" required maxlength="180"><div class="personal-meta-fields"><div><label class="personal-label" for="personalServings">Source servings</label><input id="personalServings" type="number" min="1" max="100" inputmode="numeric" placeholder="If listed"></div><div><label class="personal-label" for="personalTime">Total minutes</label><input id="personalTime" type="number" min="1" max="10080" inputmode="numeric" placeholder="If listed"></div></div><label class="personal-label" for="personalIngredients">Ingredients · one per line</label><textarea id="personalIngredients" rows="7" required placeholder="1 onion&#10;400 g chopped tomatoes"></textarea><label class="personal-label" for="personalMethod">Method · one step per line</label><textarea id="personalMethod" rows="9" required placeholder="Peel and chop the onion.&#10;…"></textarea><p class="setting-help">Check quantities and steps before saving. Imported recipes keep the source quantities.</p><div id="personalSaveStatus" role="alert"></div><div class="personal-actions"><button type="submit" class="btn primary">Save recipe</button>'+(existing?'<button type="button" class="btn secondary" id="deletePersonalRecipe">Delete recipe</button>':'')+'</div></form>','cook');
+    const fill=r=>{draft=r;document.getElementById('personalTitle').value=r.title||'';document.getElementById('personalServings').value=r.servings||'';document.getElementById('personalTime').value=r.time||'';document.getElementById('personalIngredients').value=(r.ingredientLines||r.ingredients.map(x=>x[0]==='As listed'?x[1]:x.join(' '))).join('\n');document.getElementById('personalMethod').value=(r.steps||[]).join('\n');};
+    if(draft)fill(draft);
+    document.getElementById('personalEditorBack').onclick=()=>go('myrecipes');
+    document.getElementById('recipeLinkForm').onsubmit=async e=>{e.preventDefault();const button=document.getElementById('readRecipeLink'),status=document.getElementById('recipeImportStatus'),choices=document.getElementById('recipeImportChoices');button.disabled=true;status.textContent='Reading recipe…';choices.innerHTML='';try{const found=await MW.personalRecipes.importUrl(document.getElementById('recipeLink').value);if(found.length===1){fill({...found[0],...(existing?{id:existing.id,createdAt:existing.createdAt}:{})});status.textContent='Recipe loaded. Check it below.';}else{status.textContent='Choose a recipe from this page.';choices.innerHTML=found.map((r,i)=>'<button type="button" class="btn secondary" data-choice="'+i+'">'+esc(r.title)+'</button>').join('');choices.querySelectorAll('button').forEach(b=>b.onclick=()=>{fill({...found[Number(b.dataset.choice)],...(existing?{id:existing.id,createdAt:existing.createdAt}:{})});choices.innerHTML='';status.textContent='Recipe loaded. Check it below.';});}}catch(error){status.textContent=error.message||'The recipe could not be read.';}finally{button.disabled=false;}};
+    document.getElementById('personalRecipeForm').onsubmit=e=>{e.preventDefault();const status=document.getElementById('personalSaveStatus');try{const lines=document.getElementById('personalIngredients').value.split(/\n+/).map(x=>x.trim()).filter(Boolean);const r=MW.personalRecipes.save({...draft,title:document.getElementById('personalTitle').value,sourceUrl:document.getElementById('recipeLink').value.trim(),servings:document.getElementById('personalServings').value,time:document.getElementById('personalTime').value,ingredients:lines.map(MW.personalRecipes.splitIngredient),ingredientLines:lines,steps:document.getElementById('personalMethod').value.split(/\n+/).map(x=>x.trim()).filter(Boolean)});go('myrecipes');}catch(error){status.innerHTML='<p class="operation-error">'+esc(error.message)+'</p>';}};
+    const del=document.getElementById('deletePersonalRecipe');if(del)del.onclick=async()=>{if(!await confirmAction({title:'Delete this recipe?',message:'This removes '+existing.title+' from My Recipes on your synced devices.',confirmLabel:'Delete recipe',danger:true}))return;try{MW.personalRecipes.remove(existing.id);go('myrecipes');}catch(error){document.getElementById('personalSaveStatus').textContent=error.message;}};bindNav();
   }
 
   function recipes(){
@@ -1334,11 +1357,12 @@ window.MW = window.MW || {};
       :'<section class="recipes-empty-state"><span class="empty-state-icon">'+icon('utensils')+'</span><span class="eyebrow">NOTHING TO COOK YET</span><h2>Your planned dinners will appear here</h2><p>Plan this week to get your chosen recipes, ingredients and step by step cooking guides in one place.</p><div><button class="btn primary" id="planRecipesWeek">Plan this week</button><button class="btn secondary" id="browseRecipesEmpty">Browse all recipes</button></div></section>';
     root.innerHTML=shell(
       '<section class="page-head"><div><span class="eyebrow">COOK</span><h1>Your recipes</h1></div><button class="library-shortcut" id="openLibrary">'+icon('magnifying-glass')+'<span>Library'+(onlineCount?' · '+onlineCount:'')+'</span></button></section>'+
-      deliveryReminder+
+      '<button class="settings-link personal-collection-link" id="openMyRecipes">'+icon('bookmark')+'<span><strong>My Recipes</strong><small>Your saved and imported recipes</small></span><i class="fa-solid fa-chevron-right"></i></button>'+deliveryReminder+
       recipeContent,
       'cook'
     );
     root.querySelectorAll('.openrecipe').forEach(b=>b.onclick=()=>go('recipe:'+b.dataset.id));
+    document.getElementById('openMyRecipes').onclick=()=>{st.ui.libraryTargetDay='';MW.state.save();go('myrecipes');};
     document.getElementById('openLibrary').onclick=()=>{st.ui.libraryTargetDay='';MW.state.save();go('library');};
     const planRecipesWeek=document.getElementById('planRecipesWeek');
     if(planRecipesWeek) planRecipesWeek.onclick=e=>withLoading(e.currentTarget,()=>{
@@ -1366,14 +1390,14 @@ window.MW = window.MW || {};
     const st=s();
     const people=MW.preparation.portions(r);
     const factor=r.scaleSafe===false?1:people/(r.servings||2);
-    const mealCost=people?(r.isLunch?'~'+money(recipeCost(r,people))+' ingredients':recipeCostLabel(r,people)):'';
-    const meta=[timeText(r),r.scaleSafe===false?'Source quantities':(r.isLunch?countLabel(people,'planned lunch','planned lunches'):countLabel(people,'portion','portions')),mealCost].filter(Boolean);
+    const mealCost=people&&!r.personal?(r.isLunch?'~'+money(recipeCost(r,people))+' ingredients':recipeCostLabel(r,people)):'';
+    const meta=[timeText(r),r.scaleSafe===false?(r.personal&&r.servings?countLabel(r.servings,'source portion','source portions'):'Source quantities'):(r.isLunch?countLabel(people,'planned lunch','planned lunches'):countLabel(people,'portion','portions')),mealCost].filter(Boolean);
     const tips=r.isLunch?[]:tipsForRecipe(r);
     const toolsNeeded=cookingEquipment(r);
     const gathered=gatheredIngredients(r);
     const selectedAllergens=(st.foodProfile&&st.foodProfile.allergens)||[];
     root.innerHTML=shell(
-      '<section class="recipe-hero '+(r.isLunch?'lunch-recipe-hero ':'')+(!displayRecipeImage(r)?'text-only':'')+'">'+recipePhoto(r,'recipe-hero-photo',r.title)+'<div class="recipe-hero-overlay"><button class="back-on-photo" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow light">'+esc(r.online?'ONLINE RECIPE':'MY WEEK RECIPE')+'</span><h1>'+esc(r.title)+'</h1>'+(recipeSubtitle(r)?'<p>'+esc(recipeSubtitle(r))+'</p>':'')+'<div class="hero-meta">'+meta.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div></div></div></section>'+
+      '<section class="recipe-hero '+(r.isLunch?'lunch-recipe-hero ':'')+(!displayRecipeImage(r)?'text-only':'')+'">'+recipePhoto(r,'recipe-hero-photo',r.title)+'<div class="recipe-hero-overlay"><button class="back-on-photo" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow light">'+esc(r.personal?'MY RECIPES':r.online?'ONLINE RECIPE':'MY WEEK RECIPE')+'</span><h1>'+esc(r.title)+'</h1>'+(recipeSubtitle(r)?'<p>'+esc(recipeSubtitle(r))+'</p>':'')+'<div class="hero-meta">'+meta.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div></div></div></section>'+
       (r.isLunch?(()=>{const q=MW.preparation.quantities(r),days=(st.plan.lunchDays||[]).length,eaters=Math.max(1,Number(st.plan.lunchPeople)||1),equation=days+' lunch day'+(days===1?'':'s')+' × '+eaters+' '+(eaters===1?'person':'people')+' = '+q.planned+' '+(q.planned===1?'lunch':'lunches');return '<section class="preparation-note lunch-plan-note lunch-plan-compact"><span class="eyebrow">YOUR LUNCH PLAN · PREP AT HOME</span><h2>'+q.planned+' '+(q.planned===1?'lunch':'lunches')+' this week</h2><div class="lunch-plan-equation">'+esc(equation)+'</div></section>';})():'')+
       '<button class="start-cooking" id="startCooking" '+(r.isLunch&&!people?'disabled':'')+'>'+icon('play')+'<span><strong>'+(r.isLunch?'Prep at home step by step':'Cook step by step')+'</strong></span><i class="fa-solid fa-chevron-right"></i></button>'+
       (r.online?'<div class="source-note">'+icon('circle-info')+'<span>Recipe from '+esc(r.source||'online source')+'. Ingredient quantities are kept as published.</span></div>':'')+
@@ -1562,6 +1586,24 @@ window.MW = window.MW || {};
     return '<div class="day-toggle-row" id="'+id+'">'+MW.DAYS.map(d=>'<button data-day="'+d.key+'" class="'+(set.has(d.key)?'active':'')+'"><span>'+d.short.slice(0,2)+'</span></button>').join('')+'</div>';
   }
 
+  function accountScreen(onboarding=false,mode='signin'){
+    const account=MW.accounts.status(),user=account.user;
+    root.innerHTML=shell('<section class="subpage-head">'+(!onboarding?'<button class="back-button" id="accountBack" aria-label="Back to Settings">'+icon('arrow-left')+'</button>':'')+'<div><span class="eyebrow">MY WEEK ACCOUNT</span><h1>'+(user?'Your account':onboarding?'Welcome to My Week':mode==='create'?'Create an account':'Sign in')+'</h1></div></section>'+(user?'<section class="settings-section account-summary"><h2>'+esc(user.email)+'</h2><p id="accountSyncStatus" role="status" aria-live="polite"></p><div id="accountConflict"></div><button class="btn primary" id="accountSyncNow">Sync now</button><button class="btn secondary" id="accountSignOut">Sign out</button><div id="accountError" role="alert"></div></section>':'<section class="settings-section account-auth"><p class="setting-help">Sign in on your devices to sync your week, cupboard and My Recipes.</p><div class="category-tabs"><button class="cat-tab '+(mode==='signin'?'active':'')+'" id="accountSignInTab">Sign in</button><button class="cat-tab '+(mode==='create'?'active':'')+'" id="accountCreateTab">Create account</button></div><form id="accountAuthForm"><label class="personal-label" for="accountEmail">Email address</label><input id="accountEmail" type="email" required autocomplete="email" inputmode="email"><label class="personal-label" for="accountPassword">Password</label><div class="account-password"><input id="accountPassword" type="password" required minlength="'+(mode==='create'?8:1)+'" autocomplete="'+(mode==='create'?'new-password':'current-password')+'"><button type="button" id="showAccountPassword" aria-label="Show password">'+icon('eye')+'</button></div>'+(mode==='create'?'<p class="setting-help">At least 8 characters.</p><label class="personal-label" for="accountConfirmPassword">Confirm password</label><input id="accountConfirmPassword" type="password" required minlength="8" autocomplete="new-password">':'')+'<div id="accountError" role="alert"></div><button class="btn primary" type="submit" id="accountAuthSubmit">'+(mode==='create'?'Create account':'Sign in')+'</button>'+((mode==='signin')?'<button type="button" class="text-action" id="accountForgotPassword">Forgot password?</button>':'')+'</form><div id="accountDataChoice"></div></section>')+(!onboarding?'<section class="settings-section"><button class="settings-link" id="accountTransfer">'+icon('file-export')+'<span><strong>Manual transfer & backup</strong></span><i class="fa-solid fa-chevron-right"></i></button></section>':''),'more');
+    const errorHost=document.getElementById('accountError'),fail=error=>{errorHost.textContent=error.message||'This action could not be completed.';};
+    if(!onboarding){document.getElementById('accountBack').onclick=()=>go('settings');document.getElementById('accountTransfer').onclick=()=>go('sync');}
+    if(user){paintAccountStatus();document.getElementById('accountSyncNow').onclick=e=>withLoading(e.currentTarget,async()=>{await MW.accounts.sync();paintAccountStatus();});document.getElementById('accountSignOut').onclick=async()=>{const status=MW.accounts.status();if(status.status!=='synced'&&!await confirmAction({title:'Sign out with unsynced changes?',message:'Changes will stay on this device for this account. They will sync after you sign in here again.',confirmLabel:'Sign out'}))return;try{await MW.accounts.signOut();render();window.scrollTo(0,0);}catch(error){fail(error);}};}
+    else{
+      document.getElementById('accountSignInTab').onclick=()=>accountScreen(onboarding,'signin');document.getElementById('accountCreateTab').onclick=()=>accountScreen(onboarding,'create');
+      document.getElementById('showAccountPassword').onclick=e=>{const input=document.getElementById('accountPassword'),show=input.type==='password';input.type=show?'text':'password';e.currentTarget.setAttribute('aria-label',show?'Hide password':'Show password');};
+      document.getElementById('accountAuthForm').onsubmit=async e=>{e.preventDefault();errorHost.textContent='';const password=document.getElementById('accountPassword'),submit=document.getElementById('accountAuthSubmit');if(mode==='create'&&password.value!==document.getElementById('accountConfirmPassword').value){fail(new Error('The passwords do not match.'));return;}submit.disabled=true;try{const result=await MW.accounts.connect(document.getElementById('accountEmail').value,password.value,mode==='create');password.value='';const confirm=document.getElementById('accountConfirmPassword');if(confirm)confirm.value='';if(result.needsChoice){const choices=document.getElementById('accountDataChoice');choices.innerHTML='<h2>Which data should this account use?</h2><p class="setting-help">This device already has a week. Keep the account’s saved week, or replace it with this device’s data. A local backup is kept.</p><button class="btn primary" id="useAccountData">Use saved account data</button><button class="btn secondary" id="useDeviceData">Use this device’s data</button>';for(const [id,choice] of [['useAccountData','cloud'],['useDeviceData','device']])document.getElementById(id).onclick=async()=>{try{await MW.accounts.finishConnect(choice);render();window.scrollTo(0,0);}catch(error){fail(error);}};}else{render();window.scrollTo(0,0);}}catch(error){fail(error);}finally{submit.disabled=false;}};
+      const forgot=document.getElementById('accountForgotPassword');if(forgot)forgot.onclick=async()=>{try{errorHost.textContent=await MW.accounts.passwordReset(document.getElementById('accountEmail').value);}catch(error){fail(error);}};
+    }
+    bindNav();
+  }
+  function paintAccountStatus(){
+    const host=document.getElementById('accountSyncStatus');if(!host)return;const a=MW.accounts.status(),labels={synced:'Up to date',pending:'Changes waiting to sync',syncing:'Syncing…',offline:'Offline · changes saved on this device',conflict:'Choose which changes to keep'};host.textContent=(labels[a.status]||a.status)+(a.detail?' · '+a.detail:'');const conflict=document.getElementById('accountConflict');if(a.status==='conflict'&&!conflict.querySelector('button')){conflict.innerHTML='<p>Both devices edited the same data. A backup of both versions will be kept.</p><button class="btn primary" id="keepDeviceChanges">Keep this device’s changes</button><button class="btn secondary" id="keepAccountChanges">Use account changes</button>';for(const [id,choice] of [['keepDeviceChanges','device'],['keepAccountChanges','cloud']])document.getElementById(id).onclick=async()=>{try{await MW.accounts.resolve(choice);paintAccountStatus();}catch(error){document.getElementById('accountError').textContent=error.message;}};}else if(a.status!=='conflict')conflict.innerHTML='';
+  }
+
   function settings(){
     const st=s();
     const avoidValue=[...(st.household.restrictions||[]),...(st.household.dislikes||[])].join(', ');
@@ -1577,7 +1619,7 @@ window.MW = window.MW || {};
       '<section class="settings-section"><div class="setting-title"><div><label>Dinner days</label><small>Choose the days you want dinner planned.</small></div></div>'+dayToggles('dinnerDays',st.plan.dinnerDays)+'</section>'+
       '<section class="settings-section"><div class="setting-title"><div><label>Lunch days</label><small>Your lunch recipe scales automatically to these days.</small></div></div>'+dayToggles('lunchDays',st.plan.lunchDays)+'<label class="sub-label">People eating the planned lunch</label>'+selectionButtons('lunchPeople',[1,2,3,4].map(v=>({v,label:String(v)})),st.plan.lunchPeople,'numeric-choice-row')+'</section>'+
       '<section class="settings-section"><button class="settings-link" id="cupboard">'+icon('box-open')+'<span><strong>My cupboard</strong><small>'+Object.keys(st.inventory||{}).length+' tracked items</small></span><i class="fa-solid fa-chevron-right"></i></button></section>'+
-      '<section class="settings-section"><button class="settings-link" id="deviceSync">'+icon('arrows-rotate')+'<span><strong>Device sync & transfer</strong><small>Move My Week between devices without an account or server</small></span><i class="fa-solid fa-chevron-right"></i></button></section>'+
+      '<section class="settings-section"><button class="settings-link" id="deviceSync">'+icon('user')+'<span><strong>Account & sync</strong><small>Sign in, sync your devices or sign out</small></span><i class="fa-solid fa-chevron-right"></i></button></section>'+
       (MW.updates?'<section class="settings-section app-update-section" id="appUpdatePanel"><button class="settings-link" id="checkUpdates">'+icon('cloud-arrow-down')+'<span><strong>App updates</strong><small id="updateStatus">'+(MW.updates.isNativeAndroid()?'Checking installed version…':'Web app updates automatically')+'</small></span><i class="fa-solid fa-chevron-right"></i></button><div class="update-release" id="updateRelease" hidden></div></section>':'')+
       '<section class="settings-section"><div class="switch-row"><span><strong>Lower-cost planning</strong><small>Cheaper meals and more ingredient overlap.</small></span><label class="toggle"><input id="priceMode" type="checkbox" '+(st.plan.priceMode?'checked':'')+'><span></span></label></div></section>'+
       '<div class="plan-actions single-action"><button class="btn primary" id="save">Save & rebuild week</button></div>'+
@@ -1627,7 +1669,7 @@ window.MW = window.MW || {};
       renderAvoidFeedback();
     }
     document.getElementById('cupboard').onclick=()=>go('cupboard');
-    document.getElementById('deviceSync').onclick=()=>go('sync');
+    document.getElementById('deviceSync').onclick=()=>go('account');
     const updateButton=document.getElementById('checkUpdates'),updateStatus=document.getElementById('updateStatus'),updateRelease=document.getElementById('updateRelease');
     const renderUpdate=async manual=>{
       if(!updateButton||!MW.updates)return;
@@ -1740,9 +1782,9 @@ window.MW = window.MW || {};
     const st=s();let pending=null;
     const summary=packet=>{const x=packet&&packet.state||{};const inv=Object.keys(x.inventory||{}).length,week=x.week&&x.week.weekKey||'No current week';return '<div class="sync-preview-card"><span class="eyebrow">TRANSFER FOUND</span><strong>'+esc((x.profile&&x.profile.name)||'My Week')+'</strong><small>'+esc(week)+' · '+inv+' cupboard item'+(inv===1?'':'s')+' · exported '+esc(packet.exportedAt||'')+'</small></div>';};
     root.innerHTML=shell(
-      '<section class="subpage-head"><button class="back-button" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow">YOUR DATA</span><h1>Device sync & transfer</h1><p>Move your complete My Week state directly between devices. Use either a transfer file or a transfer code; you do not need both. No My Week account or online storage is used.</p></div></section>'+
+      '<section class="subpage-head"><button class="back-button" id="back">'+icon('arrow-left')+'</button><div><span class="eyebrow">YOUR DATA</span><h1>Device sync & transfer</h1><p>Move your complete My Week state directly between devices. Use either a transfer file or a transfer code; you do not need both. This transfers a snapshot. Account sign-in details are not included.</p></div></section>'+
       '<section class="sync-explainer">'+icon('shield-halved')+'<div><strong>Two ways to transfer</strong><small>The .myweek file and transfer code contain the same snapshot. Choose whichever is easier for the devices you are moving between.</small></div></section>'+
-      '<section class="settings-section sync-section"><span class="eyebrow">SEND FROM THIS DEVICE</span><h2>Create a transfer</h2><p>The transfer includes your week, shopping progress, saved delivery quantities, cupboard, preferences and history. Receipt images are only a temporary local reference while checking a shop and are not included.</p><div class="sync-actions"><button class="btn primary" id="shareSyncFile">Share transfer file</button><button class="btn secondary" id="createSyncCode">Create transfer code</button></div><div id="syncCodeArea"></div></section>'+
+      '<section class="settings-section sync-section"><span class="eyebrow">SEND FROM THIS DEVICE</span><h2>Create a transfer</h2><p>The transfer includes your week, cupboard, My Recipes, preferences and shopping progress. Receipt images are only a temporary local reference while checking a shop and are not included.</p><div class="sync-actions"><button class="btn primary" id="shareSyncFile">Share transfer file</button><button class="btn secondary" id="createSyncCode">Create transfer code</button></div><div id="syncCodeArea"></div></section>'+
       '<section class="settings-section sync-section"><span class="eyebrow">RECEIVE ON THIS DEVICE</span><h2>Import a transfer</h2><p>Choose a .myweek file or paste a transfer code. You only need one method. Nothing is replaced until you review the transfer and confirm.</p><textarea id="syncImportCode" rows="5" placeholder="Paste a My Week transfer code"></textarea><div class="sync-actions"><button class="btn secondary" id="readSyncCode">Check transfer code</button><label class="btn secondary sync-file-picker"><span>Choose .myweek file</span><input id="syncFile" type="file" accept=".myweek,application/json,text/plain"></label></div><div id="syncImportPreview"></div></section>',
       'more'
     );
@@ -1863,6 +1905,13 @@ window.MW = window.MW || {};
   window.addEventListener('mw:storage-error',storageRecovery);
   bindNativeBack();
   document.addEventListener('visibilitychange',()=>{if(document.hidden){finishInterruptedMotion();releaseScreenWakeLock();}else syncScreenWakeLock();});
+  window.addEventListener('myweek:account-data-changed',()=>{
+    // Keep in-progress form entries and the current cooking scroll position.
+    if(root.querySelector('#personalRecipeForm,#accountAuthForm,#onboardNext')||document.body.classList.contains('cooking-active')||document.activeElement&&document.activeElement.matches('input,textarea,select'))return;
+    render();
+  });
+  window.addEventListener('myweek:account-changed',paintAccountStatus);
+  MW.accounts.start();
   render();
   syncScreenWakeLock();
 })();

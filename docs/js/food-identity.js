@@ -108,8 +108,8 @@ window.MW=window.MW||{};
   }
 
   function canonicalLabel(canonical){
-    if(canonicalLabels.has(canonical))return canonicalLabels.get(canonical);
-    return title(canonical);
+    const label=canonicalLabels.has(canonical)?canonicalLabels.get(canonical):title(canonical);
+    return MW.display&&MW.display.plainIngredientNames?title(MW.display.plainIngredientNames(label)):label;
   }
 
   let cache=null;

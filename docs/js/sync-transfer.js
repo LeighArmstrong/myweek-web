@@ -1,7 +1,7 @@
 window.MW=window.MW||{};
 (function(){
   'use strict';
-  const FORMAT='myweek-transfer-v2',LEGACY_FORMAT='myweek-transfer-v1';
+  const FORMAT='myweek-transfer-v3',V2_FORMAT='myweek-transfer-v2',LEGACY_FORMAT='myweek-transfer-v1';
   const MAX_CODE_CHARS=5*1024*1024,MAX_TRANSFER_BYTES=10*1024*1024;
   const enc=new TextEncoder(),dec=new TextDecoder();
   const clone=x=>JSON.parse(JSON.stringify(x));
@@ -29,11 +29,11 @@ window.MW=window.MW||{};
     throw new Error('This device cannot read compressed transfer codes. Use a My Week transfer file instead.');
   }
   function wrapper(state){
-    const clean=clone(state),localRecipes=MW.onlineRecipes&&MW.onlineRecipes.exportData?MW.onlineRecipes.exportData():{recipes:[],syncedAt:null};const raw=JSON.stringify({state:clean,localRecipes});return {format:FORMAT,exportedAt:new Date().toISOString(),checksum:checksum(raw),state:clean,localRecipes};
+    const clean=clone(state),localRecipes=MW.onlineRecipes&&MW.onlineRecipes.exportData?MW.onlineRecipes.exportData():{recipes:[],syncedAt:null};const personalRecipes=MW.personalRecipes.exportData();const raw=JSON.stringify({state:clean,localRecipes,personalRecipes});return {format:FORMAT,exportedAt:new Date().toISOString(),checksum:checksum(raw),state:clean,localRecipes,personalRecipes};
   }
   function validate(packet){
-    if(!packet||![FORMAT,LEGACY_FORMAT].includes(packet.format)||!packet.state||packet.state.schema!==1)throw new Error('This is not a valid My Week transfer.');
-    const raw=packet.format===LEGACY_FORMAT?JSON.stringify(packet.state):JSON.stringify({state:packet.state,localRecipes:packet.localRecipes||{recipes:[],syncedAt:null}});if(checksum(raw)!==packet.checksum)throw new Error('The transfer code is incomplete or corrupted.');
+    if(!packet||![FORMAT,V2_FORMAT,LEGACY_FORMAT].includes(packet.format)||!packet.state||packet.state.schema!==1)throw new Error('This is not a valid My Week transfer.');
+    const raw=packet.format===LEGACY_FORMAT?JSON.stringify(packet.state):packet.format===V2_FORMAT?JSON.stringify({state:packet.state,localRecipes:packet.localRecipes||{recipes:[],syncedAt:null}}):JSON.stringify({state:packet.state,localRecipes:packet.localRecipes||{recipes:[],syncedAt:null},personalRecipes:packet.personalRecipes});if(packet.format===FORMAT)MW.personalRecipes.validateData(packet.personalRecipes);if(checksum(raw)!==packet.checksum)throw new Error('The transfer code is incomplete or corrupted.');
     return packet;
   }
   async function createCode(){
@@ -65,16 +65,19 @@ window.MW=window.MW||{};
     }
     const previousState=clone(MW.state.get());
     const previousRecipes=MW.onlineRecipes&&MW.onlineRecipes.exportData?MW.onlineRecipes.exportData():null;
+    const previousPersonal=MW.personalRecipes.exportData();
     let stateApplied=false;
     try{
       const result=MW.state.replace(incomingState);
       stateApplied=true;
       if(MW.onlineRecipes&&MW.onlineRecipes.replaceData)MW.onlineRecipes.replaceData(packet.localRecipes||{recipes:[],syncedAt:null});
+      if(packet.format===FORMAT)MW.personalRecipes.replaceData(packet.personalRecipes);
       return result;
     }catch(error){
       let restored=true;
       if(stateApplied){try{MW.state.replace(previousState);}catch{restored=false;}}
       if(previousRecipes&&MW.onlineRecipes&&MW.onlineRecipes.replaceData){try{MW.onlineRecipes.replaceData(previousRecipes);}catch{restored=false;}}
+      try{MW.personalRecipes.replaceData(previousPersonal);}catch{restored=false;}
       if(!restored)throw new Error('The transfer could not be completed and automatic recovery also failed. Do not make further changes until recovery is checked.');
       throw new Error('The transfer could not be completed. Your previous data was restored.');
     }
