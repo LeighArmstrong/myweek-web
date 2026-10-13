@@ -70,6 +70,13 @@ window.MW = window.MW || {};
       return false;
     if (!/^[a-f0-9]{64}$/i.test(String(data.sha256 || ''))) return false;
     if (data.releaseNotes != null && !Array.isArray(data.releaseNotes)) return false;
+    if (
+      data.apkBytes != null &&
+      (!Number.isSafeInteger(Number(data.apkBytes)) ||
+        Number(data.apkBytes) <= 0 ||
+        Number(data.apkBytes) > 600 * 1024 * 1024)
+    )
+      return false;
     return true;
   }
 
@@ -143,8 +150,12 @@ window.MW = window.MW || {};
   function writePending(manifest, extra = {}) {
     const previous = readPending();
     const same = previous && previous.sha256 === String(manifest.sha256).toLowerCase();
+    const advertisedBytes = Number(manifest.apkBytes);
     const pending = {
       ...(same ? previous : {}),
+      ...(Number.isSafeInteger(advertisedBytes) && advertisedBytes > 0 && advertisedBytes <= 600 * 1024 * 1024
+        ? { apkBytes: advertisedBytes }
+        : {}),
       versionCode: Number(manifest.versionCode),
       versionName: String(manifest.versionName || ''),
       apkUrl: String(manifest.apkUrl || ''),
@@ -166,7 +177,8 @@ window.MW = window.MW || {};
   let installFlight = null,
     refreshFlight = null,
     resumeFlight = null;
-  const transferring = (value) => ['starting', 'downloading', 'paused', 'checking'].includes(value.phase);
+  const transferring = (value) =>
+    ['starting', 'queued', 'downloading', 'paused', 'checking'].includes(value.phase);
   function stopPolling() {
     if (timer != null) clearTimeout(timer);
     timer = null;
@@ -193,8 +205,32 @@ window.MW = window.MW || {};
     }
     return state;
   }
+  function formatBytes(bytes) {
+    const megabytes = Math.max(0, Number(bytes) || 0) / 1000000;
+    return (megabytes < 10 ? megabytes.toFixed(1) : String(Math.round(megabytes))) + ' MB';
+  }
+  function progressDetails(value) {
+    const downloaded = Math.max(0, Number(value.bytesDownloaded) || 0);
+    const reportedTotal = Number(value.bytesTotal) || 0;
+    const publishedTotal = Number(value.pending?.apkBytes || value.apkBytes) || 0;
+    const total = reportedTotal > 0 ? reportedTotal : publishedTotal > 0 ? publishedTotal : 0;
+    const nativePercent = Math.max(0, Math.min(100, Number(value.percent) || 0));
+    const percent =
+      total > 0 && downloaded > 0 ? Math.min(100, Math.round((100 * downloaded) / total)) : nativePercent;
+    return {
+      percent,
+      known: total > 0 || nativePercent > 0,
+      label:
+        downloaded > 0
+          ? formatBytes(downloaded) + (total > 0 ? ' of ' + formatBytes(total) : ' downloaded')
+          : total > 0
+            ? 'Download size: ' + formatBytes(total)
+            : 'Waiting for download progress',
+    };
+  }
   function view(value = state) {
-    const percent = Number(value.percent) || 0;
+    const details = progressDetails(value);
+    const percent = details.percent;
     switch (value.phase) {
       case 'starting':
         return {
@@ -203,26 +239,37 @@ window.MW = window.MW || {};
           label: 'Preparing…',
           busy: true,
         };
+      case 'queued':
+        return {
+          title: 'Waiting to download',
+          message: 'Android is preparing the download. ' + details.label + '.',
+          label: 'Preparing download',
+          busy: true,
+          progressPercent: details.known ? percent : null,
+        };
       case 'downloading':
         return {
           title: percent ? 'Downloading ' + percent + '%' : 'Downloading update',
-          message: 'You can leave MyWeek while it downloads.',
+          message: details.label + '. You can use other apps while it downloads.',
           label: percent ? 'Downloading ' + percent + '%' : 'Downloading…',
           busy: true,
+          progressPercent: details.known ? percent : null,
         };
       case 'paused':
         return {
           title: 'Download paused' + (percent ? ' · ' + percent + '%' : ''),
-          message: value.message || 'Waiting for a connection.',
+          message: (value.message || 'Waiting for a connection.') + ' ' + details.label + '.',
           label: 'Waiting for connection',
           busy: true,
+          progressPercent: details.known ? percent : null,
         };
       case 'checking':
         return {
           title: 'Checking update',
-          message: 'Checking the downloaded package…',
+          message: 'Download complete. Checking the package before Android opens the installer.',
           label: 'Checking…',
           busy: true,
+          progressPercent: 100,
         };
       case 'permission':
         return {

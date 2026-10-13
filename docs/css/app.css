@@ -3,11 +3,32 @@
   box-sizing: border-box;
 }
 :root {
+  /* One source of truth for the MyWeek palette, spacing shape and motion. */
+  --bg: #f8fbf9;
+  --surface: #ffffff;
+  --ink: #1f2937;
+  --muted: #718096;
+  --line: #e6eeea;
+  --green: #22a06b;
+  --green-deep: #167d56;
+  --green-soft: #f0faf5;
+  --lime: #e9f7ee;
+  --apricot: #fff4df;
+  --coral: #ef8d45;
   --danger: #a54848;
+  --shadow: 0 12px 30px rgba(31, 65, 52, 0.07);
+  --soft-shadow: 0 10px 30px rgba(28, 71, 54, 0.055);
+  --lift-shadow: 0 16px 38px rgba(28, 71, 54, 0.085);
+  --radius-control: 15px;
+  --radius-card: 20px;
+  --touch-target: 48px;
+  --motion-fast: 160ms;
+  --motion-normal: 260ms;
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
+  --device-safe-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
 }
 html,
 body {
@@ -2437,20 +2458,6 @@ p {
 .shell.cooking-shell {
   padding-bottom: calc(26px + var(--safe-bottom));
 }
-:root {
-  --bg: #f8fbf9;
-  --surface: #ffffff;
-  --ink: #1f2937;
-  --muted: #718096;
-  --line: #e6eeea;
-  --green: #22a06b;
-  --green-deep: #167d56;
-  --green-soft: #f0faf5;
-  --lime: #e9f7ee;
-  --apricot: #fff4df;
-  --coral: #ef8d45;
-  --shadow: 0 12px 30px rgba(31, 65, 52, 0.07);
-}
 .shell {
   width: min(760px, 100%);
 }
@@ -4618,11 +4625,6 @@ body.cooking-active .cook-scroll {
     border-radius: 18px 18px 0 0;
   }
 }
-:root {
-  --device-safe-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
-  --soft-shadow: 0 10px 30px rgba(28, 71, 54, 0.055);
-  --lift-shadow: 0 16px 38px rgba(28, 71, 54, 0.085);
-}
 
 html,
 body {
@@ -5870,10 +5872,6 @@ body.cooking-active .bottom-nav {
     margin: 0 0 2px;
     min-height: 66px;
   }
-}
-:root {
-  --motion-fast: 160ms;
-  --motion-normal: 260ms;
 }
 body:not(.cooking-active) .shell {
   padding-top: calc(var(--device-safe-top) + 14px);
@@ -9708,6 +9706,32 @@ body:not(.cooking-active) .lunch-swap-card .alternative-photo {
   min-width: 132px;
   max-width: 100%;
   white-space: normal;
+}
+.update-download-progress {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 9px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: var(--line);
+}
+.update-download-progress[hidden] {
+  display: none;
+}
+.update-download-progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--line);
+}
+.update-download-progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--green-deep);
+}
+.update-download-progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--green-deep);
 }
 @media (min-width: 620px) {
   .cupboard-add > .cupboard-food-search {

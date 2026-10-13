@@ -120,6 +120,15 @@ window.MW = window.MW || {};
     if (!view) return;
     const status = document.getElementById('updateStatus');
     if (status) status.textContent = view.title + ' · ' + view.message;
+    const updateProgress = document.getElementById('updateDownloadProgress');
+    if (updateProgress) {
+      updateProgress.hidden = !['starting', 'queued', 'downloading', 'paused', 'checking'].includes(
+        state?.phase,
+      );
+      if (view.progressPercent == null) updateProgress.removeAttribute('value');
+      else updateProgress.value = view.progressPercent;
+      updateProgress.setAttribute('aria-valuetext', view.message);
+    }
     const settingsButton = document.getElementById('installUpdate');
     if (settingsButton) {
       settingsButton.textContent = view.label;
@@ -843,7 +852,14 @@ window.MW = window.MW || {};
   const cachedFinal = (r) => {
     const item = r && MW.sourcedFinalCache && MW.sourcedFinalCache[r.id];
     if (!item || item.role !== 'declared-final' || item.source !== r.sourceImageUrl) return '';
-    return item.src === 'assets/images/sourced-final/' + r.id + '.jpg' ? item.src : '';
+    const extension =
+      item.encodingVersion === 'qa31-webp700-q72'
+        ? '.webp'
+        : item.encodingVersion === 'qa31-original-jpeg-perceptual-preservation' ||
+            ((MW.PRACTICAL_LUNCHES || []).some((meal) => meal.id === r.id) && !item.encodingVersion)
+          ? '.jpg'
+          : '';
+    return extension && item.src === 'assets/images/sourced-final/' + r.id + extension ? item.src : '';
   };
   const sourceImageCandidates = (r) => {
     if (!r || (r.imageQa && r.imageQa.status !== 'verified')) return [];
@@ -5331,7 +5347,7 @@ window.MW = window.MW || {};
               : '') +
             '<small>Installed: ' +
             esc(installed) +
-            '. Your week, cupboard and preferences stay on this device during a normal update.</small></div><button class="btn primary" id="installUpdate">Update My Week</button>';
+            '. Your week, cupboard and preferences stay on this device during a normal update.</small></div><progress id="updateDownloadProgress" class="update-download-progress" max="100" aria-label="Update download progress" hidden></progress><button class="btn primary" id="installUpdate">Update My Week</button>';
           updateRelease.hidden = false;
           document.getElementById('installUpdate').onclick = async () => {
             try {

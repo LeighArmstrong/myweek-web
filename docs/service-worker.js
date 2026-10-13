@@ -1,5 +1,6 @@
 const CACHE_PREFIX='myweek-shell-v';
-const CACHE=CACHE_PREFIX+'35030';
+const CACHE=CACHE_PREFIX+'35031';
+const MEDIA_CACHE='myweek-media-v1';
 const FIXED_SHELL=[
   './manifest.webmanifest',
   './assets/brand/icon-192.png',
@@ -33,17 +34,32 @@ async function cacheAppShell(){
     await cache.put(resource,response);
   }));
 }
-
+function isRecipeImage(url){
+  return /\/assets\/images\/.+\.(?:jpe?g|webp|png)$/i.test(url.pathname);
+}
+async function preserveOfflinePhotos(oldCaches){
+  const media=await caches.open(MEDIA_CACHE);
+  for(const key of oldCaches){
+    const cache=await caches.open(key);
+    for(const request of await cache.keys()){
+      if(!isRecipeImage(new URL(request.url))||await media.match(request))continue;
+      const old=await cache.match(request);
+      if(old)await media.put(request,old);
+    }
+  }
+}
 self.addEventListener('install',event=>{
   event.waitUntil(cacheAppShell().then(()=>self.skipWaiting()));
 });
 
 self.addEventListener('activate',event=>{
-  event.waitUntil(
-    caches.keys()
-      .then(keys=>Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE).map(key=>caches.delete(key))))
-      .then(()=>self.clients.claim())
-  );
+  event.waitUntil((async()=>{
+    const old=(await caches.keys()).filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE);
+    // Preserve already viewed recipes for offline cooking when the app shell changes.
+    await preserveOfflinePhotos(old);
+    await Promise.all(old.map(key=>caches.delete(key)));
+    await self.clients.claim();
+  })());
 });
 
 async function networkFirst(request,fallback){
@@ -66,7 +82,39 @@ self.addEventListener('fetch',event=>{
     event.respondWith(networkFirst(request,'./index.html'));
     return;
   }
-
+  if(isRecipeImage(url)){
+    event.respondWith((async()=>{
+      const media=await caches.open(MEDIA_CACHE);
+      const cached=await media.match(request);
+      if(cached)return cached;
+      try{
+        const response=await fetch(request);
+        if(response&&response.ok){
+          try{
+            await media.put(request,response.clone());
+            // A successfully cached WebP supersedes its older JPEG for the same recipe.
+            if(/\.webp$/i.test(url.pathname)){
+              const legacy=new URL(url);
+              legacy.pathname=legacy.pathname.replace(/\.webp$/i,'.jpg');
+              await media.delete(legacy.toString());
+            }
+          }catch{
+            // Quota errors must not prevent an image being displayed.
+          }
+        }
+        return response;
+      }catch(error){
+        if(/\.webp$/i.test(url.pathname)){
+          const legacy=new URL(url);
+          legacy.pathname=legacy.pathname.replace(/\.webp$/i,'.jpg');
+          const photo=await media.match(legacy.toString());
+          if(photo)return photo;
+        }
+        throw error;
+      }
+    })());
+    return;
+  }
   const freshEveryLaunch=['script','style','worker','manifest'].includes(request.destination)
     || /\.(?:js|css|json|webmanifest)$/i.test(url.pathname);
   if(freshEveryLaunch){
