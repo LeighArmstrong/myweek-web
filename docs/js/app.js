@@ -138,8 +138,11 @@ window.MW = window.MW || {};
   window.addEventListener('mw:update-state', paintUpdateState);
 
   function transitionRender(motion, fn) {
+    finishInterruptedMotion();
     pendingMotion = motion || 'context';
-    if (reducedMotion()) {
+    // Bottom navigation is a context switch, not a travelling page. Painting it
+    // immediately avoids showing two different screen titles at the same time.
+    if (reducedMotion() || pendingMotion === 'context') {
       animateNextPage = false;
       clearMotionDataset();
       fn();
@@ -776,7 +779,9 @@ window.MW = window.MW || {};
       "var i=Number(this.dataset.fallbackIndex||0),n=this.dataset['fallback'+i];if(n){this.dataset.fallbackIndex=String(i+1);this.src=n;return;}this.style.display='none';if(this.parentElement.classList.contains('cook-photo')){this.parentElement.style.display='none';var p=this.closest('.cook-visual-panel');if(p)p.style.display='none';var s=this.closest('.cook-scroll');if(s){s.classList.remove('has-visual');s.classList.add('no-visual');}}else this.parentElement.classList.add('photo-fallback')";
     const eager = String(cls || '')
       .split(/\s+/)
-      .includes('cook-photo');
+      .some((name) =>
+        ['cook-photo', 'recipe-hero-photo', 'home-featured-photo', 'library-priority-photo'].includes(name),
+      );
     return (
       '<div class="' +
       cls +
@@ -795,6 +800,34 @@ window.MW = window.MW || {};
       '"></div>'
     );
   };
+  // Only warm photos for the current cooking session. Background downloads must
+  // never block step text, and a small cache avoids decoding dozens of large photos.
+  const warmedCookingPhotos = new Map();
+  function warmCookingPhotos(r, steps) {
+    if (typeof Image !== 'function' || !r || !Array.isArray(steps)) return;
+    for (const step of steps) {
+      if (!step) continue;
+      const meta = (r.sourceStepImages || [])[step.sourceIndex] || {};
+      const source =
+        (MW.sourcedImageMap?.steps?.[r.id] || {})[step.sourceIndex] ||
+        helloFreshMirror(meta.src, 900) ||
+        meta.src ||
+        helloFreshMirror(meta.originalSrc, 900) ||
+        meta.originalSrc ||
+        MW.cookingVisuals?.fallbackForStep?.(step.text, step.sourceIndex, r)?.src;
+      if (!source || warmedCookingPhotos.has(source)) continue;
+      const image = new Image();
+      image.decoding = 'async';
+      image.referrerPolicy = 'no-referrer';
+      image.fetchPriority = 'low';
+      image.src = source;
+      image.decode?.().catch(() => {});
+      warmedCookingPhotos.set(source, image);
+      if (warmedCookingPhotos.size > 4) {
+        warmedCookingPhotos.delete(warmedCookingPhotos.keys().next().value);
+      }
+    }
+  }
   const fallbackRecipeImage = (r) => {
     const sourcedOnly = Boolean(r && (r.sourcedCatalogue || (r.imageQa && r.imageQa.status !== 'verified')));
     if (sourcedOnly) return '';
@@ -1345,7 +1378,9 @@ window.MW = window.MW || {};
           (pageHeader.collectionLink
             ? '<button type="button" class="library-collection-link" id="openMyRecipes">' +
               icon('bookmark') +
-              ' My Recipes</button>'
+              ' My Recipes' +
+              icon('chevron-right') +
+              '</button>'
             : '')
         : '<button class="account-link ' +
           (st.onboarded ? '' : 'static') +
@@ -1385,6 +1420,7 @@ window.MW = window.MW || {};
     return (
       '<main class="shell' +
       (pageHeader ? ' page-header-shell' : '') +
+      (st.ui.screen === 'settings' ? ' settings-page' : '') +
       '">' +
       header +
       allergyNotice +
@@ -1450,6 +1486,14 @@ window.MW = window.MW || {};
     if (!changed) {
       animateNextPage = false;
       render();
+      return;
+    }
+    // Cooking instructions must respond immediately; avoid a 200 ms ghost of
+    // the previous step whilst the user is following timings or ingredients.
+    if (from.startsWith('cookstep:') || screen.startsWith('cookstep:')) {
+      finishInterruptedMotion();
+      render();
+      window.scrollTo({ top: 0, behavior: 'instant' });
       return;
     }
     const motion = options.motion || motionFor(from, screen);
@@ -3464,13 +3508,17 @@ window.MW = window.MW || {};
         ' recipes found</div><div class="library-grid">' +
         results
           .map(
-            (r) =>
+            (r, index) =>
               '<button class="library-card ' +
               (!displayRecipeImage(r) ? 'text-recipe-card' : '') +
               '" data-id="' +
               r.id +
               '">' +
-              (recipePhoto(r, 'library-photo', r.title) ||
+              (recipePhoto(
+                r,
+                index < 2 ? 'library-photo library-priority-photo' : 'library-photo',
+                r.title,
+              ) ||
                 '<div class="recipe-text-cover" aria-hidden="true">' +
                   icon('utensils') +
                   '<span>' +
@@ -3870,7 +3918,7 @@ window.MW = window.MW || {};
         icon('arrow-left') +
         '</button><div><span class="eyebrow">SAVED MEAL PLANS</span><h1>Previous weeks</h1></div></section>' +
         (chosen
-          ? '<div class="history-week-picker"><label for="historyWeek">Week</label><span class="select-control"><select id="historyWeek">' +
+          ? '<div class="history-week-picker"><label for="historyWeek">Choose a week</label><span class="select-control"><select id="historyWeek">' +
             weeks
               .map(
                 (w) =>
@@ -4387,6 +4435,7 @@ window.MW = window.MW || {};
     document.getElementById('backToRecipe').onclick = () => leaveCookingFlow('recipe:' + id);
     document.getElementById('beginSteps').onclick = () => go('cookstep:' + id + ':0');
     bindNav();
+    requestAnimationFrame(() => warmCookingPhotos(r, MW.display.method(r).steps.slice(0, 2)));
   }
 
   function guidedStepTitle(caption, instruction) {
@@ -4749,6 +4798,7 @@ window.MW = window.MW || {};
       }
     };
     bindNav();
+    requestAnimationFrame(() => warmCookingPhotos(r, steps.slice(index + 1, index + 3)));
   }
 
   function dayToggles(id, selected) {
@@ -4998,10 +5048,7 @@ window.MW = window.MW || {};
     const st = s();
     const avoidValue = [...(st.household.restrictions || []), ...(st.household.dislikes || [])].join(', ');
     root.innerHTML = shell(
-      '<section class="settings-planner-note">' +
-        icon('sliders') +
-        '<div><strong>Planning preferences</strong><small>Saved automatically for future meal choices.</small></div></section>' +
-        '<section class="settings-section"><label>First name</label><input id="profileName" value="' +
+      '<section class="settings-section"><label>First name</label><input id="profileName" value="' +
         esc((st.profile && st.profile.name) || '') +
         '" placeholder="Your name"></section>' +
         '<section class="settings-section"><label>Supermarket</label><span class="select-control settings-select-control"><select id="retailer">' +

@@ -3890,40 +3890,6 @@ p {
   }
 }
 
-.settings-planner-note {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 12px;
-  align-items: start;
-  margin: 0 0 12px;
-  padding: 14px 15px;
-  border: 1px solid #cfe0d5;
-  border-radius: 18px;
-  background: #eef5f0;
-  color: var(--green-deep);
-}
-.settings-planner-note > i {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #fff;
-}
-.settings-planner-note strong,
-.settings-planner-note small {
-  display: block;
-}
-.settings-planner-note strong {
-  font-size: 14px;
-}
-.settings-planner-note small {
-  margin-top: 3px;
-  font-size: 11px;
-  line-height: 1.45;
-  color: #6e8077;
-}
-
 .numeric-choice-row {
   display: grid;
   justify-content: start;
@@ -3952,17 +3918,6 @@ p {
   pointer-events: none;
   color: #7a8880;
   font-size: 13px;
-}
-
-@media (max-width: 390px) {
-  .settings-planner-note {
-    grid-template-columns: 36px minmax(0, 1fr);
-    padding: 12px;
-  }
-  .settings-planner-note > i {
-    width: 36px;
-    height: 36px;
-  }
 }
 
 .setting-help {
@@ -5243,9 +5198,6 @@ body.cooking-active #app:after {
   border-radius: 14px;
 }
 
-.settings-planner-note {
-  box-shadow: var(--soft-shadow);
-}
 .settings-section {
   padding: 19px !important;
 }
@@ -5481,20 +5433,19 @@ body.cooking-active .bottom-nav {
   .library-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .shell:has(.settings-planner-note) {
+  .shell.settings-page {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     align-items: start;
   }
-  .shell:has(.settings-planner-note) > .appbar,
-  .shell:has(.settings-planner-note) > .subpage-head,
-  .shell:has(.settings-planner-note) > .settings-planner-note,
-  .shell:has(.settings-planner-note) > .plan-actions,
-  .shell:has(.settings-planner-note) > .danger-link {
+  .shell.settings-page > .appbar,
+  .shell.settings-page > .subpage-head,
+  .shell.settings-page > .plan-actions,
+  .shell.settings-page > .danger-link {
     grid-column: 1/-1;
   }
-  .shell:has(.settings-planner-note) > .settings-section {
+  .shell.settings-page > .settings-section {
     margin: 0;
     height: auto;
   }
@@ -5595,20 +5546,19 @@ body.cooking-active .bottom-nav {
     margin: 0;
   }
 
-  .shell:has(.settings-planner-note) {
+  .shell.settings-page {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
     align-items: start;
   }
-  .shell:has(.settings-planner-note) > .appbar,
-  .shell:has(.settings-planner-note) > .subpage-head,
-  .shell:has(.settings-planner-note) > .settings-planner-note,
-  .shell:has(.settings-planner-note) > .plan-actions,
-  .shell:has(.settings-planner-note) > .danger-link {
+  .shell.settings-page > .appbar,
+  .shell.settings-page > .subpage-head,
+  .shell.settings-page > .plan-actions,
+  .shell.settings-page > .danger-link {
     grid-column: 1/-1;
   }
-  .shell:has(.settings-planner-note) > .settings-section {
+  .shell.settings-page > .settings-section {
     margin: 0;
     height: auto;
   }
@@ -5894,14 +5844,11 @@ body.cooking-active .bottom-nav {
     flex: 0 0 auto;
   }
 
-  .shell:has(.settings-planner-note) {
+  .shell.settings-page {
     width: min(1080px, 100%);
   }
-  .shell:has(.settings-planner-note) > .subpage-head {
+  .shell.settings-page > .subpage-head {
     max-width: none;
-  }
-  .shell:has(.settings-planner-note) > .settings-planner-note {
-    margin-top: 0;
   }
 
   .cook-scroll.has-visual {
@@ -7036,6 +6983,12 @@ body.cooking-active .cook-control:disabled {
 ::view-transition-new(mw-bottom-nav) {
   animation: none;
   mix-blend-mode: normal;
+}
+/* Old headers must disappear before the new title is painted. */
+::view-transition-old(mw-appbar),
+::view-transition-old(mw-bottom-nav),
+::view-transition-old(mw-cook-header) {
+  opacity: 0;
 }
 @keyframes mwContextOld {
   to {
@@ -8491,17 +8444,33 @@ body:not(.cooking-active) .lunch-recipe-hero.text-only {
   flex-wrap: wrap;
 }
 .library-collection-link {
-  min-height: 44px;
-  padding: 8px 0;
-  background: transparent;
-  border: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 11px 16px;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid #dce9e3;
+  border-radius: 14px;
+  box-shadow: 0 5px 18px rgba(25, 63, 49, 0.045);
   color: var(--green-deep);
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 14px;
+  font-weight: 850;
   white-space: nowrap;
 }
-.library-collection-link i {
-  margin-right: 5px;
+.library-collection-link:hover,
+.library-collection-link:focus-visible {
+  background: var(--green-soft);
+  border-color: #b6d5c5;
+}
+.library-collection-link:focus-visible {
+  outline: 2px solid var(--green-deep);
+  outline-offset: 2px;
+}
+.library-collection-link i:last-child {
+  margin-left: 2px;
+  font-size: 10px;
 }
 .page-header-shell .appbar-greeting {
   flex-direction: row;
@@ -10790,9 +10759,9 @@ body:not(.cooking-active) .appbar .appbar-actions > button i {
 }
 
 @media (min-width: 700px) {
-  .shell:has(.settings-planner-note) > .food-settings,
-  .shell:has(.settings-planner-note) > .settings-section:has(#budget),
-  .shell:has(.settings-planner-note) > .allergy-notice,
+  .shell.settings-page > .food-settings,
+  .shell.settings-page > .settings-section:has(#budget),
+  .shell.settings-page > .allergy-notice,
   .shell:has(.shopping-check-head) > .allergy-notice {
     grid-column: 1/-1;
   }
@@ -10836,18 +10805,44 @@ body:not(.cooking-active) .appbar .appbar-actions > button i {
   outline-offset: 4px;
 }
 .history-week-picker {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 12px 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  margin: 12px 0 16px;
+  padding: 16px 18px;
+  max-width: 540px;
   grid-column: 1/-1;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: var(--soft-shadow);
 }
 .history-week-picker > label {
-  font-weight: 750;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--ink);
 }
 .history-week-picker .select-control {
-  flex: 1;
-  max-width: 360px;
+  min-width: 0;
+  width: 100%;
+}
+.history-week-picker .select-control select {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 48px 12px 14px;
+  border: 1px solid #d9ded9;
+  border-radius: 15px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.history-week-picker .select-control select:focus-visible {
+  outline: 2px solid var(--green-deep);
+  outline-offset: 2px;
 }
 .history-cooked {
   display: inline-flex;
@@ -10873,9 +10868,6 @@ body:not(.cooking-active) .appbar .appbar-actions > button i {
   font-weight: 700;
   font-size: 13px;
   margin: 10px 0;
-}
-.settings-planner-note {
-  grid-column: 1/-1;
 }
 .settings-save-status i {
   font-size: 12px;
