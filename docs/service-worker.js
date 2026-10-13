@@ -1,5 +1,5 @@
 const CACHE_PREFIX='myweek-shell-v';
-const CACHE=CACHE_PREFIX+'35028';
+const CACHE=CACHE_PREFIX+'35029';
 const FIXED_SHELL=[
   './manifest.webmanifest',
   './assets/brand/icon-192.png',

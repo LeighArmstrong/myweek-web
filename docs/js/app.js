@@ -8,6 +8,7 @@ window.MW = window.MW || {};
   let activeViewTransition = null;
   let previewRolloverFor = '';
   let libraryObserver = null;
+  let libraryFilterEvents = null;
   MW.onboarding.startViewport();
   const navStack = [];
   const keepScreenAwakeEnabled = MW.screenAwake.enabled;
@@ -113,44 +114,28 @@ window.MW = window.MW || {};
     requestAnimationFrame(() => animatePage(pendingMotion));
   });
   pageObserver.observe(root, { childList: true });
-  window.addEventListener('mw:update-permission-resume', (event) => {
-    const detail = (event && event.detail) || {};
+  function paintUpdateState() {
+    const state = MW.updates?.getState();
+    const view = MW.updates?.view(state);
+    if (!view) return;
     const status = document.getElementById('updateStatus');
+    if (status) status.textContent = view.title + ' · ' + view.message;
     const settingsButton = document.getElementById('installUpdate');
-    const homeNotice = document.getElementById('homeUpdateNotice');
-    const homeCopy = homeNotice && homeNotice.querySelector('span');
-    if (detail.error) {
-      if (status) status.textContent = 'Update could not resume automatically';
-      if (homeCopy)
-        homeCopy.innerHTML =
-          '<strong>Update needs attention</strong><small>' + esc(detail.error) + '</small>';
-      return;
+    if (settingsButton) {
+      settingsButton.textContent = view.label;
+      settingsButton.disabled = view.busy;
     }
-    if (detail.waitingForPermission) {
-      if (status) status.textContent = 'Allow My Week to install verified updates, then return here';
-      if (homeCopy)
-        homeCopy.innerHTML =
-          '<strong>One permission needed</strong><small>Turn on Allow from this source, then return to My Week.</small>';
-      return;
+    const notice = document.getElementById('homeUpdateNotice');
+    if (notice) {
+      notice.disabled = view.busy;
+      notice.setAttribute('aria-busy', String(view.busy));
+      notice.classList.toggle('is-loading', view.busy);
+      const copy = notice.querySelector('span');
+      if (copy)
+        copy.innerHTML = '<strong>' + esc(view.title) + '</strong><small>' + esc(view.message) + '</small>';
     }
-    if (detail.resumed) {
-      const result = detail.result || {};
-      if (result.installerOpened) {
-        if (status)
-          status.textContent = 'Permission granted · verified update resumed · Android installer opened';
-        if (settingsButton) settingsButton.textContent = 'Installer opened';
-        if (homeCopy)
-          homeCopy.innerHTML =
-            '<strong>Android installer opened</strong><small>Finish the update in Android. Your My Week data stays on this device.</small>';
-      } else {
-        if (status) status.textContent = 'Permission granted · continuing verified update';
-        if (settingsButton) settingsButton.textContent = 'Continuing update…';
-        if (homeCopy)
-          homeCopy.innerHTML =
-            '<strong>Continuing update</strong><small>My Week is resuming the verified download automatically.</small>';
-      }
-    }
-  });
+  }
+  window.addEventListener('mw:update-state', paintUpdateState);
 
   function transitionRender(motion, fn) {
     pendingMotion = motion || 'context';
@@ -1338,24 +1323,38 @@ window.MW = window.MW || {};
     bindNav();
   }
 
-  function shell(body, active) {
+  function shell(body, active, pageHeader) {
     const st = s();
     const name = ((st.profile && st.profile.name) || '').trim();
-    const title = name ? 'Hi ' + name : 'My Week';
+    const home = st.onboarded && st.ui.screen === 'week';
+    const title = home && name ? 'Hi ' + name : 'My Week';
     const sub = st.onboarded ? weekRange(st.week && st.week.weekKey) : 'Simple meals. Happier weeks.';
     const previousDate = new Date(MW.planner.currentWeekKey() + 'T12:00:00');
     previousDate.setDate(previousDate.getDate() - 7);
     const historyLabel = weekRange(MW.weeks.all()[0]?.weekKey || previousDate.toISOString().slice(0, 10));
     const nav = st.onboarded ? globalNav(active) : '';
     const header =
-      '<header class="appbar"><div class="appbar-greeting"><button class="account-link ' +
-      (st.onboarded ? '' : 'static') +
-      '" id="accountButton"><span class="account-name">' +
-      esc(title) +
-      '</span><span class="account-sub">' +
-      esc(sub) +
-      '</span></button>' +
-      (st.onboarded
+      '<header class="appbar"><div class="appbar-greeting">' +
+      (pageHeader
+        ? '<h1 class="' +
+          (pageHeader.hideTitle ? 'visually-hidden' : 'account-name') +
+          '">' +
+          esc(pageHeader.title) +
+          '</h1>' +
+          (pageHeader.leading || '') +
+          (pageHeader.collectionLink
+            ? '<button type="button" class="library-collection-link" id="openMyRecipes">' +
+              icon('bookmark') +
+              ' My Recipes</button>'
+            : '')
+        : '<button class="account-link ' +
+          (st.onboarded ? '' : 'static') +
+          '" id="accountButton"><span class="account-name">' +
+          esc(title) +
+          '</span>' +
+          (home || !st.onboarded ? '<span class="account-sub">' + esc(sub) + '</span>' : '') +
+          '</button>') +
+      (home
         ? '<button type="button" class="week-history-shortcut" id="weekHistoryButton" aria-label="View previous meal plans">' +
           icon('chevron-left') +
           '<span>' +
@@ -1383,7 +1382,16 @@ window.MW = window.MW || {};
           icon('chevron-down') +
           '</summary><p>Recipes with selected allergens, “may contain” warnings or missing verified records are excluded.</p></details></section>'
         : '';
-    return '<main class="shell">' + header + allergyNotice + body + nav + '</main>';
+    return (
+      '<main class="shell' +
+      (pageHeader ? ' page-header-shell' : '') +
+      '">' +
+      header +
+      allergyNotice +
+      body +
+      nav +
+      '</main>'
+    );
   }
 
   function bindNav() {
@@ -1575,6 +1583,8 @@ window.MW = window.MW || {};
   );
 
   function render() {
+    if (libraryFilterEvents) libraryFilterEvents.abort();
+    libraryFilterEvents = null;
     if (MW.state.recoveryStatus && MW.state.recoveryStatus().blocked) return storageRecovery();
     const st = s();
     if (!st.onboarded) {
@@ -1957,7 +1967,13 @@ window.MW = window.MW || {};
     bindNav();
     if (MW.updates && MW.updates.isNativeAndroid()) {
       MW.updates
-        .check()
+        .pendingStatus()
+        .then(async (pending) => {
+          const checked = await MW.updates.check();
+          return pending && !pending.installed
+            ? { ...checked, available: true, manifest: { ...pending.pending, releaseNotes: [] } }
+            : checked;
+        })
         .then((result) => {
           if (!result || !result.available || !result.manifest || document.getElementById('homeUpdateNotice'))
             return;
@@ -1977,37 +1993,14 @@ window.MW = window.MW || {};
           intro.insertAdjacentElement('afterend', notice);
           notice.onclick = async () => {
             if (notice.disabled) return;
-            const copy = notice.querySelector('span');
-            const leadingIcon = notice.querySelector('i');
-            const originalIconClass = leadingIcon.className;
-            const originalIconContent = leadingIcon.innerHTML;
-            notice.disabled = true;
-            notice.classList.add('is-loading');
-            notice.setAttribute('aria-busy', 'true');
-            leadingIcon.className = 'update-loading-slot';
-            leadingIcon.innerHTML =
-              '<i class="fa-solid fa-circle-notch mw-loading-icon" aria-hidden="true"></i>';
             try {
-              const installResult = await MW.updates.install(result.manifest);
-              if (installResult && installResult.needsInstallPermission)
-                copy.innerHTML =
-                  '<strong>Install permission needed</strong><small>Allow My Week to install verified updates, then return to My Week. The update will continue automatically.</small>';
-              else if (installResult && installResult.installerOpened)
-                copy.innerHTML =
-                  '<strong>Android installer opened</strong><small>Finish the installation in Android. My Week will confirm the installed version next time it opens.</small>';
-            } catch (error) {
-              copy.innerHTML =
-                '<strong>Update could not start</strong><small>' +
-                esc((error && error.message) || 'Please try again.') +
-                '</small>';
-            } finally {
-              leadingIcon.innerHTML = originalIconContent;
-              leadingIcon.className = originalIconClass;
-              notice.disabled = false;
-              notice.classList.remove('is-loading');
-              notice.removeAttribute('aria-busy');
+              await MW.updates.install(result.manifest);
+            } catch {
+              /* Shared state shows the failure. */
             }
+            paintUpdateState();
           };
+          paintUpdateState();
         })
         .catch(() => {});
     }
@@ -2226,7 +2219,7 @@ window.MW = window.MW || {};
     const forced = st.week.forceBuy;
 
     root.innerHTML = shell(
-      '<section class="subpage-head simple"><div><span class="eyebrow">BEFORE THE SHOP</span><h1>Quick check</h1><p>Only confirm the things that can change this week.</p></div></section>' +
+      '<section class="subpage-head simple shopping-check-head"><div><h1>Before you shop</h1></div></section>' +
         (questions.length
           ? '<section class="check-section"><div class="section-title"><div><span class="eyebrow">CUPBOARD</span><h2>Still have enough?</h2></div></div><div class="stock-questions">' +
             questions
@@ -2238,7 +2231,7 @@ window.MW = window.MW || {};
                   esc(ingredientName(q.name)) +
                   '</strong><small>' +
                   (q.amountText ? esc(q.amountText) + ' noted · ' : '') +
-                  'I am not fully sure this is still in stock.</small></div><div><button class="stock-answer yes" data-i="' +
+                  'Check your cupboard</small></div><div><button class="stock-answer yes" data-i="' +
                   i +
                   '">Yes</button><button class="stock-answer no" data-i="' +
                   i +
@@ -2254,10 +2247,7 @@ window.MW = window.MW || {};
             forced.map((x) => esc(ingredientName(x))).join(' · ') +
             '</small></div></section>'
           : '') +
-        '<section class="check-budget"><span><strong>' +
-        money(st.household.budget) +
-        '</strong> weekly budget</span><small>Meals, lunches and anything you add here count towards the weekly budget estimate.</small></section>' +
-        '<section class="check-section"><div class="section-title"><div><span class="eyebrow">WEEKLY ESSENTIALS</span><h2>Add what you need</h2></div></div><div class="essential-list" id="regulars">' +
+        '<section class="check-section"><div class="section-title"><div><h2>Weekly essentials</h2></div></div><div class="essential-list" id="regulars">' +
         st.regulars
           .map(
             (x) =>
@@ -2267,9 +2257,7 @@ window.MW = window.MW || {};
               x.id +
               '"><div class="essential-name"><strong>' +
               esc(ingredientName(x.name)) +
-              '</strong><small>' +
-              (x.selected ? 'Added to this shop' : 'Not added') +
-              '</small></div><label class="toggle"><input class="regular-toggle" data-id="' +
+              '</strong></div><label class="toggle"><input class="regular-toggle" data-id="' +
               x.id +
               '" type="checkbox" ' +
               (x.selected ? 'checked' : '') +
@@ -2295,7 +2283,7 @@ window.MW = window.MW || {};
           )
           .join('') +
         '</div></section>' +
-        '<section class="check-section"><div class="section-title"><div><span class="eyebrow">ANYTHING ELSE</span><h2>Add extras</h2></div></div><span class="mini-label">Popular</span><div class="quick-adds">' +
+        '<section class="check-section"><div class="section-title"><div><h2>Extras</h2></div></div><div class="quick-adds">' +
         MW.EXTRA_SUGGESTIONS.map(
           (x, i) =>
             '<button class="quick-add" data-index="' +
@@ -2306,7 +2294,7 @@ window.MW = window.MW || {};
             esc(ingredientName(x.name)) +
             '</button>',
         ).join('') +
-        '</div><span class="mini-label custom-label">Something else</span><div class="add-custom"><input id="extra" placeholder="e.g. coffee, shampoo, pet food"><button id="addExtra">' +
+        '</div><div class="add-custom"><input id="extra" placeholder="e.g. coffee, shampoo, pet food"><button id="addExtra">' +
         icon('plus') +
         ' Add</button></div><div class="extras-list">' +
         (extras.length
@@ -2619,7 +2607,7 @@ window.MW = window.MW || {};
       ) +
       '</span><span class="retail-heading"><strong>' +
       esc(g) +
-      '</strong><em>Shop this section</em></span><small>' +
+      '</strong></span><small>' +
       allItems.filter((x) => x.group === g).length +
       '</small></header><div class="retail-items">' +
       allItems
@@ -2647,9 +2635,7 @@ window.MW = window.MW || {};
               ? issueCount + ' item' + (issueCount === 1 ? '' : 's') + ' missing or short'
               : 'Shop quantities saved') +
             '</strong><small>' +
-            (issueCount
-              ? 'Your original order stays below so you can see exactly what was planned.'
-              : 'The quantities you actually bought are now in your cupboard. Cooking will deduct what you use. Your original order stays below.') +
+            (issueCount ? 'Original order shown below.' : 'Bought quantities saved in your cupboard.') +
             '</small></span><i class="fa-solid fa-chevron-right"></i></button>'
           : '';
 
@@ -2663,67 +2649,62 @@ window.MW = window.MW || {};
       receiptTotal != null
         ? 'receipt total'
         : substitutionCount
-          ? substitutionCount +
-            ' in-store swap' +
-            (substitutionCount === 1 ? '' : 's') +
-            ' not repriced · planned estimate'
+          ? substitutionCount + ' swap' + (substitutionCount === 1 ? '' : 's') + ' not priced'
           : shop.savingMode
             ? 'after ~' + money(shop.estimatedSavings) + ' saving'
-            : 'estimated · ' + Math.round(shop.priceCoverage || 0) + '% benchmark coverage';
+            : 'Estimate';
+
+    const sectionChoice =
+      '<div class="shop-section-choice"><select id="shopSection" aria-label="Shopping section"><option value="__all">All items · ' +
+      allItems.length +
+      '</option>' +
+      retailGroups
+        .map(
+          (g) =>
+            '<option value="' +
+            esc(g) +
+            '">' +
+            esc(g) +
+            ' · ' +
+            allItems.filter((x) => x.group === g).length +
+            '</option>',
+        )
+        .join('') +
+      '</select>' +
+      icon('chevron-down') +
+      '</div>';
 
     root.innerHTML = shell(
-      '<section class="page-head shop-head"><div><span class="eyebrow">' +
-        (orderLocked ? 'YOUR ORDER' : 'YOUR SHOP') +
-        '</span><h1>' +
-        shop.itemCount +
-        ' things</h1><p>' +
-        (orderLocked
-          ? 'Original shopping list kept for this week'
-          : esc(shop.priceRetailer || st.household.retailer) +
-            ' · price estimate' +
-            (shop.priceAsOf ? ' · updated ' + esc(shop.priceAsOf) : '')) +
-        '</p></div><div class="shop-total"><strong>' +
+      '<section class="page-head shop-head"><div class="shop-summary"><div class="shop-total"><details><summary><strong>' +
         money(totalValue) +
         '</strong><span>' +
         esc(totalMeta) +
-        '</span></div></section>' +
-        deliveryNotice +
-        '<section class="shop-progress" id="shopProgress"><div><strong id="shopProgressCount">' +
+        '</span>' +
+        icon('chevron-down') +
+        '</summary><p>' +
+        (orderLocked ? 'Original shopping list for this week. ' : '') +
+        esc(shop.priceRetailer || st.household.retailer) +
+        (shop.priceAsOf ? ' · updated ' + esc(shop.priceAsOf) : '') +
+        '. Prices are estimates; swaps may change the total.</p></details></div><section class="shop-progress" id="shopProgress"><div><strong id="shopProgressCount">' +
         done +
         ' of ' +
         allItems.length +
-        '</strong><span> checked off</span></div><span id="shopProgressPct">' +
+        '</strong><span> checked</span></div><div class="progress"><span id="shopProgressBar" style="width:' +
         pct +
-        '%</span><div class="progress"><span id="shopProgressBar" style="width:' +
-        pct +
-        '%"></span></div></section>' +
+        '%"></span></div></section></div>' +
         (orderLocked
           ? ''
           : shop.savingMode
-            ? '<section class="saving-summary compact-saving"><div>' +
-              icon('sterling-sign') +
-              '<div><strong>Lower-cost planning</strong><small>~' +
+            ? '<label class="shop-price-mode"><span>Lower-cost meals<small>~' +
               money(shop.estimatedSavings) +
-              ' estimated saving</small></div></div><label class="toggle"><input id="normalPrice" type="checkbox" checked><span></span></label></section>'
-            : '<button class="saving-prompt" id="lowerShop">' +
+              ' saving</small></span><span class="toggle"><input id="normalPrice" type="checkbox" checked><span></span></span></label>'
+            : '<button type="button" class="shop-price-action" id="lowerShop">' +
               icon('sterling-sign') +
-              '<span><strong>Try to lower the price</strong><small>Change meals only if the trolley estimate is lower.</small></span><i class="fa-solid fa-chevron-right"></i></button>') +
-        '<div class="category-tabs"><button class="cat-tab active" data-group="__all">All <span>' +
-        allItems.length +
-        '</span></button>' +
-        retailGroups
-          .map(
-            (g) =>
-              '<button class="cat-tab" data-group="' +
-              esc(g) +
-              '">' +
-              esc(g) +
-              ' <span>' +
-              allItems.filter((x) => x.group === g).length +
-              '</span></button>',
-          )
-          .join('') +
-        '</div>' +
+              ' Find cheaper meals ' +
+              icon('chevron-right') +
+              '</button>') +
+        '</section>' +
+        deliveryNotice +
         '<section class="shop-surface"><div class="shop-group show grouped-shop" data-shopgroup="__all">' +
         groupedHtml +
         '</div>' +
@@ -2740,17 +2721,14 @@ window.MW = window.MW || {};
         '</section>' +
         postOrderActions,
       'shop',
+      { title: orderLocked ? 'Your order' : 'Shopping', hideTitle: true, leading: sectionChoice },
     );
 
-    root.querySelectorAll('.cat-tab').forEach(
-      (b) =>
-        (b.onclick = () => {
-          root.querySelectorAll('.cat-tab').forEach((x) => x.classList.toggle('active', x === b));
-          root
-            .querySelectorAll('.shop-group')
-            .forEach((g) => g.classList.toggle('show', g.dataset.shopgroup === b.dataset.group));
-        }),
-    );
+    document.getElementById('shopSection').onchange = (event) => {
+      root
+        .querySelectorAll('.shop-group')
+        .forEach((group) => group.classList.toggle('show', group.dataset.shopgroup === event.target.value));
+    };
     bindIngredientActions(root);
     root.querySelectorAll('.shop-item').forEach(
       (b) =>
@@ -2774,10 +2752,8 @@ window.MW = window.MW || {};
           const newDone = allItems.filter((x) => st.ui.shopChecks[x.key]).length;
           const newPct = allItems.length ? Math.round((newDone / allItems.length) * 100) : 0;
           const count = document.getElementById('shopProgressCount');
-          const pctEl = document.getElementById('shopProgressPct');
           const bar = document.getElementById('shopProgressBar');
           if (count) count.textContent = newDone + ' of ' + allItems.length;
-          if (pctEl) pctEl.textContent = newPct + '%';
           if (bar) bar.style.width = newPct + '%';
         }),
     );
@@ -3338,6 +3314,7 @@ window.MW = window.MW || {};
   }
 
   async function library() {
+    libraryFilterEvents = new AbortController();
     const st = s(),
       target = st.ui.libraryTargetDay || '',
       local = [...MW.RECIPES, ...(target ? [] : MW.LUNCHES)],
@@ -3412,31 +3389,24 @@ window.MW = window.MW || {};
     };
     const savedMatch = () => active.size === defaults.length && defaults.every((x) => active.has(x));
     root.innerHTML = shell(
-      '<section class="subpage-head library-head"><button class="back-button" id="libraryBack">' +
-        icon('arrow-left') +
-        '</button><div><span class="eyebrow">RECIPE LIBRARY</span><h1>' +
-        (target ? 'Choose a meal' : 'Meals') +
-        '</h1><p>' +
-        local.length +
-        ' recipes to explore</p></div></section>' +
-        '<form class="library-search" id="librarySearchForm"><i class="fa-solid fa-magnifying-glass"></i><input id="recipeSearch" value="' +
+      (target
+        ? '<section class="subpage-head library-head"><button class="back-button" id="libraryBack" aria-label="Back">' +
+          icon('arrow-left') +
+          '</button><div><h1>Choose a meal</h1></div></section>'
+        : '') +
+        '<div class="library-search-row"><form class="library-search" id="librarySearchForm"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="recipeSearch" value="' +
         esc(st.ui.libraryQuery || '') +
-        '" placeholder="Search recipes or ingredients" inputmode="search" enterkeyhint="search"></form>' +
-        '<div class="meal-collections"><button class="collection-card" id="openMyRecipes">' +
-        icon('bookmark') +
-        '<span><strong>My Recipes</strong><small>Your saved recipes</small></span>' +
-        icon('chevron-right') +
-        '</button><button class="collection-card" id="openPreviousWeeks">' +
-        icon('calendar-days') +
-        '<span><strong>Previous weeks</strong><small>Your saved meal plans</small></span>' +
-        icon('chevron-right') +
-        '</button></div>' +
-        '<div class="library-filter-head"><span class="eyebrow">FILTERS</span><button type="button" id="savedLibraryFilters" class="saved-filter-reset ' +
+        '" aria-label="Search recipes or ingredients" placeholder="Search recipes" inputmode="search" enterkeyhint="search"></form>' +
+        '<details class="library-filters" id="libraryFilters"><summary aria-label="Recipe filters">' +
+        icon('sliders') +
+        '<span id="libraryFilterLabel" aria-hidden="true" hidden></span></summary><div class="library-filter-panel">' +
+        '<div class="library-filter-head"><button type="button" id="savedLibraryFilters" aria-label="Reset filters to your saved preferences" class="saved-filter-reset ' +
         (savedMatch() ? 'is-default' : '') +
         '">' +
-        icon('sliders') +
-        ' Saved preferences</button></div>' +
-        '<div class="category-tabs library-cats">' +
+        icon('rotate-left') +
+        ' Reset</button><button type="button" class="library-filter-close" id="closeLibraryFilters" aria-label="Close filters">' +
+        icon('xmark') +
+        '</button></div><div class="category-tabs library-cats">' +
         filters
           .map(
             ([key, label]) =>
@@ -3445,6 +3415,8 @@ window.MW = window.MW || {};
               (locked.has(key) ? 'locked' : '') +
               '" data-cat="' +
               key +
+              '" aria-pressed="' +
+              (key === 'all' ? active.size === 0 : active.has(key)) +
               '" ' +
               (locked.has(key) ? 'disabled' : '') +
               '>' +
@@ -3452,22 +3424,22 @@ window.MW = window.MW || {};
               '</button>',
           )
           .join('') +
-        '</div>' +
+        '</div></div></details></div>' +
         (target
           ? '<div class="library-target">' +
             icon('calendar-day') +
             ' Choosing dinner for <strong>' +
             esc(day(target).label) +
-            '</strong></div>'
+            '</strong><button type="button" class="library-collection-link" id="openMyRecipes">' +
+            icon('bookmark') +
+            ' My Recipes</button></div>'
           : '') +
         '<div id="libraryResults"></div>',
       'cook',
+      target ? null : { title: 'Meals', hideTitle: true, collectionLink: true },
     );
-    document.getElementById('openMyRecipes').onclick = () => go('myrecipes');
-    document.getElementById('openPreviousWeeks').onclick = () => {
-      st.ui.weekHistoryKey = MW.weeks.all()[0]?.weekKey || '';
-      go('history');
-    };
+    const myRecipesLink = document.getElementById('openMyRecipes');
+    if (myRecipesLink) myRecipesLink.onclick = () => go('myrecipes');
     const resultsHost = document.getElementById('libraryResults'),
       search = document.getElementById('recipeSearch');
     const renderResults = () => {
@@ -3487,11 +3459,9 @@ window.MW = window.MW || {};
       const limit = Math.max(80, Number(st.ui.libraryLimit) || 80),
         results = allResults.slice(0, limit);
       resultsHost.innerHTML =
-        '<div class="library-count"><strong>' +
-        results.length +
-        '</strong> of <strong>' +
-        allResults.length +
-        '</strong> matching recipes shown</div><div class="library-grid">' +
+        '<div class="visually-hidden" role="status" aria-live="polite">' +
+        allResults.length.toLocaleString('en-GB') +
+        ' recipes found</div><div class="library-grid">' +
         results
           .map(
             (r) =>
@@ -3552,15 +3522,20 @@ window.MW = window.MW || {};
       updateControlNames();
     };
     const repaintFilters = () => {
-      root
-        .querySelectorAll('.library-cats .cat-tab')
-        .forEach((b) =>
-          b.classList.toggle(
-            'active',
-            b.dataset.cat === 'all' ? active.size === 0 : active.has(b.dataset.cat),
-          ),
+      root.querySelectorAll('.library-cats .cat-tab').forEach((b) => {
+        b.setAttribute(
+          'aria-pressed',
+          String(b.dataset.cat === 'all' ? active.size === 0 : active.has(b.dataset.cat)),
         );
+        b.classList.toggle('active', b.dataset.cat === 'all' ? active.size === 0 : active.has(b.dataset.cat));
+      });
       document.getElementById('savedLibraryFilters').classList.toggle('is-default', savedMatch());
+      const filterCount = document.getElementById('libraryFilterLabel');
+      filterCount.textContent = active.size ? String(active.size) : '';
+      filterCount.hidden = !active.size;
+      root
+        .querySelector('#libraryFilters > summary')
+        .setAttribute('aria-label', 'Recipe filters' + (active.size ? ', ' + active.size + ' active' : ''));
     };
     let timer;
     search.addEventListener('input', () => {
@@ -3598,12 +3573,51 @@ window.MW = window.MW || {};
       repaintFilters();
       renderResults();
     };
-    document.getElementById('libraryBack').onclick = () => {
-      st.ui.libraryTargetDay = '';
-      MW.state.save();
-      go(target ? 'day:' + target : 'week', { motion: 'drill-back' });
-    };
+    const libraryBack = document.getElementById('libraryBack');
+    if (libraryBack)
+      libraryBack.onclick = () => {
+        st.ui.libraryTargetDay = '';
+        MW.state.save();
+        go(target ? 'day:' + target : 'week', { motion: 'drill-back' });
+      };
+    repaintFilters();
     renderResults();
+    const filtersPanel = document.getElementById('libraryFilters');
+    const fitFilters = () => {
+      if (!filtersPanel.open) return;
+      const panel = filtersPanel.querySelector('.library-filter-panel');
+      const anchor = filtersPanel.getBoundingClientRect();
+      const viewportBottom =
+        (window.visualViewport?.height || innerHeight) + (window.visualViewport?.offsetTop || 0);
+      const bottom =
+        Math.min(
+          viewportBottom,
+          root.querySelector('.bottom-nav')?.getBoundingClientRect().top || viewportBottom,
+        ) - 12;
+      const below = anchor.bottom + 8;
+      const top = bottom - below >= 140 ? below : Math.max(8, bottom - 180);
+      panel.style.top = top - anchor.top + 'px';
+      panel.style.setProperty('--filter-panel-height', Math.max(80, bottom - top) + 'px');
+    };
+    filtersPanel.addEventListener('toggle', fitFilters);
+    const filterListener = { signal: libraryFilterEvents.signal, passive: true };
+    window.addEventListener('resize', fitFilters, filterListener);
+    window.addEventListener('scroll', fitFilters, { ...filterListener, capture: true });
+    window.visualViewport?.addEventListener('resize', fitFilters, filterListener);
+    document.getElementById('closeLibraryFilters').onclick = () => {
+      filtersPanel.open = false;
+      filtersPanel.querySelector('summary').focus();
+    };
+    const closeFilters = (event) => {
+      if (!filtersPanel.contains(event.target)) filtersPanel.open = false;
+    };
+    filtersPanel.closest('.shell').addEventListener('click', closeFilters);
+    filtersPanel.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        filtersPanel.open = false;
+        filtersPanel.querySelector('summary').focus();
+      }
+    });
     bindNav();
   }
 
@@ -3611,12 +3625,13 @@ window.MW = window.MW || {};
     const st = s(),
       target = st.ui.libraryTargetDay || '';
     root.innerHTML = shell(
-      '<section class="subpage-head"><button class="back-button" id="personalBack" aria-label="Back">' +
+      '<div class="personal-search-row"><button class="back-button" id="personalBack" aria-label="Back to Meals">' +
         icon('arrow-left') +
-        '</button><div><span class="eyebrow">YOUR COLLECTION</span><h1>My Recipes</h1></div></section><div class="personal-actions"><button class="btn primary" id="importRecipe">' +
-        icon('link') +
-        ' Add a recipe</button></div><form class="library-search" id="personalSearchForm"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="personalSearch" placeholder="Search your recipes or ingredients" aria-label="Search My Recipes" inputmode="search" enterkeyhint="search"></form><div class="personal-sync-row"><span id="personalSyncStatus" role="status" aria-live="polite"></span><button type="button" class="text-action" id="personalSyncNow">Sync now</button></div><div id="personalResults"></div>',
+        '</button><form class="library-search" id="personalSearchForm"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i><input id="personalSearch" placeholder="Search your recipes" aria-label="Search My Recipes" inputmode="search" enterkeyhint="search"></form><button type="button" class="btn primary" id="importRecipe" aria-label="Add a recipe" title="Add a recipe">' +
+        icon('plus') +
+        '</button></div><div class="personal-sync-row"><span id="personalSyncStatus" role="status" aria-live="polite"></span><button type="button" class="text-action" id="personalSyncNow">Sync now</button></div><div id="personalResults"></div>',
       'cook',
+      { title: 'My Recipes' },
     );
     const host = document.getElementById('personalResults'),
       search = document.getElementById('personalSearch');
@@ -3968,6 +3983,7 @@ window.MW = window.MW || {};
           : countLabel(people, 'portion', 'portions'),
       mealCost,
     ].filter(Boolean);
+    const method = MW.display.method(r);
     const tips = r.isLunch ? [] : tipsForRecipe(r);
     const toolsNeeded = cookingEquipment(r);
     const gathered = gatheredIngredients(r);
@@ -4087,7 +4103,7 @@ window.MW = window.MW || {};
             icon('chevron-down') +
             '</summary><p>Filters use the recipe source’s allergen records. Recipes without verified records are excluded. Always check product labels and cross-contamination warnings.</p></details>'
           : '') +
-        '<section class="recipe-section ingredients-section"><div class="section-title"><div><span class="eyebrow">INGREDIENTS</span><h2>What you need</h2></div></div>' +
+        '<section class="recipe-section ingredients-section"><div class="section-title"><div><h2>What you need</h2></div></div>' +
         r.ingredients
           .map((x, ingredientIndex) => {
             const practical = practicalQuantity(r, ingredientIndex, factor),
@@ -4137,13 +4153,14 @@ window.MW = window.MW || {};
           })
           .join('') +
         '</section>' +
-        '<section class="recipe-section equipment-section"><div class="section-title"><div><span class="eyebrow">EQUIPMENT</span><h2>Get these ready</h2></div></div><div class="cook-equipment-list">' +
+        '<section class="recipe-section equipment-section"><div class="section-title"><div><h2>Equipment</h2></div></div><div class="cook-equipment-list">' +
         toolsNeeded.map((x) => '<span>' + icon('check') + esc(x) + '</span>').join('') +
         '</div></section>' +
-        '<section class="recipe-section method-section"><div class="section-title"><div><span class="eyebrow">METHOD</span><h2>Cook it</h2></div></div><div class="steps">' +
-        r.steps
-          .map((x, i) => {
-            const used = stepIngredients(r, x, factor, i);
+        preparationGuidance(method, r, factor, people) +
+        '<section class="recipe-section method-section"><div class="section-title"><div><h2>Method</h2></div></div><div class="steps">' +
+        method.steps
+          .map(({ text: x, sourceIndex }, i) => {
+            const used = stepIngredients(r, x, factor, sourceIndex);
             return (
               '<div class="step"><span>' +
               (i + 1) +
@@ -4202,6 +4219,16 @@ window.MW = window.MW || {};
     bindNav();
   }
 
+  function preparationGuidance(method, r, factor, people) {
+    return method.preparation.length
+      ? '<section class="preparation-guidance"><h2>Before cooking</h2>' +
+          method.preparation
+            .map((text) => '<p>' + esc(displayInstruction(text, r, factor, people)) + '</p>')
+            .join('') +
+          '</section>'
+      : '';
+  }
+
   function cookPrep(id) {
     const r = recipe(id);
     if (!r) return go('recipes');
@@ -4231,7 +4258,7 @@ window.MW = window.MW || {};
       '</header>' +
       '<section class="cook-prep-scroll">' +
       '<article class="cook-prep-intro">' +
-      '<h1>Collect everything before you cook</h1>' +
+      '<h1>Get ready to cook</h1>' +
       '</article>' +
       '<section class="cook-prep-card">' +
       '<div class="cook-prep-heading">' +
@@ -4283,6 +4310,7 @@ window.MW = window.MW || {};
       equipment.map((x) => '<span>' + icon('check') + esc(x) + '</span>').join('') +
       '</div>' +
       '</section>' +
+      preparationGuidance(MW.display.method(r), r, factor, people) +
       (r.isLunch
         ? (() => {
             const q = MW.preparation.quantities(r),
@@ -4530,16 +4558,19 @@ window.MW = window.MW || {};
     const st = s();
     const active = MW.weeks.cookingWeek(st) && MW.weeks.cookingWeek(st).preparation;
     if (!active || active.recipeId !== id || active.finished) return go('cookprep:' + id);
-    const steps = r.steps || [];
+    const steps = MW.display.method(r).steps;
     if (!steps.length) return go('recipe:' + id);
-    index = Math.max(0, Math.min(index, steps.length - 1));
+    // Saved routes use the source index, so removing a preparation introduction
+    // cannot advance an existing cooking session to a different instruction.
+    const sourcePosition = steps.findIndex((step) => step.sourceIndex === index);
+    index = sourcePosition < 0 ? 0 : sourcePosition;
 
     const people = MW.preparation.portions(r);
     const factor = r.scaleSafe === false ? 1 : people / (r.servings || 2);
-    const currentStep = steps[index];
-    const used = stepIngredients(r, currentStep, factor, index);
-    const stepSwapNotes = stepSubstitutionNotes(r, currentStep, index);
-    const stepMeta = (r && Array.isArray(r.sourceStepImages) && r.sourceStepImages[index]) || null;
+    const { text: currentStep, sourceIndex } = steps[index];
+    const used = stepIngredients(r, currentStep, factor, sourceIndex);
+    const stepSwapNotes = stepSubstitutionNotes(r, currentStep, sourceIndex);
+    const stepMeta = (r && Array.isArray(r.sourceStepImages) && r.sourceStepImages[sourceIndex]) || null;
     const exactStep = (stepMeta && stepMeta.src) || '';
     const originalStep = (stepMeta && stepMeta.originalSrc) || '';
     const localStep =
@@ -4547,11 +4578,11 @@ window.MW = window.MW || {};
         MW.sourcedImageMap &&
         MW.sourcedImageMap.steps &&
         MW.sourcedImageMap.steps[r.id] &&
-        MW.sourcedImageMap.steps[r.id][index]) ||
+        MW.sourcedImageMap.steps[r.id][sourceIndex]) ||
       '';
     const safeStepFallback =
       MW.cookingVisuals && MW.cookingVisuals.fallbackForStep
-        ? MW.cookingVisuals.fallbackForStep(currentStep, index, r)
+        ? MW.cookingVisuals.fallbackForStep(currentStep, sourceIndex, r)
         : null;
     const stepCandidates = [
       ...new Set(
@@ -4707,11 +4738,11 @@ window.MW = window.MW || {};
     };
     document.getElementById('closeCook').onclick = () => leaveCookingFlow('recipe:' + id);
     document.getElementById('prevStep').onclick = () => {
-      if (index > 0) go('cookstep:' + id + ':' + (index - 1));
+      if (index > 0) go('cookstep:' + id + ':' + steps[index - 1].sourceIndex);
       else go('cookprep:' + id, { motion: 'drill-back', back: true });
     };
     document.getElementById('nextStep').onclick = () => {
-      if (index < steps.length - 1) go('cookstep:' + id + ':' + (index + 1));
+      if (index < steps.length - 1) go('cookstep:' + id + ':' + steps[index + 1].sourceIndex);
       else {
         MW.preparation.finish(r);
         leaveCookingFlow(st.ui.weekHistoryKey ? 'history' : 'recipes');
@@ -4928,6 +4959,7 @@ window.MW = window.MW || {};
     if (button) {
       button.textContent = !a.user ? 'Sign in' : a.status === 'conflict' ? 'Review sync' : 'Sync now';
       button.disabled = a.status === 'syncing';
+      button.hidden = Boolean(a.user && a.status === 'synced');
     }
   }
   function paintAccountStatus() {
@@ -4966,12 +4998,9 @@ window.MW = window.MW || {};
     const st = s();
     const avoidValue = [...(st.household.restrictions || []), ...(st.household.dislikes || [])].join(', ');
     root.innerHTML = shell(
-      '<section class="subpage-head"><button class="back-button" id="back">' +
-        icon('arrow-left') +
-        '</button><div><span class="eyebrow">YOUR ACCOUNT</span><h1>Settings</h1></div></section>' +
-        '<section class="settings-planner-note">' +
+      '<section class="settings-planner-note">' +
         icon('sliders') +
-        '<div><strong>Your weekly planning defaults</strong><small>Changes save automatically. Planning preferences apply when you next choose or change meals.</small></div></section>' +
+        '<div><strong>Planning preferences</strong><small>Saved automatically for future meal choices.</small></div></section>' +
         '<section class="settings-section"><label>First name</label><input id="profileName" value="' +
         esc((st.profile && st.profile.name) || '') +
         '" placeholder="Your name"></section>' +
@@ -5063,6 +5092,7 @@ window.MW = window.MW || {};
         ' Changes save automatically</p>' +
         '<button class="danger-link" id="reset">Reset My Week</button>',
       'more',
+      { title: 'Settings' },
     );
 
     function toggleDays(id) {
@@ -5214,7 +5244,7 @@ window.MW = window.MW || {};
           return;
         }
         const installed = String(local.version || 'unknown');
-        if (!result.available) {
+        if (!result.available && !(pending && !pending.installed)) {
           if (updateStatus)
             updateStatus.textContent = justInstalled
               ? 'Updated successfully · Installed ' + installed
@@ -5225,7 +5255,16 @@ window.MW = window.MW || {};
           }
           return;
         }
-        const release = result.manifest || {};
+        const release =
+          pending && !pending.installed
+            ? {
+                ...pending.pending,
+                releaseNotes:
+                  result.manifest?.versionCode === pending.pending.versionCode
+                    ? result.manifest.releaseNotes
+                    : [],
+              }
+            : result.manifest || {};
         if (updateStatus)
           updateStatus.textContent =
             'Installed ' + installed + ' · ' + String(release.versionName || 'New version') + ' available';
@@ -5247,50 +5286,15 @@ window.MW = window.MW || {};
             esc(installed) +
             '. Your week, cupboard and preferences stay on this device during a normal update.</small></div><button class="btn primary" id="installUpdate">Update My Week</button>';
           updateRelease.hidden = false;
-          document.getElementById('installUpdate').onclick = async (e) => {
-            const button = e.currentTarget,
-              original = button.textContent;
-            const onProgress = (event) => {
-              const pct = Math.max(
-                0,
-                Math.min(100, Number(event && event.detail && event.detail.percent) || 0),
-              );
-              button.textContent = pct ? 'Downloading ' + pct + '%' : 'Preparing update…';
-              if (updateStatus)
-                updateStatus.textContent = pct
-                  ? 'Downloading verified update · ' + pct + '%'
-                  : 'Preparing verified update…';
-            };
-            button.disabled = true;
-            window.addEventListener('mw:update-progress', onProgress);
+          document.getElementById('installUpdate').onclick = async () => {
             try {
-              const installResult = await MW.updates.install(release);
-              if (installResult && installResult.needsInstallPermission) {
-                if (updateStatus)
-                  updateStatus.textContent =
-                    'Allow My Week to install verified updates, then return to My Week. The update will continue automatically';
-                button.textContent = 'Update My Week';
-              } else if (installResult && installResult.installerOpened) {
-                if (updateStatus) updateStatus.textContent = 'Download verified · Android installer opened';
-                button.textContent = 'Installer opened';
-              } else {
-                if (updateStatus) updateStatus.textContent = 'Verified update ready for Android';
-                button.textContent = 'Continue update';
-              }
-            } catch (error) {
-              button.textContent = original;
-              if (updateStatus) updateStatus.textContent = 'Update could not be installed';
-              updateRelease.insertAdjacentHTML(
-                'beforeend',
-                '<p class="operation-error" role="alert">' +
-                  esc((error && error.message) || 'The update could not be installed.') +
-                  '</p>',
-              );
-            } finally {
-              window.removeEventListener('mw:update-progress', onProgress);
-              button.disabled = false;
+              await MW.updates.install(release);
+            } catch {
+              /* Shared state shows the failure. */
             }
+            paintUpdateState();
           };
+          paintUpdateState();
         }
       } catch (error) {
         if (updateStatus)
@@ -5310,7 +5314,6 @@ window.MW = window.MW || {};
       updateButton.onclick = () => renderUpdate(true);
       renderUpdate(false);
     }
-    document.getElementById('back').onclick = () => go('week');
     const saveSettings = () => {
       if (st.week && !st.week.planning) st.week.planning = MW.weeks.planning(st);
       st.profile.name = document.getElementById('profileName').value.trim();

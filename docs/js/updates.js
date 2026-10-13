@@ -133,12 +133,161 @@ window.MW = window.MW || {};
     }
   }
 
+  function readPending() {
+    try {
+      return JSON.parse(localStorage.getItem(PENDING_KEY) || 'null');
+    } catch {
+      return null;
+    }
+  }
+  function writePending(manifest, extra = {}) {
+    const previous = readPending();
+    const same = previous && previous.sha256 === String(manifest.sha256).toLowerCase();
+    const pending = {
+      ...(same ? previous : {}),
+      versionCode: Number(manifest.versionCode),
+      versionName: String(manifest.versionName || ''),
+      apkUrl: String(manifest.apkUrl || ''),
+      sha256: String(manifest.sha256 || '').toLowerCase(),
+      requestedAt: same ? previous.requestedAt : new Date().toISOString(),
+      awaitingPermission: false,
+      ...extra,
+    };
+    try {
+      localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+      localStorage.removeItem(CACHE_KEY);
+    } catch {}
+    return pending;
+  }
+
+  let active = true,
+    state = { phase: 'idle' },
+    timer = null;
+  let installFlight = null,
+    refreshFlight = null,
+    resumeFlight = null;
+  const transferring = (value) => ['starting', 'downloading', 'paused', 'checking'].includes(value.phase);
+  function stopPolling() {
+    if (timer != null) clearTimeout(timer);
+    timer = null;
+  }
+  function emit(type, detail) {
+    try {
+      window.dispatchEvent(new CustomEvent(type, { detail }));
+    } catch {}
+  }
+  function publish(next) {
+    state = { ...next, percent: Math.max(0, Math.min(100, Number(next.percent) || 0)) };
+    emit('mw:update-state', state);
+    emit('mw:update-progress', state);
+    stopPolling();
+    if (
+      active &&
+      (transferring(state) || (state.phase === 'ready' && state.installerDeferred)) &&
+      nativeUpdater()?.getUpdateStatus
+    ) {
+      timer = setTimeout(() => {
+        timer = null;
+        recover().catch(() => {});
+      }, 1500);
+    }
+    return state;
+  }
+  function view(value = state) {
+    const percent = Number(value.percent) || 0;
+    switch (value.phase) {
+      case 'starting':
+        return {
+          title: 'Preparing update',
+          message: 'Preparing the download…',
+          label: 'Preparing…',
+          busy: true,
+        };
+      case 'downloading':
+        return {
+          title: percent ? 'Downloading ' + percent + '%' : 'Downloading update',
+          message: 'You can leave MyWeek while it downloads.',
+          label: percent ? 'Downloading ' + percent + '%' : 'Downloading…',
+          busy: true,
+        };
+      case 'paused':
+        return {
+          title: 'Download paused' + (percent ? ' · ' + percent + '%' : ''),
+          message: value.message || 'Waiting for a connection.',
+          label: 'Waiting for connection',
+          busy: true,
+        };
+      case 'checking':
+        return {
+          title: 'Checking update',
+          message: 'Checking the downloaded package…',
+          label: 'Checking…',
+          busy: true,
+        };
+      case 'permission':
+        return {
+          title: 'Install permission needed',
+          message: 'Turn on Allow from this source, then return to MyWeek.',
+          label: 'Allow update',
+          busy: false,
+        };
+      case 'ready':
+        return {
+          title: 'Update ready',
+          message: 'The download is saved. Continue to open Android’s installer.',
+          label: 'Continue update',
+          busy: false,
+        };
+      case 'installer-opened':
+        return {
+          title: 'Android installer opened',
+          message: 'If you dismissed it, tap Continue update.',
+          label: 'Continue update',
+          busy: false,
+        };
+      case 'failed':
+        return {
+          title: 'Update needs attention',
+          message: value.message || 'Please try again.',
+          label: 'Retry update',
+          busy: false,
+        };
+      case 'installed':
+        return {
+          title: 'Updated successfully',
+          message: 'Your update is installed.',
+          label: 'Updated',
+          busy: false,
+        };
+      default:
+        return null;
+    }
+  }
+  function manifestFrom(pending) {
+    return { ...pending, releaseNotes: [] };
+  }
+
   async function pendingStatus() {
     if (!isNativeAndroid()) return null;
-    let pending = null;
-    try {
-      pending = JSON.parse(localStorage.getItem(PENDING_KEY) || 'null');
-    } catch {}
+    let pending = readPending();
+    const updater = nativeUpdater();
+    let nativeState = null;
+    if (updater && typeof updater.getUpdateStatus === 'function') {
+      nativeState = await updater.getUpdateStatus();
+      if (nativeState && nativeState.url && nativeState.sha256 && Number(nativeState.versionCode) > 0) {
+        pending = writePending(
+          { ...nativeState, apkUrl: nativeState.url },
+          {
+            awaitingPermission: Boolean(pending?.sha256 === nativeState.sha256 && pending.awaitingPermission),
+            error:
+              transferring(nativeState) || pending?.sha256 !== nativeState.sha256 ? '' : pending?.error || '',
+            ...(nativeState.phase === 'installer-opened'
+              ? { installerOpenedAt: pending?.installerOpenedAt || new Date().toISOString() }
+              : {}),
+          },
+        );
+      }
+    }
     if (!pending || !Number.isFinite(Number(pending.versionCode))) return null;
     const local = await appInfo();
     const installed = Number(local.build) >= Number(pending.versionCode);
@@ -147,8 +296,27 @@ window.MW = window.MW || {};
         localStorage.removeItem(PENDING_KEY);
         localStorage.removeItem(CACHE_KEY);
       } catch {}
+      publish({ phase: 'installed', versionCode: Number(pending.versionCode) });
+    } else if (pending.awaitingPermission && !local.canRequestPackageInstalls) {
+      publish({ phase: 'permission', pending });
+    } else if (nativeState && nativeState.phase !== 'idle' && nativeState.phase !== 'installed') {
+      const installerError = pending.error && ['ready', 'installer-opened'].includes(nativeState.phase);
+      publish({
+        ...nativeState,
+        ...(installerError ? { phase: 'failed', message: pending.error } : {}),
+        pending,
+      });
+    } else if (pending.awaitingPermission) {
+      publish({ phase: 'permission', pending });
+    } else if (pending.error) {
+      publish({ phase: 'failed', message: pending.error, pending });
+    } else if (pending.installerOpenedAt) {
+      publish({ phase: 'installer-opened', pending });
+    } else if (nativeState?.phase === 'idle') {
+      // Missing Android job is an explicit retry, never an automatic new download on resume.
+      publish({ phase: 'failed', message: 'The saved download is no longer available. Try again.', pending });
     }
-    return { pending, local, installed };
+    return { pending, local, installed, state };
   }
 
   async function bindProgress() {
@@ -158,121 +326,118 @@ window.MW = window.MW || {};
     progressBound = true;
     try {
       await updater.addListener('downloadProgress', (event) => {
-        try {
-          window.dispatchEvent(
-            new CustomEvent('mw:update-progress', {
-              detail: { percent: Number(event && event.percent) || 0 },
-            }),
-          );
-        } catch {}
+        publish({ ...state, phase: 'downloading', percent: Number(event?.percent) || 0 });
       });
     } catch {
       progressBound = false;
     }
   }
-
-  function writePending(manifest, extra = {}) {
-    try {
-      localStorage.setItem(
-        PENDING_KEY,
-        JSON.stringify({
+  function install(manifest) {
+    if (installFlight) return installFlight;
+    const operation = async () => {
+      if (!validManifest(manifest))
+        throw new Error('This update could not be verified from its release manifest.');
+      if (!isNativeAndroid()) throw new Error('The web app updates itself automatically.');
+      const updater = nativeUpdater();
+      if (!updater || typeof updater.installUpdate !== 'function')
+        throw new Error('This MyWeek build cannot install updates safely yet.');
+      const local = await appInfo();
+      if (!newer(manifest, local)) throw new Error('This update is already installed.');
+      const pending = writePending(manifest, { error: '' });
+      publish({ ...state, phase: transferring(state) ? state.phase : 'starting', pending });
+      await bindProgress();
+      try {
+        const result = await updater.installUpdate({
+          url: manifest.apkUrl,
+          sha256: String(manifest.sha256).toLowerCase(),
           versionCode: Number(manifest.versionCode),
-          versionName: String(manifest.versionName || ''),
-          apkUrl: String(manifest.apkUrl || ''),
-          sha256: String(manifest.sha256 || '').toLowerCase(),
-          requestedAt: new Date().toISOString(),
-          awaitingPermission: false,
-          ...extra,
-        }),
-      );
-      localStorage.removeItem(CACHE_KEY);
-    } catch {}
-  }
-
-  function readPending() {
-    try {
-      return JSON.parse(localStorage.getItem(PENDING_KEY) || 'null');
-    } catch {
-      return null;
-    }
-  }
-
-  async function install(manifest) {
-    if (!validManifest(manifest))
-      throw new Error('This update could not be verified from its release manifest.');
-    if (!isNativeAndroid()) throw new Error('The web app updates itself automatically.');
-    const updater = nativeUpdater();
-    if (!updater || typeof updater.installUpdate !== 'function')
-      throw new Error('This My Week build cannot install updates safely yet.');
-    writePending(manifest);
-    await bindProgress();
-    try {
-      const result = await updater.installUpdate({
-        url: manifest.apkUrl,
-        sha256: String(manifest.sha256).toLowerCase(),
-      });
-      if (result && result.needsInstallPermission) writePending(manifest, { awaitingPermission: true });
-      else if (result && result.installerOpened)
-        writePending(manifest, { installerOpenedAt: new Date().toISOString() });
-      return result;
-    } catch (error) {
-      try {
-        localStorage.removeItem(PENDING_KEY);
-      } catch {}
-      throw error;
-    }
-  }
-
-  async function resumePendingPermission() {
-    if (!isNativeAndroid()) return null;
-    const pending = readPending();
-    if (!pending || pending.awaitingPermission !== true) return null;
-    const local = await appInfo();
-    if (!local.canRequestPackageInstalls) return { resumed: false, waitingForPermission: true };
-    const manifest = {
-      versionCode: Number(pending.versionCode),
-      versionName: String(pending.versionName || ''),
-      apkUrl: String(pending.apkUrl || ''),
-      sha256: String(pending.sha256 || ''),
-      releaseNotes: [],
+          versionName: String(manifest.versionName),
+        });
+        if (result?.needsInstallPermission) {
+          publish({ phase: 'permission', pending: writePending(manifest, { awaitingPermission: true }) });
+        } else if (result?.installerOpened) {
+          publish({
+            ...result,
+            phase: 'installer-opened',
+            pending: writePending(manifest, { installerOpenedAt: new Date().toISOString(), error: '' }),
+          });
+        } else if (result?.phase) {
+          publish({ ...result, pending });
+        } else publish({ phase: 'ready', pending });
+        return result;
+      } catch (error) {
+        const message = String(error?.message || error);
+        publish({ phase: 'failed', message, pending: writePending(manifest, { error: message }) });
+        throw error;
+      }
     };
-    if (!validManifest(manifest)) {
-      try {
-        localStorage.removeItem(PENDING_KEY);
-      } catch {}
-      throw new Error('The pending update information is no longer valid.');
-    }
-    const result = await install(manifest);
-    return { resumed: true, result };
+    installFlight = operation().finally(() => {
+      installFlight = null;
+    });
+    return installFlight;
   }
-
+  function resumePendingPermission() {
+    if (resumeFlight) return resumeFlight;
+    resumeFlight = (async () => {
+      if (!active || !isNativeAndroid()) return null;
+      const pending = readPending();
+      if (!pending || pending.awaitingPermission !== true) return null;
+      const local = await appInfo();
+      if (Number(local.build) >= Number(pending.versionCode)) {
+        await pendingStatus();
+        return null;
+      }
+      if (!local.canRequestPackageInstalls) return { resumed: false, waitingForPermission: true };
+      const manifest = manifestFrom(pending);
+      if (!validManifest(manifest)) throw new Error('The pending update information is no longer valid.');
+      const result = await install(manifest);
+      return { resumed: true, result };
+    })().finally(() => {
+      resumeFlight = null;
+    });
+    return resumeFlight;
+  }
+  function recover() {
+    if (refreshFlight) return refreshFlight;
+    refreshFlight = (async () => {
+      if (!active || !isNativeAndroid()) return null;
+      const status = await pendingStatus();
+      if (!active || !status || status.installed) return status;
+      if (status.pending.awaitingPermission) {
+        const detail = await resumePendingPermission();
+        if (detail) emit('mw:update-permission-resume', detail);
+      } else if (state.phase === 'ready' && !status.pending.installerOpenedAt && !status.pending.error) {
+        await install(manifestFrom(status.pending));
+      }
+      return status;
+    })()
+      .catch((error) => {
+        publish({ ...state, phase: 'failed', message: String(error?.message || error) });
+        return null;
+      })
+      .finally(() => {
+        refreshFlight = null;
+      });
+    return refreshFlight;
+  }
   let appResumeBound = false;
   async function bindAppResume() {
     if (appResumeBound || !isNativeAndroid()) return;
-    const app = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.App;
+    const app = window.Capacitor?.Plugins?.App;
     if (!app || typeof app.addListener !== 'function') return;
     appResumeBound = true;
     try {
-      await app.addListener('appStateChange', (state) => {
-        if (!state || !state.isActive) return;
-        resumePendingPermission()
-          .then((detail) => {
-            if (detail) window.dispatchEvent(new CustomEvent('mw:update-permission-resume', { detail }));
-          })
-          .catch((error) => {
-            window.dispatchEvent(
-              new CustomEvent('mw:update-permission-resume', {
-                detail: { error: String((error && error.message) || error) },
-              }),
-            );
-          });
+      await app.addListener('appStateChange', (value) => {
+        active = Boolean(value && value.isActive);
+        if (active) recover();
+        else stopPolling();
       });
+      if (typeof app.getState === 'function') active = Boolean((await app.getState()).isActive);
+      if (active && nativeUpdater()?.getUpdateStatus) recover();
     } catch {
       appResumeBound = false;
     }
   }
-
-  bindAppResume();
   MW.updates = {
     MANIFEST_URL,
     isNativeAndroid,
@@ -284,5 +449,9 @@ window.MW = window.MW || {};
     validManifest,
     newer,
     bindProgress,
+    recover,
+    getState: () => state,
+    view,
   };
+  bindAppResume();
 })();

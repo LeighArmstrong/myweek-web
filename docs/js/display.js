@@ -274,6 +274,51 @@ window.MW = window.MW || {};
     if (text && !/[.!?][\"'’)?\]]*$/.test(text)) text += '.';
     return text;
   }
+  // Present source methods without changing their records or source-image indexes.
+  function method(recipe) {
+    const preparation = [],
+      steps = [];
+    for (const [sourceIndex, value] of (recipe.steps || []).entries()) {
+      const source = plain(value);
+      const readiness =
+        sourceIndex === 0 &&
+        /before you begin/i.test(source) &&
+        /get (?:all your|your [^.]+ and all your) ingredients/i.test(source);
+      let text = source
+        .replace(/^Spend less time cooking and make dinner work around you\.\s*/i, '')
+        .replace(/^Before you begin[.,!\s]*/i, '')
+        .replace(/^Now,? let['’]s get started!\s*/i, '');
+      if (readiness) {
+        text = text
+          .replace(/^This recipe takes around 5-\s*10 min\s*to prep, so\s*/i, 'Prep: 5–10 min. ')
+          .replace(/^Get all your ingredients and equipment ready\s*/i, '')
+          .replace(
+            /(?:^|(?<=Prep: 5–10 min\. ))Get your [^.]+? and all your ingredients ready,?\s*(?:then\s*)?/i,
+            '',
+          )
+          .replace(/^Skim through these steps,?\s*(?:then\s*)?/i, '')
+          .replace(
+            /Note: Equipment and pan sizes vary\. Make sure you cook (?:your )?food thoroughly \(even if it takes you a little longer than 10 mins?\)/i,
+            'Cook food thoroughly; timings can vary with your equipment.',
+          )
+          .replace(
+            /Note: Microwave ovens vary\. Make sure you heat food thoroughly \(even if it takes you a little longer than 10 min\)/i,
+            'Heat food thoroughly; microwave timings can vary.',
+          );
+        text = text.replace(/^(Prep: 5–10 min\. )wash/i, function (_, prefix) {
+          return prefix + 'Wash';
+        });
+        if (text) preparation.push(text);
+      } else if (text) steps.push({ text, sourceIndex });
+    }
+    // An unusual recipe containing only a readiness entry must remain readable.
+    if (!steps.length)
+      return {
+        preparation: [],
+        steps: (recipe.steps || []).map((text, sourceIndex) => ({ text, sourceIndex })),
+      };
+    return { preparation, steps };
+  }
   function instruction(value, context) {
     let text = plainIngredientNames(plain(value)),
       factor = Number(context && context.factor);
@@ -299,6 +344,7 @@ window.MW = window.MW || {};
     amount,
     equipment,
     instruction,
+    method,
     restoreInstructionBoundaries,
     actionStarters: [...instructionActionStarters],
   };
