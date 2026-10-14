@@ -2788,6 +2788,8 @@ p {
   max-width: 580px;
 }
 .onboard-card {
+  display: grid;
+  gap: 18px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 26px;
@@ -2913,7 +2915,6 @@ p {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  margin-top: 18px;
   padding: 13px;
   border-radius: 15px;
   background: #fff3ec;
@@ -4094,6 +4095,14 @@ button,
 }
 .onboard-actions .btn.primary {
   min-width: 0;
+}
+.onboard-actions.is-submitting > .btn.secondary {
+  display: none;
+}
+.onboard-actions.is-submitting > .btn.primary {
+  flex: 1 1 100%;
+  white-space: nowrap;
+  overflow-wrap: normal;
 }
 .choice-row,
 .food-choice,
@@ -10911,6 +10920,8 @@ body:not(.cooking-active) .appbar .appbar-actions > button i {
   display: flex;
   gap: 8px;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   grid-column: 1/-1;
   color: var(--green-deep);
   font-weight: 700;

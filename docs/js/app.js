@@ -4811,7 +4811,7 @@ window.MW = window.MW || {};
       if (index < steps.length - 1) go('cookstep:' + id + ':' + steps[index + 1].sourceIndex);
       else {
         MW.preparation.finish(r);
-        leaveCookingFlow(st.ui.weekHistoryKey ? 'history' : 'recipes');
+        leaveCookingFlow('week');
       }
     };
     bindNav();

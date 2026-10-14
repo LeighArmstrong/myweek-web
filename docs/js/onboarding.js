@@ -770,6 +770,7 @@ window.MW = window.MW || {};
           window.scrollTo({ top: 0, behavior: 'instant' });
           return;
         }
+        next.parentElement.classList.add('is-submitting');
         next.classList.add('is-loading');
         next.disabled = true;
         next.setAttribute('aria-busy', 'true');
@@ -786,6 +787,7 @@ window.MW = window.MW || {};
               // The storage recovery screen may already have replaced this button.
               if (MW.state.recoveryStatus && MW.state.recoveryStatus().blocked) return;
               next.disabled = false;
+              next.parentElement.classList.remove('is-submitting');
               next.classList.remove('is-loading');
               next.removeAttribute('aria-busy');
               next.textContent = 'Try creating your week again';
