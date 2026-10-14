@@ -71,6 +71,8 @@ window.MW = window.MW || {};
             esc(x.id == null ? x.v : x.id) +
             '" class="' +
             (set.has(x.id == null ? x.v : x.id) ? 'active' : '') +
+            '" aria-pressed="' +
+            (set.has(x.id == null ? x.v : x.id) ? 'true' : 'false') +
             '">' +
             (x.icon ? icon(x.icon) : '') +
             esc(x.label) +
@@ -87,7 +89,37 @@ window.MW = window.MW || {};
       values.map((v) => ({ v, label: String(v) })),
       selected,
       false,
-      'onboard-counts cols-' + values.length,
+      'onboard-counts',
+    );
+  }
+
+  // Every selection is a fieldset rather than a label wrapping interactive buttons.
+  // Icons reinforce the meaning of each choice and do not replace its visible text.
+  function choiceGroup(title, controls, glyph, help) {
+    return (
+      '<fieldset class="onboard-choice-group"><legend><span class="onboard-choice-label">' +
+      icon(glyph) +
+      '<span>' +
+      esc(title) +
+      '</span></span></legend>' +
+      (help ? '<small class="onboard-label-help">' + esc(help) + '</small>' : '') +
+      controls +
+      '</fieldset>'
+    );
+  }
+
+  function heading(number, category, title, description, glyph) {
+    return (
+      '<section class="onboard-heading"><div class="onboard-heading-top">' +
+      '<span>' +
+      esc(number + ' · ' + category) +
+      '</span><span class="onboard-heading-icon">' +
+      icon(glyph) +
+      '</span></div><h1>' +
+      esc(title) +
+      '</h1><p>' +
+      esc(description) +
+      '</p></section>'
     );
   }
 
@@ -152,18 +184,18 @@ window.MW = window.MW || {};
     }
     if (step === 2) {
       visual =
-        '<div class="onboard-week-preview" aria-hidden="true">' +
+        '<div class="onboard-week-visual" aria-hidden="true"><div class="onboard-week-preview">' +
         MW.DAYS.map(
           (d, i) =>
             '<span class="' +
             (i < draft.dinners ? 'has-dinner' : '') +
             '">' +
-            esc(d.short.slice(0, 1)) +
+            esc(d.short.slice(0, 2)) +
             '<i class="' +
             (i < draft.lunches ? 'has-lunch' : '') +
             '"></i></span>',
         ).join('') +
-        '</div>';
+        '</div><div class="onboard-week-legend"><span><i class="dinner-key"></i>Dinner</span><span><i class="lunch-key"></i>Lunch</span></div></div>';
       title = draft.dinners + ' dinners · ' + draft.lunches + ' lunch days';
       detail = 'Your usual week';
     }
@@ -242,11 +274,13 @@ window.MW = window.MW || {};
     );
   }
 
-  function hero() {
+  function hero({ intro = false } = {}) {
     return (
       '<section class="onboard-welcome">' +
       '<figure class="onboard-hero-art"><img src="assets/onboarding/onboarding-hero.webp" alt="Fresh chicken, avocado and grain bowl"></figure>' +
-      '<h1>My Week</h1><p class="onboard-tagline">Simple meals. Happier weeks.</p>' +
+      '<h1>Good food. Less fuss.</h1><p class="onboard-tagline">' +
+      (intro ? 'Plan, shop and cook with My Week.' : 'Plan your meals, shop once and cook with confidence.') +
+      '</p>' +
       '<div class="onboard-benefits">' +
       '<div><span>' +
       icon('calendar-check') +
@@ -259,7 +293,9 @@ window.MW = window.MW || {};
       '</span><p><strong>Eat well, your way</strong><small>Options for all diets, tastes and budgets</small></p></div>' +
       '</div>' +
       '</section>' +
-      '<div class="onboard-actions hero-actions"><button class="btn primary" id="onboardNext"><span>Get started</span>' +
+      '<div class="onboard-actions hero-actions' +
+      (intro ? ' intro-actions' : '') +
+      '"><button class="btn primary" id="onboardNext"><span>Get started</span>' +
       icon('arrow-right') +
       '</button></div>'
     );
@@ -267,13 +303,16 @@ window.MW = window.MW || {};
 
   function household() {
     return (
-      '<section class="onboard-heading"><span>1 · YOUR HOUSEHOLD</span><h1>Who’s eating?</h1><p>Set your portions and budget.</p></section><section class="onboard-card form-card">' +
+      heading('1', 'YOUR HOUSEHOLD', 'Who’s eating?', 'Set your portions and budget.', 'users') +
+      '<section class="onboard-card form-card">' +
       '<label>First name<input id="obName" value="' +
       esc(draft.name) +
       '" placeholder="Your name" autocomplete="given-name"></label>' +
-      '<label>People usually eating dinner' +
-      countRow('obPeople', [1, 2, 3, 4, 5, 6], draft.people) +
-      '</label>' +
+      choiceGroup(
+        'People usually eating dinner',
+        countRow('obPeople', [1, 2, 3, 4, 5, 6], draft.people),
+        'users',
+      ) +
       '<div class="onboard-two"><label>Weekly food budget<div class="prefix-input"><span>£</span><input id="obBudget" type="number" min="20" step="5" value="' +
       esc(draft.budget) +
       '"></div></label><label>Supermarket' +
@@ -286,39 +325,54 @@ window.MW = window.MW || {};
 
   function rhythm() {
     return (
-      '<section class="onboard-heading"><span>2 · YOUR ROUTINE</span><h1>How many meals?</h1><p>Choose how many meals to plan. You can change these in Settings.</p></section>' +
+      heading(
+        '2',
+        'YOUR ROUTINE',
+        'How many meals?',
+        'Choose how many meals to plan. You can change these in Settings.',
+        'calendar-days',
+      ) +
       '<section class="onboard-card form-card">' +
-      '<label><span>Dinners to plan each week</span><small class="onboard-label-help">Choose from 1 to 7 dinners.</small>' +
-      countRow('obDinners', [1, 2, 3, 4, 5, 6, 7], draft.dinners) +
-      '</label>' +
-      '<label>Lunches to plan' +
-      chipRow(
-        'obLunches',
-        [
-          { v: 0, label: 'None' },
-          { v: 5, label: 'Weekdays' },
-          { v: 7, label: 'Every day' },
-        ],
-        draft.lunches,
-        false,
+      choiceGroup(
+        'Dinners to plan each week',
+        countRow('obDinners', [1, 2, 3, 4, 5, 6, 7], draft.dinners),
+        'utensils',
+        'Choose from 1 to 7 dinners.',
       ) +
-      '</label>' +
+      choiceGroup(
+        'Lunches to plan',
+        chipRow(
+          'obLunches',
+          [
+            { v: 0, label: 'None' },
+            { v: 5, label: 'Weekdays' },
+            { v: 7, label: 'Every day' },
+          ],
+          draft.lunches,
+          false,
+        ),
+        'sun',
+      ) +
       (draft.lunches
-        ? '<label>People eating the planned lunch' +
-          countRow('obLunchPeople', [1, 2, 3, 4, 5, 6], draft.lunchPeople) +
-          '</label>'
+        ? choiceGroup(
+            'People eating the planned lunch',
+            countRow('obLunchPeople', [1, 2, 3, 4, 5, 6], draft.lunchPeople),
+            'users',
+          )
         : '') +
-      '<label>Weeknight cooking' +
-      chipRow(
-        'obEffort',
-        [
-          { v: 'easy', label: 'Keep it easy' },
-          { v: 'mixed', label: 'A mixture' },
-        ],
-        draft.effort,
-        false,
+      choiceGroup(
+        'Weeknight cooking',
+        chipRow(
+          'obEffort',
+          [
+            { v: 'easy', label: 'Keep it easy' },
+            { v: 'mixed', label: 'A mixture' },
+          ],
+          draft.effort,
+          false,
+        ),
+        'clock',
       ) +
-      '</label>' +
       '</section>' +
       nextButton()
     );
@@ -326,16 +380,16 @@ window.MW = window.MW || {};
 
   function food() {
     return (
-      '<section class="onboard-heading"><span>3 · FOOD YOU LIKE</span><h1>What do you enjoy?</h1><p>Choose the food you enjoy.</p></section><section class="onboard-card form-card">' +
-      '<label>Eating style' +
-      chipRow('obDiet', MW.food.patterns, draft.diet, false) +
-      '</label>' +
-      '<label>Meal priorities' +
-      chipRow('obGoals', MW.food.goals, draft.goals, true) +
-      '</label>' +
-      '<label>Lunch styles you like' +
-      chipRow('obLunchStyles', MW.food.lunchStyles, draft.lunchStyles, true) +
-      '<small class="onboard-label-help">Choose one or more.</small></label>' +
+      heading('3', 'FOOD YOU LIKE', 'What do you enjoy?', 'Choose the food you enjoy.', 'carrot') +
+      '<section class="onboard-card form-card">' +
+      choiceGroup('Eating style', chipRow('obDiet', MW.food.patterns, draft.diet, false), 'leaf') +
+      choiceGroup('Meal priorities', chipRow('obGoals', MW.food.goals, draft.goals, true), 'heart') +
+      choiceGroup(
+        'Lunch styles you like',
+        chipRow('obLunchStyles', MW.food.lunchStyles, draft.lunchStyles, true),
+        'bowl-food',
+        'Choose one or more.',
+      ) +
       '<label>Foods you simply do not want<div class="food-autocomplete-host"><input id="obAvoid" value="' +
       esc(draft.avoid) +
       '" placeholder="Start typing a food"></div><small class="onboard-label-help">Choose a recognised food from the list. Add commas for more than one food.</small><span class="avoid-feedback" id="obAvoidFeedback"></span></label>' +
@@ -346,8 +400,19 @@ window.MW = window.MW || {};
 
   function allergens() {
     return (
-      '<section class="onboard-heading"><span>4 · ALLERGIES & RESTRICTIONS</span><h1>Any allergies or intolerances?</h1><p>For disliked foods, use the food preferences on the previous screen.</p></section><section class="onboard-card">' +
-      chipRow('obAllergens', MW.food.allergens, draft.allergens, true) +
+      heading(
+        '4',
+        'ALLERGIES & RESTRICTIONS',
+        'Any allergies or intolerances?',
+        'For disliked foods, use the food preferences on the previous screen.',
+        'shield-heart',
+      ) +
+      '<section class="onboard-card">' +
+      choiceGroup(
+        'Allergens and intolerances',
+        chipRow('obAllergens', MW.food.allergens, draft.allergens, true),
+        'shield-heart',
+      ) +
       '<div class="onboard-safety">' +
       icon('triangle-exclamation') +
       '<p>Excludes recipes with selected allergens, “may contain” warnings or missing verified records. Always check product labels and cross-contamination warnings.</p></div>' +
@@ -358,12 +423,22 @@ window.MW = window.MW || {};
 
   function equipment() {
     return (
-      '<section class="onboard-heading"><span>5 · YOUR KITCHEN</span><h1>What’s in your kitchen?</h1><p>Add the specialist appliances you use.</p></section><section class="onboard-card">' +
+      heading(
+        '5',
+        'YOUR KITCHEN',
+        'What’s in your kitchen?',
+        'Add the specialist appliances you use.',
+        'kitchen-set',
+      ) +
+      '<section class="onboard-card">' +
       '<div class="standard-kit">' +
       icon('circle-check') +
       '<div><strong>Standard kitchen kit</strong><small>Oven, hob, saucepans, frying pan and basic utensils are assumed.</small></div></div>' +
-      '<span class="onboard-mini">Select anything else you have</span>' +
-      chipRow('obEquipment', MW.equipment.items, draft.equipment, true) +
+      choiceGroup(
+        'Other appliances you have',
+        chipRow('obEquipment', MW.equipment.items, draft.equipment, true),
+        'kitchen-set',
+      ) +
       '</section>' +
       nextButton()
     );
@@ -373,7 +448,14 @@ window.MW = window.MW || {};
     const diet = (MW.food.patterns.find((x) => x.id === draft.diet) || { label: 'Anything' }).label;
     const equip = draft.equipment.map(MW.equipment.label);
     return (
-      '<section class="onboard-heading"><span>6 · READY</span><h1>Your first week</h1><p>Ready to choose your meals? You can change these choices anytime.</p></section><section class="onboard-summary">' +
+      heading(
+        '6',
+        'READY',
+        'Your first week',
+        'Ready to choose your meals? You can change these choices anytime.',
+        'circle-check',
+      ) +
+      '<section class="onboard-summary">' +
       '<div><span>' +
       icon('users') +
       '</span><strong>' +
@@ -724,12 +806,7 @@ window.MW = window.MW || {};
     step = 0;
   }
   function intro(root, onStart, onSignIn) {
-    const content = hero()
-      .replace('Simple meals. Happier weeks.', 'Plan, shop and cook with My Week.')
-      .replace(
-        '<div class="onboard-actions hero-actions">',
-        '<div class="onboard-actions hero-actions intro-actions">',
-      );
+    const content = hero({ intro: true });
     root.innerHTML = chrome(content)
       .replace('shell onboarding-shell', 'shell onboarding-shell intro-shell')
       .replace(progress(), '<button type="button" class="text-action" id="introSignIn">Sign in</button>');

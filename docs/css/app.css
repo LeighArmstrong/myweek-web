@@ -74,8 +74,9 @@ button {
 }
 .appbar {
   display: flex;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 14px 2px 24px;
+  padding: 8px 2px 14px;
 }
 .account-link {
   border: 0;
@@ -84,7 +85,18 @@ button {
   text-align: left;
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  min-height: 48px;
   color: var(--ink);
+}
+.account-link:has(.account-sub) {
+  display: grid;
+  grid-template-rows: 48px auto;
+  align-content: start;
+  justify-items: start;
+}
+.account-link:has(.account-sub) .account-name {
+  align-self: center;
 }
 .account-link.static {
   cursor: default;
@@ -93,6 +105,11 @@ button {
   line-height: 1;
   font-weight: 900;
   letter-spacing: -0.04em;
+}
+.appbar-greeting > h1.account-name {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
 }
 .account-sub {
   font-weight: 850;
@@ -122,12 +139,41 @@ h3,
 p {
   margin: 0;
 }
-.page-head,
-.subpage-head {
+.page-head {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  margin: 8px 2px 18px;
+  gap: 14px;
+  margin: 8px 2px 20px;
+}
+/* The back control belongs alongside the title, not the eyebrow or paragraph.
+   Give each part of the existing heading its natural grid row. */
+.subpage-head {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  column-gap: 14px;
+  margin: 8px 2px 20px;
+  align-items: start;
+}
+.subpage-head > div {
+  display: contents;
+}
+.subpage-head > .back-button {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: center;
+}
+.subpage-head > div > .eyebrow {
+  grid-column: 2;
+  grid-row: 1;
+}
+.subpage-head > div > h1 {
+  grid-column: 2;
+  grid-row: 2;
+}
+.subpage-head > div > p {
+  grid-column: 2;
+  grid-row: 3;
 }
 .page-head h1,
 .subpage-head h1 {
@@ -445,6 +491,10 @@ p {
   margin: 18px 0 4px;
 }
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   border: 0;
   border-radius: 16px;
   padding: 15px 16px;
@@ -462,9 +512,6 @@ p {
 .btn.danger {
   background: var(--danger);
   color: white;
-}
-.btn i {
-  margin-right: 7px;
 }
 .primary-action {
   width: 100%;
@@ -589,12 +636,6 @@ p {
 .lunch-people-row .choice-row button {
   min-width: 38px;
   padding: 9px;
-}
-.subpage-head {
-  align-items: flex-start;
-}
-.subpage-head.simple {
-  display: block;
 }
 .back-button {
   width: 42px;
@@ -1861,9 +1902,6 @@ p {
   font-weight: 850;
   white-space: nowrap;
 }
-.library-head {
-  align-items: center;
-}
 .library-search {
   height: 52px;
   display: grid;
@@ -2689,7 +2727,7 @@ p {
   color: #fff;
 }
 .onboard-hero-copy > span,
-.onboard-heading > span {
+.onboard-heading-top > span:first-child {
   font-size: 10px;
   font-weight: 950;
   letter-spacing: 0.14em;
@@ -2715,8 +2753,25 @@ p {
 .onboard-heading {
   padding: 9px 3px 19px;
 }
-.onboard-heading > span {
+.onboard-heading-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.onboard-heading-top > span:first-child {
   color: var(--coral);
+}
+.onboard-heading-icon {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 15px;
+  background: var(--green-soft);
+  color: var(--green-deep);
+  font-size: 20px;
 }
 .onboard-heading h1 {
   font-size: 39px;
@@ -2740,7 +2795,34 @@ p {
 }
 .form-card {
   display: grid;
-  gap: 19px;
+  gap: 22px;
+}
+.onboard-choice-group {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.onboard-choice-group legend {
+  margin: 0 0 12px;
+  padding: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 900;
+}
+.onboard-choice-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.onboard-choice-label > i {
+  color: var(--green-deep);
+  font-size: 16px;
+}
+.onboard-choice-group > .onboard-label-help {
+  margin: 0;
 }
 .form-card label {
   display: grid;
@@ -2772,7 +2854,9 @@ p {
 .onboard-chips button {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 7px;
+  min-height: 44px;
   border: 1px solid var(--line);
   background: #fff;
   color: #68776f;
@@ -2955,39 +3039,22 @@ p {
 }
 .onboard-counts {
   display: grid;
-  grid-template-columns: repeat(var(--count-cols, 7), 50px);
-  gap: 10px;
-  width: min(100%, 430px);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  width: min(100%, 350px);
   align-items: center;
 }
-.onboard-counts.cols-1 {
-  --count-cols: 1;
-}
-.onboard-counts.cols-2 {
-  --count-cols: 2;
-}
-.onboard-counts.cols-3 {
-  --count-cols: 3;
-}
-.onboard-counts.cols-4 {
-  --count-cols: 4;
-}
-.onboard-counts.cols-5 {
-  --count-cols: 5;
-}
-.onboard-counts.cols-6 {
-  --count-cols: 6;
-}
-.onboard-counts.cols-7 {
-  --count-cols: 7;
-}
 .onboard-counts button {
-  aspect-ratio: 1/1;
+  width: min(100%, 64px);
+  min-width: 48px;
+  height: auto;
+  min-height: 48px;
+  aspect-ratio: 1;
+  justify-self: center;
   justify-content: center;
   border-radius: 50%;
   padding: 0;
-  gap: 0;
-  font-size: 13px;
+  font-size: 16px;
 }
 .select-control {
   position: relative;
@@ -3010,10 +3077,7 @@ p {
 }
 @media (max-width: 390px) {
   .onboard-counts {
-    gap: 5px;
-  }
-  .onboard-counts button {
-    font-size: 12px;
+    gap: 9px;
   }
   .onboard-algorithm-note {
     grid-template-columns: 34px minmax(0, 1fr);
@@ -4737,10 +4801,6 @@ body.cooking-active #app:after {
   transform: scale(0.985);
 }
 
-.appbar {
-  align-items: flex-start;
-  padding-bottom: 14px !important;
-}
 .account-name {
   font-size: 25px;
   color: #102b24;
@@ -4773,11 +4833,6 @@ body.cooking-active #app:after {
   transform: translateY(-2px) scale(1.06) !important;
 }
 
-.page-head,
-.subpage-head {
-  gap: 14px;
-  margin-bottom: 20px !important;
-}
 .page-head h1,
 .subpage-head h1 {
   color: #102b24;
@@ -5487,7 +5542,7 @@ body.cooking-active .bottom-nav {
     padding-right: 34px;
   }
   .appbar {
-    padding-bottom: 18px !important;
+    padding-bottom: 18px;
   }
   .onboarding-shell {
     width: min(1180px, 100%);
@@ -5533,18 +5588,18 @@ body.cooking-active .bottom-nav {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .shell:has(.shopping-check-head) {
+  .shell.shopping-check-page {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 14px;
     align-items: start;
   }
-  .shell:has(.shopping-check-head) > .appbar,
-  .shell:has(.shopping-check-head) > .subpage-head,
-  .shell:has(.shopping-check-head) > .saving-toggle,
-  .shell:has(.shopping-check-head) > .plan-actions {
+  .shell.shopping-check-page > .appbar,
+  .shell.shopping-check-page > .subpage-head,
+  .shell.shopping-check-page > .saving-toggle,
+  .shell.shopping-check-page > .plan-actions {
     grid-column: 1/-1;
   }
-  .shell:has(.shopping-check-head) > .check-section {
+  .shell.shopping-check-page > .check-section {
     margin: 0;
   }
 
@@ -5749,16 +5804,12 @@ body.cooking-active .bottom-nav {
     transition: none !important;
   }
 }
-.subpage-head {
-  justify-content: flex-start;
-}
 @media (min-width: 900px) and (orientation: landscape) {
-  .shell:has(.shopping-check-head) {
+  .shell.shopping-check-page {
     display: block;
     width: min(920px, 100%);
   }
-  .shell:has(.shopping-check-head) > .check-section {
-    height: auto !important;
+  .shell.shopping-check-page > .check-section {
     margin-bottom: 12px;
   }
 
@@ -5878,9 +5929,6 @@ body:not(.cooking-active) .shell {
 }
 .onboarding-shell {
   padding-top: calc(var(--device-safe-top) + 12px);
-}
-.appbar {
-  padding-top: 8px !important;
 }
 @keyframes mwAmbientA {
   0% {
@@ -6377,9 +6425,9 @@ body .onboarding-shell:has(.onboard-welcome) .hero-actions .btn {
   }
   body .onboarding-shell:has(.onboard-welcome) .onboard-welcome {
     display: grid;
-    grid-template-columns: minmax(500px, 1.08fr) minmax(350px, 0.92fr);
+    grid-template-columns: minmax(0, 1.08fr) minmax(0, 0.92fr);
     grid-template-areas: 'hero copy' 'hero benefits';
-    column-gap: 44px;
+    column-gap: clamp(20px, 3.5vw, 44px);
     row-gap: 12px;
     align-items: center;
     text-align: left;
@@ -9939,17 +9987,6 @@ body:not(.cooking-active) .lunch-swap-card .alternative-photo {
     padding: 6px 0;
   }
 }
-@media (max-width: 600px) {
-  .onboard-counts.cols-5,
-  .onboard-counts.cols-6,
-  .onboard-counts.cols-7 {
-    grid-template-columns: repeat(4, 50px);
-  }
-  .onboard-counts button {
-    min-width: 44px;
-    min-height: 44px;
-  }
-}
 @media (max-width: 900px) {
   .day-toggle-row {
     grid-template-columns: repeat(4, minmax(44px, 1fr));
@@ -9970,7 +10007,6 @@ body:not(.cooking-active) .lunch-swap-card .alternative-photo {
     animation: none;
   }
 }
-.onboard-counts button,
 .numeric-choice-row button {
   width: 50px;
   height: 50px;
@@ -10719,18 +10755,6 @@ body.cooking-active .cook-scroll.no-visual .cook-instruction {
   min-height: 44px;
   padding: 8px 12px;
 }
-@media (max-width: 699px) and (orientation: portrait) {
-  body .intro-shell:has(.onboard-welcome) .onboard-hero-art {
-    height: clamp(150px, 29vh, 260px);
-    aspect-ratio: auto;
-  }
-  body .intro-shell:has(.onboard-welcome) .onboard-benefits {
-    transform: none !important;
-  }
-  body .intro-shell:has(.onboard-welcome) .hero-actions {
-    margin-top: 24px;
-  }
-}
 
 .appbar {
   gap: 12px;
@@ -10786,7 +10810,7 @@ body:not(.cooking-active) .appbar .appbar-actions > button i {
   .shell.settings-page > .food-settings,
   .shell.settings-page > .settings-section:has(#budget),
   .shell.settings-page > .allergy-notice,
-  .shell:has(.shopping-check-head) > .allergy-notice {
+  .shell.shopping-check-page > .allergy-notice {
     grid-column: 1/-1;
   }
 }
@@ -10983,24 +11007,27 @@ body #app .onboarding-shell .onboard-content .onboard-welcome {
   overflow: visible;
 }
 body #app .onboarding-shell .onboard-content .onboard-hero-art {
-  height: clamp(90px, 22dvh, 230px);
+  height: auto;
   min-height: 0;
-  aspect-ratio: auto;
-  width: 100%;
-  margin: 0 0 8px;
+  max-height: none;
+  aspect-ratio: 799 / 615;
+  width: min(100%, 480px);
+  margin: 0 auto 12px;
   flex: none;
 }
 body #app .onboarding-shell .onboard-content .onboard-benefits {
-  margin: 15px auto 0;
-  gap: 10px;
+  width: min(100%, 360px);
+  margin: 22px auto 0;
+  gap: 13px;
   transform: none !important;
 }
 body #app .onboarding-shell .onboard-content .onboard-welcome h1 {
-  font-size: 30px;
+  font-size: clamp(32px, 8.5vw, 42px);
+  line-height: 1.05;
 }
 body #app .onboarding-shell .onboard-content .onboard-heading h1 {
-  font-size: clamp(23px, 5.7vw, 32px);
-  line-height: 1.15;
+  font-size: clamp(29px, 7.4vw, 37px);
+  line-height: 1.08;
 }
 body #app .onboarding-account .onboard-content .account-auth {
   margin-bottom: 0;
@@ -11014,6 +11041,15 @@ body #app .onboarding-account .onboard-content .account-auth {
   body #app .onboarding-shell .onboard-content {
     max-width: 720px;
     margin: auto;
+  }
+}
+@media (min-width: 900px) and (orientation: landscape) {
+  body #app main.shell.onboarding-shell:has(.onboard-welcome) {
+    width: min(1120px, 100%);
+    max-width: 1120px;
+  }
+  body #app main.shell.onboarding-shell:has(.onboard-welcome) > .onboard-content {
+    max-width: 1020px;
   }
 }
 
@@ -11054,10 +11090,10 @@ body #app .onboarding-account .onboard-content .account-auth {
   color: #205d49;
 }
 .onboard-scene > img {
-  width: 62px;
-  height: 54px;
+  width: 82px;
+  height: 70px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: 14px;
 }
 .onboard-scene > div:last-child {
   min-width: 0;
@@ -11076,14 +11112,14 @@ body #app .onboarding-account .onboard-content .account-auth {
   overflow-wrap: anywhere;
 }
 .onboard-scene-icon {
-  width: 44px;
-  height: 44px;
-  flex: 0 0 44px;
-  border-radius: 15px;
+  width: 52px;
+  height: 52px;
+  flex: 0 0 52px;
+  border-radius: 16px;
   background: #fff;
   display: grid;
   place-items: center;
-  font-size: 23px;
+  font-size: 25px;
 }
 .scene-3 {
   background: #f4f7ec;
@@ -11094,36 +11130,71 @@ body #app .onboarding-account .onboard-content .account-auth {
 .scene-5 {
   background: #eef4f8;
 }
+.onboard-scene.scene-2 {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+.onboard-week-visual {
+  min-width: 0;
+}
 .onboard-week-preview {
-  display: flex;
-  gap: 3px;
-  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  width: 100%;
 }
 .onboard-week-preview > span {
-  width: 17px;
-  min-height: 34px;
-  padding: 6px 0;
-  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 53px;
+  padding: 7px 0;
+  border-radius: 11px;
   background: #fff;
-  font-size: 10px;
-  font-weight: 700;
-  text-align: center;
-  color: #829087;
+  color: #73857b;
+  font-size: 12px;
+  font-weight: 800;
 }
 .onboard-week-preview > span.has-dinner {
-  background: #d6ece0;
-  color: #23684a;
+  background: #cde9d8;
+  color: #205d49;
 }
 .onboard-week-preview i {
   display: block;
-  width: 4px;
-  height: 4px;
-  margin: 4px auto 0;
+  width: 6px;
+  height: 6px;
+  margin-top: 7px;
   border-radius: 50%;
-  background: transparent;
+  background: #dce6df;
 }
 .onboard-week-preview i.has-lunch {
-  background: #eb9463;
+  background: #e88653;
+}
+.onboard-week-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 8px;
+  color: #5d756a;
+  font-size: 11px;
+  font-weight: 750;
+}
+.onboard-week-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.onboard-week-legend i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cde9d8;
+}
+.onboard-week-legend .lunch-key {
+  background: #e88653;
 }
 .recipe-text-cover {
   height: 125px;
@@ -11155,17 +11226,8 @@ body:not(.cooking-active) #app .appbar-actions {
   .onboard-scene strong {
     font-size: 14px;
   }
-  .onboard-week-preview {
-    gap: 2px;
-  }
-  .onboard-week-preview > span {
-    width: 15px;
-  }
 }
 @media (max-height: 550px) {
-  body #app .onboarding-shell .onboard-content .onboard-hero-art {
-    height: clamp(55px, 16dvh, 88px);
-  }
   body #app .onboarding-shell .onboard-content .onboard-benefits {
     gap: 7px;
     margin-top: 10px;
@@ -11184,9 +11246,6 @@ body:not(.cooking-active) #app .appbar-actions {
   }
   body #app .onboarding-shell .onboard-content .onboard-benefits small {
     font-size: 10.7px;
-  }
-  body #app .onboarding-shell .onboard-content .onboard-welcome h1 {
-    font-size: 26px;
   }
 }
 

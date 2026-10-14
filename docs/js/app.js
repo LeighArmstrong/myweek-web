@@ -1437,6 +1437,7 @@ window.MW = window.MW || {};
       '<main class="shell' +
       (pageHeader ? ' page-header-shell' : '') +
       (st.ui.screen === 'settings' ? ' settings-page' : '') +
+      (st.ui.screen === 'check' ? ' shopping-check-page' : '') +
       '">' +
       header +
       allergyNotice +
@@ -2279,27 +2280,26 @@ window.MW = window.MW || {};
     const forced = st.week.forceBuy;
 
     root.innerHTML = shell(
-      '<section class="subpage-head simple shopping-check-head"><div><h1>Before you shop</h1></div></section>' +
-        (questions.length
-          ? '<section class="check-section"><div class="section-title"><div><span class="eyebrow">CUPBOARD</span><h2>Still have enough?</h2></div></div><div class="stock-questions">' +
-            questions
-              .map(
-                (q, i) =>
-                  '<div class="stock-question" data-name="' +
-                  esc(ingredientName(q.name)) +
-                  '"><div><strong>' +
-                  esc(ingredientName(q.name)) +
-                  '</strong><small>' +
-                  (q.amountText ? esc(q.amountText) + ' noted · ' : '') +
-                  'Check your cupboard</small></div><div><button class="stock-answer yes" data-i="' +
-                  i +
-                  '">Yes</button><button class="stock-answer no" data-i="' +
-                  i +
-                  '">Add it</button></div></div>',
-              )
-              .join('') +
-            '</div></section>'
-          : '') +
+      (questions.length
+        ? '<section class="check-section"><div class="section-title"><div><span class="eyebrow">CUPBOARD</span><h2>Still have enough?</h2></div></div><div class="stock-questions">' +
+          questions
+            .map(
+              (q, i) =>
+                '<div class="stock-question" data-name="' +
+                esc(ingredientName(q.name)) +
+                '"><div><strong>' +
+                esc(ingredientName(q.name)) +
+                '</strong><small>' +
+                (q.amountText ? esc(q.amountText) + ' noted · ' : '') +
+                'Check your cupboard</small></div><div><button class="stock-answer yes" data-i="' +
+                i +
+                '">Yes</button><button class="stock-answer no" data-i="' +
+                i +
+                '">Add it</button></div></div>',
+            )
+            .join('') +
+          '</div></section>'
+        : '') +
         (forced.length
           ? '<section class="forced-buy-note">' +
             icon('basket-shopping') +
@@ -2388,6 +2388,7 @@ window.MW = window.MW || {};
         '><span></span></label></section>' +
         '<div class="plan-actions"><button class="btn secondary" id="back">Back to meals</button><button class="btn primary" id="build">Build my shop</button></div>',
       'shop',
+      { title: 'Before you shop' },
     );
 
     root.querySelectorAll('.stock-answer').forEach(
