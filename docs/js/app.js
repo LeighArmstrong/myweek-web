@@ -117,25 +117,35 @@ window.MW = window.MW || {};
   function paintUpdateState() {
     const state = MW.updates?.getState();
     const view = MW.updates?.view(state);
-    if (!view) return;
-    const status = document.getElementById('updateStatus');
-    if (status) status.textContent = view.title + ' · ' + view.message;
-    const updateProgress = document.getElementById('updateDownloadProgress');
-    if (updateProgress) {
-      updateProgress.hidden = !['starting', 'queued', 'downloading', 'paused', 'checking'].includes(
-        state?.phase,
-      );
-      if (view.progressPercent == null) updateProgress.removeAttribute('value');
-      else updateProgress.value = view.progressPercent;
-      updateProgress.setAttribute('aria-valuetext', view.message);
-    }
-    const settingsButton = document.getElementById('installUpdate');
-    if (settingsButton) {
-      settingsButton.textContent = view.label;
-      settingsButton.disabled = view.busy;
+    // A completed previous install must not overwrite a newly available update.
+    // The settings check itself shows "Updated successfully" only when up to date.
+    if (!view || state?.phase === 'installed') return;
+    const activeVersion = Number(state?.pending?.versionCode || state?.versionCode || 0);
+    const matchesUpdate = (element) => {
+      const shownVersion = Number(element?.dataset.updateVersionCode || 0);
+      return !shownVersion || !activeVersion || shownVersion === activeVersion;
+    };
+    const releasePanel = document.getElementById('updateRelease');
+    if (matchesUpdate(releasePanel)) {
+      const status = document.getElementById('updateStatus');
+      if (status) status.textContent = view.title + ' · ' + view.message;
+      const updateProgress = document.getElementById('updateDownloadProgress');
+      if (updateProgress) {
+        updateProgress.hidden = !['starting', 'queued', 'downloading', 'paused', 'checking'].includes(
+          state?.phase,
+        );
+        if (view.progressPercent == null) updateProgress.removeAttribute('value');
+        else updateProgress.value = view.progressPercent;
+        updateProgress.setAttribute('aria-valuetext', view.message);
+      }
+      const settingsButton = document.getElementById('installUpdate');
+      if (settingsButton) {
+        settingsButton.textContent = view.label;
+        settingsButton.disabled = view.busy;
+      }
     }
     const notice = document.getElementById('homeUpdateNotice');
-    if (notice) {
+    if (notice && matchesUpdate(notice)) {
       notice.disabled = view.busy;
       notice.setAttribute('aria-busy', String(view.busy));
       notice.classList.toggle('is-loading', view.busy);
@@ -733,7 +743,12 @@ window.MW = window.MW || {};
     sheet.querySelector('.ingredient-action-cancel').onclick = close;
     const swap = sheet.querySelector('.ingredient-shop-substitute');
     if (swap)
-      swap.onclick = () => showShopSubstitution({ shopKey, name, plannedAmount: options.plannedAmount });
+      swap.onclick = () =>
+        showShopSubstitution({
+          shopKey,
+          name,
+          plannedAmount: options.plannedAmount,
+        });
     const google = sheet.querySelector('.ingredient-google-alternative');
     google.onclick = async () => {
       google.disabled = true;
@@ -899,7 +914,12 @@ window.MW = window.MW || {};
     return count + ' ' + unit;
   };
   const foodProfile = () =>
-    s().foodProfile || { diet: 'omnivore', goals: [], allergens: [], lunchStyle: 'any' };
+    s().foodProfile || {
+      diet: 'omnivore',
+      goals: [],
+      allergens: [],
+      lunchStyle: 'any',
+    };
   const foodChoice = (id, items, selected) =>
     '<div class="food-choice" id="' +
     id +
@@ -1036,7 +1056,10 @@ window.MW = window.MW || {};
     return {
       name: sub.replacementName,
       amount: Number.isFinite(converted)
-        ? MW.inventory.formatAmount({ value: converted, unit: replacement.unit })
+        ? MW.inventory.formatAmount({
+            value: converted,
+            unit: replacement.unit,
+          })
         : sub.replacementAmount,
       originalName: name,
       originalAmount: plannedAmount,
@@ -1124,7 +1147,10 @@ window.MW = window.MW || {};
       const key = MW.inventory.stockKey(original) + '>' + MW.inventory.stockKey(sub.replacementName);
       if (seen.has(key)) return;
       seen.add(key);
-      notes.push({ originalName: original, replacementName: sub.replacementName });
+      notes.push({
+        originalName: original,
+        replacementName: sub.replacementName,
+      });
     });
     return notes;
   }
@@ -1268,7 +1294,10 @@ window.MW = window.MW || {};
     );
     document.getElementById('generateNewWeek').onclick = (e) =>
       withLoading(e.currentTarget, () => {
-        MW.planner.regenerateAll({ planMode: 'new-week-full', rebuildShop: false });
+        MW.planner.regenerateAll({
+          planMode: 'new-week-full',
+          rebuildShop: false,
+        });
         previewRolloverFor = '';
         st.ui.dismissedRolloverFor = '';
         MW.state.log('week_rollover_confirmed', { weekKey: currentKey });
@@ -1468,7 +1497,14 @@ window.MW = window.MW || {};
           '">' +
           esc(pageHeader.title) +
           '</h1>' +
-          (pageHeader.leading || '')
+          (pageHeader.leading || '') +
+          (pageHeader.collectionLink
+            ? '<button type="button" class="library-collection-link" id="openMyRecipes">' +
+              icon('bookmark') +
+              ' My Recipes' +
+              icon('chevron-right') +
+              '</button>'
+            : '')
         : '<button class="account-link ' +
           (st.onboarded ? '' : 'static') +
           '" id="accountButton"><span class="account-name">' +
@@ -2115,7 +2151,11 @@ window.MW = window.MW || {};
         .then(async (pending) => {
           const checked = await MW.updates.check();
           return pending && !pending.installed
-            ? { ...checked, available: true, manifest: { ...pending.pending, releaseNotes: [] } }
+            ? {
+                ...checked,
+                available: true,
+                manifest: { ...pending.pending, releaseNotes: [] },
+              }
             : checked;
         })
         .then((result) => {
@@ -2126,6 +2166,7 @@ window.MW = window.MW || {};
           const notice = document.createElement('button');
           notice.id = 'homeUpdateNotice';
           notice.className = 'delivery-notice';
+          notice.dataset.updateVersionCode = String(result.manifest.versionCode);
           const installed = String((result.local && result.local.version) || 'unknown');
           notice.innerHTML =
             icon('cloud-arrow-down') +
@@ -2522,7 +2563,11 @@ window.MW = window.MW || {};
           if (!x) return;
           x.selected = input.checked;
           st.week.shop = null;
-          MW.state.log('weekly_essential_toggled', { id: x.id, selected: x.selected, count: x.count });
+          MW.state.log('weekly_essential_toggled', {
+            id: x.id,
+            selected: x.selected,
+            count: x.count,
+          });
           MW.state.save();
           samePage(weeklyCheck);
         }),
@@ -2611,7 +2656,10 @@ window.MW = window.MW || {};
     const currentSignature = MW.shopping && MW.shopping.signature ? MW.shopping.signature() : null;
     if (!orderLocked && (!shop || (currentSignature && shop.planSignature !== currentSignature))) {
       try {
-        shop = MW.shopping.build({ savingMode: st.plan.priceMode, preserveChecks: Boolean(shop) });
+        shop = MW.shopping.build({
+          savingMode: st.plan.priceMode,
+          preserveChecks: Boolean(shop),
+        });
       } catch (e) {
         return go('check');
       }
@@ -2624,9 +2672,17 @@ window.MW = window.MW || {};
       : ['Fruit & Veg', 'Chilled', 'Cupboard', 'Frozen', 'Bakery', 'Household', 'Other'];
     const sourceGroups = Object.keys(shop.groups || {});
     const rawItems = orderLocked
-      ? delivery.items.map((x) => ({ ...x, key: x.key, sourceGroup: x.sourceGroup || 'Ingredients' }))
+      ? delivery.items.map((x) => ({
+          ...x,
+          key: x.key,
+          sourceGroup: x.sourceGroup || 'Ingredients',
+        }))
       : sourceGroups.flatMap((g) =>
-          shop.groups[g].map((x) => ({ key: g + '|' + x.name, sourceGroup: g, ...x })),
+          shop.groups[g].map((x) => ({
+            key: g + '|' + x.name,
+            sourceGroup: g,
+            ...x,
+          })),
         );
     const allItems = rawItems.map((x) => {
       const substitution =
@@ -3384,7 +3440,11 @@ window.MW = window.MW || {};
     document.getElementById('backDelivery').onclick = () => go('shopreview');
     document.getElementById('confirmDelivery').onclick = (e) =>
       withLoading(e.currentTarget, () => {
-        MW.delivery.reconcile({ missingKeys: [...missing], actualAmounts: actual, receipt: receiptSummary });
+        MW.delivery.reconcile({
+          missingKeys: [...missing],
+          actualAmounts: actual,
+          receipt: receiptSummary,
+        });
         go('shopreview');
       });
     refreshSummary();
@@ -3629,13 +3689,6 @@ window.MW = window.MW || {};
           )
           .join('') +
         '</div></div></details></div>' +
-        (!target
-          ? '<div class="library-shortcuts"><button type="button" class="library-collection-link" id="openMyRecipes">' +
-            icon('bookmark') +
-            ' My Recipes' +
-            icon('chevron-right') +
-            '</button></div>'
-          : '') +
         (target
           ? '<div class="library-target">' +
             icon('calendar-day') +
@@ -3647,7 +3700,7 @@ window.MW = window.MW || {};
           : '') +
         '<div id="libraryResults"></div>',
       'cook',
-      target ? null : { title: 'Meals' },
+      target ? null : { title: 'Meals', hideTitle: true, collectionLink: true },
     );
     const myRecipesLink = document.getElementById('openMyRecipes');
     if (myRecipesLink) myRecipesLink.onclick = () => go('myrecipes');
@@ -3792,9 +3845,15 @@ window.MW = window.MW || {};
       panel.style.setProperty('--filter-panel-height', Math.max(80, bottom - top) + 'px');
     };
     filtersPanel.addEventListener('toggle', fitFilters);
-    const filterListener = { signal: libraryFilterEvents.signal, passive: true };
+    const filterListener = {
+      signal: libraryFilterEvents.signal,
+      passive: true,
+    };
     window.addEventListener('resize', fitFilters, filterListener);
-    window.addEventListener('scroll', fitFilters, { ...filterListener, capture: true });
+    window.addEventListener('scroll', fitFilters, {
+      ...filterListener,
+      capture: true,
+    });
     window.visualViewport?.addEventListener('resize', fitFilters, filterListener);
     document.getElementById('closeLibraryFilters').onclick = () => {
       filtersPanel.open = false;
@@ -3947,7 +4006,10 @@ window.MW = window.MW || {};
       try {
         const found = await MW.personalRecipes.importUrl(document.getElementById('recipeLink').value);
         if (found.length === 1) {
-          fill({ ...found[0], ...(existing ? { id: existing.id, createdAt: existing.createdAt } : {}) });
+          fill({
+            ...found[0],
+            ...(existing ? { id: existing.id, createdAt: existing.createdAt } : {}),
+          });
           status.textContent = 'Recipe loaded. Check it below.';
         } else {
           status.textContent = 'Choose a recipe from this page.';
@@ -4054,7 +4116,10 @@ window.MW = window.MW || {};
     MW.state.save();
     const items = chosen
       ? [
-          ...(chosen.meals || []).map((m) => ({ ...m, kind: day(m.day)?.label || 'Dinner' })),
+          ...(chosen.meals || []).map((m) => ({
+            ...m,
+            kind: day(m.day)?.label || 'Dinner',
+          })),
           ...(chosen.lunchId ? [{ recipeId: chosen.lunchId, kind: 'Lunch prep' }] : []),
         ]
           .map((m) => ({ ...m, recipe: recipe(m.recipeId) }))
@@ -5460,6 +5525,15 @@ window.MW = window.MW || {};
           return;
         }
         const installed = String(local.version || 'unknown');
+        if (result.error && !(pending && !pending.installed)) {
+          if (updateStatus)
+            updateStatus.textContent = 'Could not check for new updates · Installed ' + installed;
+          if (updateRelease) {
+            updateRelease.hidden = true;
+            updateRelease.innerHTML = '';
+          }
+          return;
+        }
         if (!result.available && !(pending && !pending.installed)) {
           if (updateStatus)
             updateStatus.textContent = justInstalled
@@ -5485,6 +5559,7 @@ window.MW = window.MW || {};
           updateStatus.textContent =
             'Installed ' + installed + ' · ' + String(release.versionName || 'New version') + ' available';
         if (updateRelease) {
+          updateRelease.dataset.updateVersionCode = String(release.versionCode);
           const notes = Array.isArray(release.releaseNotes) ? release.releaseNotes : [];
           updateRelease.innerHTML =
             '<div class="update-release-copy"><span class="eyebrow">UPDATE AVAILABLE</span><strong>' +
@@ -5736,7 +5811,10 @@ window.MW = window.MW || {};
     const wholeStockUnits = wholeInventoryUnits;
     const unitOptions = inventoryUnitOptions;
     const itemRow = (x) => {
-      const p = MW.inventory.partsForEdit(x.amountText) || { value: '', unit: 'g' },
+      const p = MW.inventory.partsForEdit(x.amountText) || {
+          value: '',
+          unit: 'g',
+        },
         keyMatch = MW.foodIdentity && MW.foodIdentity.resolveExact(x._key),
         nameMatch = MW.foodIdentity && MW.foodIdentity.resolveExact(x.name),
         resolved = x.canonical || (keyMatch && keyMatch.canonical) || (nameMatch && nameMatch.canonical),
@@ -5839,7 +5917,11 @@ window.MW = window.MW || {};
         ? '<span class="choose">' + icon('magnifying-glass') + ' Choose a suggestion to link this item</span>'
         : '<span class="custom">' + icon('circle-question') + ' Custom item · Not linked to recipes</span>';
     };
-    if (MW.foodIdentity) MW.foodIdentity.attach(stockName, { limit: 5, onSelect: updateStockMatch });
+    if (MW.foodIdentity)
+      MW.foodIdentity.attach(stockName, {
+        limit: 5,
+        onSelect: updateStockMatch,
+      });
     stockName.addEventListener('input', updateStockMatch);
     updateStockMatch();
     const syncStep = (input, unit) => {
@@ -5872,7 +5954,10 @@ window.MW = window.MW || {};
           converted = have ? MW.inventory.valueInUnit(incoming, have.unit, canonical) : null;
         if (Number.isFinite(converted)) {
           const label = ingredientName(existing.item.name || MW.foodIdentity.canonicalLabel(canonical));
-          const next = MW.inventory.formatAmount({ value: have.value + converted, unit: have.unit });
+          const next = MW.inventory.formatAmount({
+            value: have.value + converted,
+            unit: have.unit,
+          });
           if (
             !confirm(
               label +

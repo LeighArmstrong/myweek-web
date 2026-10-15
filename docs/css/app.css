@@ -8529,16 +8529,6 @@ body:not(.cooking-active) .lunch-recipe-hero.text-only {
   font-weight: 850;
   white-space: nowrap;
 }
-.library-shortcuts {
-  grid-column: 1/-1;
-  display: flex;
-  justify-content: flex-end;
-  margin: 0 0 12px;
-}
-.library-shortcuts .library-collection-link {
-  min-height: 44px;
-  padding: 9px 14px;
-}
 .library-collection-link:hover,
 .library-collection-link:focus-visible {
   background: var(--green-soft);
@@ -10846,6 +10836,14 @@ body:not(.cooking-active) .appbar .appbar-actions > button i {
 @media (max-width: 360px) {
   .appbar {
     gap: 8px;
+  }
+  .appbar-actions {
+    gap: 6px;
+  }
+  .page-header-shell .appbar-greeting > .library-collection-link {
+    font-size: 12px;
+    gap: 6px;
+    padding-inline: 10px;
   }
   body:not(.cooking-active) .appbar .appbar-actions > button {
     width: 44px;
