@@ -1468,14 +1468,7 @@ window.MW = window.MW || {};
           '">' +
           esc(pageHeader.title) +
           '</h1>' +
-          (pageHeader.leading || '') +
-          (pageHeader.collectionLink
-            ? '<button type="button" class="library-collection-link" id="openMyRecipes">' +
-              icon('bookmark') +
-              ' My Recipes' +
-              icon('chevron-right') +
-              '</button>'
-            : '')
+          (pageHeader.leading || '')
         : '<button class="account-link ' +
           (st.onboarded ? '' : 'static') +
           '" id="accountButton"><span class="account-name">' +
@@ -1493,11 +1486,9 @@ window.MW = window.MW || {};
       '</div>' +
       (st.onboarded
         ? '<div class="appbar-actions">' +
-          (home
-            ? '<button type="button" class="favourites-shortcut" id="favouritesButton" aria-label="Favourites" title="Favourites">' +
-              icon('heart') +
-              '</button>'
-            : '') +
+          '<button type="button" class="favourites-shortcut" id="favouritesButton" aria-label="Favourites" title="Favourites">' +
+          icon('heart') +
+          '</button>' +
           '<button type="button" class="account-shortcut" id="accountTopButton" aria-label="' +
           (MW.accounts.status().user ? 'Account & sync' : 'Sign in') +
           '" title="Account">' +
@@ -2480,7 +2471,7 @@ window.MW = window.MW || {};
         '><span></span></label></section>' +
         '<div class="plan-actions"><button class="btn secondary" id="back">Back to meals</button><button class="btn primary" id="build">Build my shop</button></div>',
       'shop',
-      { title: 'Before you shop' },
+      { title: 'Shop prep' },
     );
 
     root.querySelectorAll('.stock-answer').forEach(
@@ -2828,7 +2819,10 @@ window.MW = window.MW || {};
       '</div>';
 
     root.innerHTML = shell(
-      '<section class="page-head shop-head"><div class="shop-summary"><div class="shop-total"><details><summary><strong>' +
+      '<div class="shop-list-toolbar"><span class="eyebrow">SHOW ITEMS</span>' +
+        sectionChoice +
+        '</div>' +
+        '<section class="page-head shop-head"><div class="shop-summary"><div class="shop-total"><details><summary><strong>' +
         money(totalValue) +
         '</strong><span>' +
         esc(totalMeta) +
@@ -2874,7 +2868,7 @@ window.MW = window.MW || {};
         '</section>' +
         postOrderActions,
       'shop',
-      { title: orderLocked ? 'Your order' : 'Shopping', hideTitle: true, leading: sectionChoice },
+      { title: orderLocked ? 'Order' : 'Shop' },
     );
 
     document.getElementById('shopSection').onchange = (event) => {
@@ -3635,6 +3629,13 @@ window.MW = window.MW || {};
           )
           .join('') +
         '</div></div></details></div>' +
+        (!target
+          ? '<div class="library-shortcuts"><button type="button" class="library-collection-link" id="openMyRecipes">' +
+            icon('bookmark') +
+            ' My Recipes' +
+            icon('chevron-right') +
+            '</button></div>'
+          : '') +
         (target
           ? '<div class="library-target">' +
             icon('calendar-day') +
@@ -3646,7 +3647,7 @@ window.MW = window.MW || {};
           : '') +
         '<div id="libraryResults"></div>',
       'cook',
-      target ? null : { title: 'Meals', hideTitle: true, collectionLink: true },
+      target ? null : { title: 'Meals' },
     );
     const myRecipesLink = document.getElementById('openMyRecipes');
     if (myRecipesLink) myRecipesLink.onclick = () => go('myrecipes');
@@ -5209,14 +5210,6 @@ window.MW = window.MW || {};
         '</select>' +
         icon('chevron-down') +
         '</span></section>' +
-        '<section class="settings-section"><label>People eating dinner</label><small class="setting-help">Used for recipe quantities this week and in future plans. If you have already shopped, check the existing list before buying more.</small>' +
-        selectionButtons(
-          'dinnerPeople',
-          [1, 2, 3, 4, 5, 6].map((v) => ({ v, label: String(v) })),
-          MW.weeks.currentPlanning(st).people,
-          'numeric-choice-row',
-        ) +
-        '</section>' +
         '<section class="settings-section"><label>Weekly food budget</label><div class="prefix-input"><span>£</span><input id="budget" type="number" inputmode="decimal" min="0" step="1" value="' +
         st.household.budget +
         '"></div></section>' +
@@ -5264,6 +5257,14 @@ window.MW = window.MW || {};
         '</section>' +
         '<section class="settings-section"><div class="setting-title"><div><label>Dinner days</label><small>Choose the days you want dinner planned.</small></div></div>' +
         dayToggles('dinnerDays', st.plan.dinnerDays) +
+        '<label class="sub-label">People eating dinner</label>' +
+        selectionButtons(
+          'dinnerPeople',
+          [1, 2, 3, 4, 5, 6].map((v) => ({ v, label: String(v) })),
+          MW.weeks.currentPlanning(st).people,
+          'numeric-choice-row',
+        ) +
+        '<small class="setting-help">Sets recipe quantities for this week and future plans. If you have already shopped, check your list before buying more.</small>' +
         '</section>' +
         '<section class="settings-section"><div class="setting-title"><div><label>Lunch days</label><small>Used for your next meal plan.</small></div></div>' +
         dayToggles('lunchDays', st.plan.lunchDays) +

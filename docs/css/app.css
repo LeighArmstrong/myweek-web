@@ -954,6 +954,21 @@ p {
   width: max-content;
   max-width: 100%;
 }
+.shop-list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  grid-column: 1/-1;
+}
+.shop-list-toolbar .shop-section-choice {
+  min-width: 0;
+  width: min(68%, 280px);
+}
+.shop-list-toolbar .eyebrow {
+  flex: 0 0 auto;
+}
 .shop-section-choice select {
   min-height: 48px;
   width: 100%;
@@ -8514,6 +8529,16 @@ body:not(.cooking-active) .lunch-recipe-hero.text-only {
   font-weight: 850;
   white-space: nowrap;
 }
+.library-shortcuts {
+  grid-column: 1/-1;
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 12px;
+}
+.library-shortcuts .library-collection-link {
+  min-height: 44px;
+  padding: 9px 14px;
+}
 .library-collection-link:hover,
 .library-collection-link:focus-visible {
   background: var(--green-soft);
@@ -10810,6 +10835,25 @@ body:not(.cooking-active) .appbar .appbar-actions > button {
 }
 body:not(.cooking-active) .appbar .appbar-actions > button i {
   font-size: 19px;
+}
+.page-header-shell .appbar-greeting > h1.account-name {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  .appbar {
+    gap: 8px;
+  }
+  body:not(.cooking-active) .appbar .appbar-actions > button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    flex: 0 0 44px;
+  }
 }
 .appbar-actions .favourites-shortcut,
 .appbar-actions .account-shortcut,
