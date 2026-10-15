@@ -13,10 +13,7 @@ window.MW = window.MW || {};
       .map((x) => x.trim())
       .filter(Boolean);
     if (parts.length < 2) {
-      parts = raw
-        .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
-        .map((x) => x.trim())
-        .filter((x) => x.length > 3);
+      parts = MW.display.splitInstructionActions(raw).filter((x) => x.length > 3);
     }
     return parts;
   }

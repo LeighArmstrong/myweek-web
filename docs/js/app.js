@@ -4801,10 +4801,7 @@ window.MW = window.MW || {};
     ];
     const stepTitle = guidedStepTitle(stepMeta && stepMeta.caption, currentStep);
     const displayedStep = displayInstruction(currentStep, r, factor, people);
-    const instructionParts = String(displayedStep)
-      .split(/(?<=[.!?])\s+(?=[A-Z])/)
-      .map((x) => x.trim())
-      .filter(Boolean);
+    const instructionParts = MW.display.splitInstructionActions(displayedStep);
     const rawFacts = [
       ...(String(currentStep).match(/\b\d{2,3}°C(?:\/\d{2,3}°C fan)?(?:\/gas mark \d+)?/gi) || []),
       ...(String(currentStep).match(/\b\d+(?:-\d+)?\s*(?:mins?|minutes?|hours?|hrs?|seconds?|secs?)\b/gi) ||

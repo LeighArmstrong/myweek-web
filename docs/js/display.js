@@ -259,13 +259,26 @@ window.MW = window.MW || {};
     'Whilst',
     'Zest',
   ]);
+  // Parenthetical notes (often questions about spice or batch sizes) are part of
+  // their surrounding action, even if they contain punctuation or imperative verbs.
+  function insideBrackets(text, end) {
+    let round = 0;
+    let square = 0;
+    for (let i = 0; i < end; i++) {
+      if (text[i] === '(') round++;
+      else if (text[i] === ')') round = Math.max(0, round - 1);
+      else if (text[i] === '[' && text.indexOf(']', i + 1) !== -1) square++;
+      else if (text[i] === ']') square = Math.max(0, square - 1);
+    }
+    return round > 0 || square > 0;
+  }
   function restoreInstructionBoundaries(value) {
     let text = plain(value)
       .replace(/\s+([,.;!?])/g, '$1')
       .replace(/\.{2,}/g, '.')
       .replace(/\s{2,}/g, ' ');
     text = text.replace(/\s+([A-Z][A-Za-z'-]*)\b/g, function (match, word, offset, whole) {
-      if (!instructionActionStarters.has(word)) return match;
+      if (!instructionActionStarters.has(word) || insideBrackets(whole, offset)) return match;
       const before = whole.slice(0, offset).trimEnd().slice(-1);
       if (!before || /[.!?;:,–—-]/.test(before)) return match;
       return '. ' + word;
@@ -273,6 +286,33 @@ window.MW = window.MW || {};
     text = text.trim();
     if (text && !/[.!?][\"'’)?\]]*$/.test(text)) text += '.';
     return text;
+  }
+  function splitInstructionActions(value) {
+    const text = plain(value);
+    if (!text) return [];
+    const result = [];
+    let start = 0;
+    let round = 0;
+    let square = 0;
+    for (let i = 0; i < text.length; i++) {
+      const character = text[i];
+      if (character === '(') round++;
+      else if (character === ')') round = Math.max(0, round - 1);
+      else if (character === '[' && text.indexOf(']', i + 1) !== -1) square++;
+      else if (character === ']') square = Math.max(0, square - 1);
+      if (!/[.!?]/.test(character) || round || square) continue;
+      if (!/\s/.test(text[i + 1] || '')) continue;
+      let next = i + 1;
+      while (next < text.length && /\s/.test(text[next])) next++;
+      if (!/[A-Z]/.test(text[next] || '')) continue;
+      const action = text.slice(start, i + 1).trim();
+      if (action) result.push(action);
+      start = next;
+      i = next - 1;
+    }
+    const last = text.slice(start).trim();
+    if (last) result.push(last);
+    return result;
   }
   // Present source methods without changing their records or source-image indexes.
   function method(recipe) {
@@ -346,6 +386,7 @@ window.MW = window.MW || {};
     instruction,
     method,
     restoreInstructionBoundaries,
+    splitInstructionActions,
     actionStarters: [...instructionActionStarters],
   };
 })();
