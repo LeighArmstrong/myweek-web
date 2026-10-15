@@ -35,7 +35,7 @@ window.MW = window.MW || {};
         lunchStyle: 'any',
         lunchStyles: ['any'],
       },
-      preferences: { scores: {}, recentMeals: [] },
+      preferences: { scores: {}, recentMeals: [], favourites: {} },
       inventory: {
         salt: { name: 'Salt', amountText: '500 g', updatedAt: new Date().toISOString() },
         'black pepper': { name: 'Black pepper', amountText: '100 g', updatedAt: new Date().toISOString() },
@@ -129,6 +129,15 @@ window.MW = window.MW || {};
     x.preferences = x.preferences || { scores: {}, recentMeals: [] };
     x.preferences.scores = x.preferences.scores || {};
     x.preferences.recentMeals = Array.isArray(x.preferences.recentMeals) ? x.preferences.recentMeals : [];
+    if (!isObject(x.preferences.favourites)) x.preferences.favourites = {};
+    x.preferences.favourites = Object.fromEntries(
+      Object.entries(x.preferences.favourites)
+        .filter(
+          ([id, value]) =>
+            id.length <= 200 && !['__proto__', 'prototype', 'constructor'].includes(id) && value === true,
+        )
+        .slice(0, 500),
+    );
     x.plan = x.plan || {};
     if (!Array.isArray(x.plan.dinnerDays)) {
       const legacy = x.week && Array.isArray(x.week.meals) ? x.week.meals.map((m) => m.day) : dinnerDefaults;
@@ -254,6 +263,8 @@ window.MW = window.MW || {};
     ]) {
       if (value[key] != null && !isObject(value[key])) throw new Error('Invalid saved ' + key + '.');
     }
+    if (value.preferences?.favourites != null && !isObject(value.preferences.favourites))
+      throw new Error('Invalid saved favourites.');
     for (const key of ['regulars', 'events']) {
       if (value[key] != null && !Array.isArray(value[key])) throw new Error('Invalid saved ' + key + '.');
     }

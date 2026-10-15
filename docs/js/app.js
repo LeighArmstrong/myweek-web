@@ -1372,6 +1372,84 @@ window.MW = window.MW || {};
     bindNav();
   }
 
+  function favouriteButton(recipeItem, extraClass = '') {
+    const saved = MW.favourites.has(recipeItem.id);
+    return (
+      '<button type="button" class="favourite-toggle ' +
+      (saved ? 'is-saved ' : '') +
+      esc(extraClass) +
+      '" data-favourite-id="' +
+      esc(recipeItem.id) +
+      '" data-favourite-title="' +
+      esc(recipeItem.title) +
+      '" aria-label="' +
+      (saved ? 'Remove ' : 'Add ') +
+      esc(recipeItem.title) +
+      (saved ? ' from favourites' : ' to favourites') +
+      '" aria-pressed="' +
+      saved +
+      '" title="' +
+      (saved ? 'Remove from favourites' : 'Add to favourites') +
+      '"><i class="fa-' +
+      (saved ? 'solid' : 'regular') +
+      ' fa-heart" aria-hidden="true"></i></button>'
+    );
+  }
+
+  function bindFavouriteButtons(host = root) {
+    host.querySelectorAll('[data-favourite-id]').forEach((button) => {
+      button.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        const id = button.dataset.favouriteId;
+        let saved;
+        try {
+          saved = MW.favourites.toggle(id);
+        } catch (error) {
+          button.title = (error && error.message) || 'Could not save favourite';
+          return;
+        }
+        root.querySelectorAll('[data-favourite-id]').forEach((other) => {
+          if (other.dataset.favouriteId !== id) return;
+          other.classList.toggle('is-saved', saved);
+          other.setAttribute('aria-pressed', String(saved));
+          other.setAttribute(
+            'aria-label',
+            (saved ? 'Remove ' : 'Add ') +
+              (other.dataset.favouriteTitle || 'recipe') +
+              (saved ? ' from favourites' : ' to favourites'),
+          );
+          other.title = saved ? 'Remove from favourites' : 'Add to favourites';
+          other.querySelector('i').className = 'fa-' + (saved ? 'solid' : 'regular') + ' fa-heart';
+        });
+        if (!saved) button.classList.remove('is-popping');
+        if (saved) {
+          button.classList.add('is-popping');
+          button.addEventListener('animationend', (animation) => {
+            if (animation.animationName === 'favourite-ring') button.classList.remove('is-popping');
+          });
+        }
+        if (!saved && s().ui.screen === 'favourites') {
+          const card = button.closest('.favourite-card-shell');
+          if (card) {
+            const removeCard = () => {
+              card.remove();
+              if (s().ui.screen === 'favourites' && !root.querySelector('.favourite-card-shell'))
+                favourites();
+            };
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) removeCard();
+            else {
+              card.addEventListener('transitionend', (animation) => {
+                if (animation.target === card && animation.propertyName === 'opacity') removeCard();
+              });
+              card.classList.add('is-removing');
+            }
+          }
+        }
+      };
+    });
+  }
+
   function shell(body, active, pageHeader) {
     const st = s();
     const name = ((st.profile && st.profile.name) || '').trim();
@@ -1414,7 +1492,13 @@ window.MW = window.MW || {};
         : '') +
       '</div>' +
       (st.onboarded
-        ? '<div class="appbar-actions"><button type="button" class="account-shortcut" id="accountTopButton" aria-label="' +
+        ? '<div class="appbar-actions">' +
+          (home
+            ? '<button type="button" class="favourites-shortcut" id="favouritesButton" aria-label="Favourites" title="Favourites">' +
+              icon('heart') +
+              '</button>'
+            : '') +
+          '<button type="button" class="account-shortcut" id="accountTopButton" aria-label="' +
           (MW.accounts.status().user ? 'Account & sync' : 'Sign in') +
           '" title="Account">' +
           icon('circle-user') +
@@ -1448,6 +1532,9 @@ window.MW = window.MW || {};
   }
 
   function bindNav() {
+    bindFavouriteButtons();
+    const favouritesShortcut = document.getElementById('favouritesButton');
+    if (favouritesShortcut) favouritesShortcut.onclick = () => go('favourites', { motion: 'drill-forward' });
     const historyButton = document.getElementById('weekHistoryButton');
     if (historyButton)
       historyButton.onclick = () => {
@@ -1680,6 +1767,7 @@ window.MW = window.MW || {};
     if (screen === 'library') return library();
     if (screen === 'history') return history();
     if (screen === 'myrecipes') return myRecipes();
+    if (screen === 'favourites') return favourites();
     if (screen.indexOf('cookprep:') === 0) return cookPrep(screen.slice(9));
     if (screen.indexOf('cookstep:') === 0) {
       const parts = screen.split(':');
@@ -1839,6 +1927,7 @@ window.MW = window.MW || {};
         esc(featured.recipe.title) +
         '">' +
         recipePhoto(featured.recipe, 'home-featured-photo', featured.recipe.title) +
+        favouriteButton(featured.recipe) +
         '<div class="home-featured-body"><span class="eyebrow">' +
         esc(day(featured.day).label + "'s dinner") +
         '</span><h3>' +
@@ -1873,8 +1962,10 @@ window.MW = window.MW || {};
                   '" tabindex="0" role="link" aria-label="Open ' +
                   esc(m.recipe.title) +
                   '">' +
+                  '<div class="meal-photo-wrap">' +
                   recipePhoto(m.recipe, 'meal-thumb', m.recipe.title) +
-                  '<button class="meal-open" data-recipe="' +
+                  favouriteButton(m.recipe) +
+                  '</div><button class="meal-open" data-recipe="' +
                   m.recipe.id +
                   '" aria-label="Open ' +
                   esc(m.recipe.title) +
@@ -1942,6 +2033,7 @@ window.MW = window.MW || {};
             esc(lunch.title) +
             '">' +
             recipePhoto(lunch, 'lunch-photo', lunch.title) +
+            favouriteButton(lunch) +
             '<div class="lunch-body"><span class="eyebrow">LUNCH PREP</span><h2>' +
             esc(lunch.title) +
             '</h2><p>' +
@@ -3326,7 +3418,7 @@ window.MW = window.MW || {};
         (dinnerOn ? 'checked' : '') +
         '><span></span></label></div>' +
         (dinnerOn && r
-          ? '<button class="day-meal-card" id="dayViewRecipe" aria-label="Open ' +
+          ? '<div class="favourite-card-shell day-favourite-shell"><button class="day-meal-card" id="dayViewRecipe" aria-label="Open ' +
             esc(r.title) +
             '">' +
             recipePhoto(r, 'day-meal-photo', r.title) +
@@ -3334,7 +3426,9 @@ window.MW = window.MW || {};
             esc(r.title) +
             '</strong><small>' +
             esc(timeText(r)) +
-            '</small></span><i class="fa-solid fa-chevron-right"></i></button><div class="day-meal-actions"><button class="btn secondary" id="changeDinner">Change meal</button><button class="day-random" id="randomDinner">' +
+            '</small></span></button>' +
+            favouriteButton(r) +
+            '</div><div class="day-meal-actions"><button class="btn secondary" id="changeDinner">Change meal</button><button class="day-random" id="randomDinner">' +
             icon('dice') +
             '<span><strong>Choose one for me</strong><small>Swap ' +
             esc(d.label) +
@@ -3371,6 +3465,61 @@ window.MW = window.MW || {};
           if (pick) MW.planner.replace(dayKey, pick.id);
           samePage(() => dayEditor(dayKey), 'continuity-forward');
         });
+    bindNav();
+  }
+
+  function libraryRecipeCard(recipeItem, index = 0) {
+    return (
+      '<article class="favourite-card-shell">' +
+      '<button type="button" class="library-card ' +
+      (!displayRecipeImage(recipeItem) ? 'text-recipe-card' : '') +
+      '" data-id="' +
+      esc(recipeItem.id) +
+      '">' +
+      (recipePhoto(
+        recipeItem,
+        index < 2 ? 'library-photo library-priority-photo' : 'library-photo',
+        recipeItem.title,
+      ) ||
+        '<div class="recipe-text-cover" aria-hidden="true">' +
+          icon('utensils') +
+          '<span>' +
+          esc(timeText(recipeItem)) +
+          '</span></div>') +
+      '<span><strong>' +
+      esc(recipeItem.title) +
+      '</strong>' +
+      (recipeSubtitle(recipeItem) ? '<small>' + esc(recipeSubtitle(recipeItem)) + '</small>' : '') +
+      '</span></button>' +
+      favouriteButton(recipeItem) +
+      '</article>'
+    );
+  }
+
+  function favourites() {
+    const savedIds = MW.favourites.ids();
+    const items = savedIds.map((id) => recipe(id)).filter(Boolean);
+    root.innerHTML = shell(
+      '<section class="favourites-intro"><span class="eyebrow">RECIPES YOU LOVE</span><p>' +
+        (items.length
+          ? countLabel(items.length, 'favourite', 'favourites') + ' saved for another day.'
+          : 'Tap a heart on any recipe to keep it here.') +
+        '</p></section>' +
+        (items.length
+          ? '<div class="library-grid favourites-grid">' +
+            items.map((item, index) => libraryRecipeCard(item, index)).join('') +
+            '</div>'
+          : '<section class="empty-state favourites-empty"><span class="empty-state-icon">' +
+            icon('heart') +
+            '</span><h2>No favourites yet</h2><p>Find something delicious and tap its heart to save it here.</p><button class="btn primary" id="browseFavourites">Browse meals</button></section>'),
+      'cook',
+      { title: 'Favourites' },
+    );
+    root
+      .querySelectorAll('.library-card[data-id]')
+      .forEach((button) => (button.onclick = () => go('recipe:' + button.dataset.id)));
+    const browse = document.getElementById('browseFavourites');
+    if (browse) browse.onclick = () => go('recipes');
     bindNav();
   }
 
@@ -3523,31 +3672,7 @@ window.MW = window.MW || {};
         '<div class="visually-hidden" role="status" aria-live="polite">' +
         allResults.length.toLocaleString('en-GB') +
         ' recipes found</div><div class="library-grid">' +
-        results
-          .map(
-            (r, index) =>
-              '<button class="library-card ' +
-              (!displayRecipeImage(r) ? 'text-recipe-card' : '') +
-              '" data-id="' +
-              r.id +
-              '">' +
-              (recipePhoto(
-                r,
-                index < 2 ? 'library-photo library-priority-photo' : 'library-photo',
-                r.title,
-              ) ||
-                '<div class="recipe-text-cover" aria-hidden="true">' +
-                  icon('utensils') +
-                  '<span>' +
-                  esc(timeText(r)) +
-                  '</span></div>') +
-              '<span><strong>' +
-              esc(r.title) +
-              '</strong>' +
-              (recipeSubtitle(r) ? '<small>' + esc(recipeSubtitle(r)) + '</small>' : '') +
-              '</span></button>',
-          )
-          .join('') +
+        results.map((r, index) => libraryRecipeCard(r, index)).join('') +
         '</div>' +
         (!results.length
           ? '<div class="empty-state">' +
@@ -3557,6 +3682,7 @@ window.MW = window.MW || {};
         (results.length < allResults.length
           ? '<button class="refresh-library" id="loadMoreRecipes">' + icon('plus') + ' Show 80 more</button>'
           : '');
+      bindFavouriteButtons(resultsHost);
       resultsHost.querySelectorAll('.library-card').forEach(
         (b) =>
           (b.onclick = () => {
@@ -3727,7 +3853,9 @@ window.MW = window.MW || {};
                   esc(r.title) +
                   '</strong><small>' +
                   esc(r.source) +
-                  '</small></span></button><button class="personal-edit" data-edit="' +
+                  '</small></span></button>' +
+                  favouriteButton(r) +
+                  '<button class="personal-edit" data-edit="' +
                   esc(r.id) +
                   '" aria-label="Edit ' +
                   esc(r.title) +
@@ -3751,6 +3879,7 @@ window.MW = window.MW || {};
             }),
         );
         bindRecipeCards();
+        bindFavouriteButtons(host);
         host
           .querySelectorAll('[data-edit]')
           .forEach((b) => (b.onclick = () => personalEditor(MW.personalRecipes.byId(b.dataset.edit))));
@@ -3954,7 +4083,7 @@ window.MW = window.MW || {};
             items
               .map(
                 (m) =>
-                  '<button class="recipe-card history-recipe" data-id="' +
+                  '<article class="favourite-card-shell"><button class="recipe-card history-recipe" data-id="' +
                   esc(m.recipeId) +
                   '">' +
                   recipePhoto(m.recipe, 'recipe-card-photo', m.recipe.title) +
@@ -3968,7 +4097,9 @@ window.MW = window.MW || {};
                   ((chosen.completedRecipes || []).includes(m.recipeId)
                     ? '<em class="history-cooked">' + icon('check') + ' Cooked</em>'
                     : '') +
-                  '</div></button>',
+                  '</div></button>' +
+                  favouriteButton(m.recipe) +
+                  '</article>',
               )
               .join('') +
             '</div>'
@@ -4074,6 +4205,7 @@ window.MW = window.MW || {};
         (!displayRecipeImage(r) ? 'text-only' : '') +
         '">' +
         recipePhoto(r, 'recipe-hero-photo', r.title) +
+        favouriteButton(r, 'on-hero') +
         '<div class="recipe-hero-overlay"><button class="back-on-photo" id="back">' +
         icon('arrow-left') +
         '</button><div><span class="eyebrow light">' +
@@ -4133,6 +4265,11 @@ window.MW = window.MW || {};
         '<span><strong>' +
         (r.isLunch ? 'Prep at home step by step' : 'Cook step by step') +
         '</strong></span><i class="fa-solid fa-chevron-right"></i></button>' +
+        (MW.planner.doubleChickenPortion(r)
+          ? '<div class="source-note double-chicken-note">' +
+            icon('circle-info') +
+            '<span>Double chicken recipe: the original uses two chicken breasts per portion. Choose a different recipe for a lighter serving.</span></div>'
+          : '') +
         (r.online
           ? '<div class="source-note">' +
             icon('circle-info') +
@@ -5075,6 +5212,14 @@ window.MW = window.MW || {};
         '</select>' +
         icon('chevron-down') +
         '</span></section>' +
+        '<section class="settings-section"><label>People eating dinner</label><small class="setting-help">Used for recipe quantities this week and in future plans. If you have already shopped, check the existing list before buying more.</small>' +
+        selectionButtons(
+          'dinnerPeople',
+          [1, 2, 3, 4, 5, 6].map((v) => ({ v, label: String(v) })),
+          MW.weeks.currentPlanning(st).people,
+          'numeric-choice-row',
+        ) +
+        '</section>' +
         '<section class="settings-section"><label>Weekly food budget</label><div class="prefix-input"><span>£</span><input id="budget" type="number" inputmode="decimal" min="0" step="1" value="' +
         st.household.budget +
         '"></div></section>' +
@@ -5171,6 +5316,15 @@ window.MW = window.MW || {};
       budgetInput.onkeydown = (e) => {
         if (['e', 'E', '+', '-'].includes(e.key)) e.preventDefault();
       };
+    root
+      .querySelectorAll('#dinnerPeople button')
+      .forEach(
+        (b) =>
+          (b.onclick = () =>
+            root
+              .querySelectorAll('#dinnerPeople button')
+              .forEach((x) => x.classList.toggle('active', x === b))),
+      );
     root
       .querySelectorAll('#lunchPeople button')
       .forEach(
@@ -5382,6 +5536,10 @@ window.MW = window.MW || {};
       if (st.week && !st.week.planning) st.week.planning = MW.weeks.planning(st);
       st.profile.name = document.getElementById('profileName').value.trim();
       st.household.retailer = document.getElementById('retailer').value;
+      const dinnerPeople = root.querySelector('#dinnerPeople button.active');
+      const people = Math.max(1, Math.min(6, Number(dinnerPeople && dinnerPeople.dataset.v) || 2));
+      st.household.people = people;
+      if (st.week && st.week.planning) st.week.planning.people = people;
       const budgetValue = document.getElementById('budget').value;
       if (budgetValue !== '' && Number.isFinite(Number(budgetValue)) && Number(budgetValue) >= 0)
         st.household.budget = Number(budgetValue);
@@ -5389,6 +5547,11 @@ window.MW = window.MW || {};
       st.plan.lunchDays = [...root.querySelectorAll('#lunchDays button.active')].map((x) => x.dataset.day);
       const lp = root.querySelector('#lunchPeople button.active');
       st.plan.lunchPeople = Math.max(1, Math.min(st.household.people, Number(lp && lp.dataset.v) || 1));
+      root
+        .querySelectorAll('#lunchPeople button')
+        .forEach((button) =>
+          button.classList.toggle('active', Number(button.dataset.v) === st.plan.lunchPeople),
+        );
       const dietBtn = root.querySelector('#settingsDiet button.active');
       const selectedLunchStyles = [...root.querySelectorAll('#settingsLunchStyles button.active')].map(
         (x) => x.dataset.v,
@@ -5424,7 +5587,7 @@ window.MW = window.MW || {};
       });
     root
       .querySelectorAll(
-        '#dinnerDays button,#lunchDays button,#lunchPeople button,#settingsDiet button,#settingsGoals button,#settingsAllergens button,#settingsLunchStyles button,#settingsEquipment button',
+        '#dinnerPeople button,#dinnerDays button,#lunchDays button,#lunchPeople button,#settingsDiet button,#settingsGoals button,#settingsAllergens button,#settingsLunchStyles button,#settingsEquipment button',
       )
       .forEach((button) => button.addEventListener('click', saveSettings));
     if (avoidFoods) avoidFoods.addEventListener('blur', saveSettings);

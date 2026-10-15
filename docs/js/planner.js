@@ -96,6 +96,24 @@ window.MW = window.MW || {};
     return basic && foodOk && equipmentOk;
   }
 
+  // Published 'Double Chicken' recipes can legitimately contain four breasts
+  // for two people. Keep their source amounts untouched and allow them when a
+  // person deliberately chooses the recipe, but do not schedule them as an
+  // everyday dinner without that choice.
+  function doubleChickenPortion(recipe) {
+    if (!/\bdouble\b/i.test(String(recipe && recipe.title))) return false;
+    const servings = Number(recipe && recipe.servings);
+    if (!Number.isFinite(servings) || servings < 1) return false;
+    return ((recipe && recipe.ingredients) || []).some(([amount, ingredient]) => {
+      if (!/\bchicken breasts?\b/i.test(String(ingredient))) return false;
+      const count = String(amount)
+        .trim()
+        .match(/^(\d+(?:\.\d+)?)(?:\s*(?:breasts?|fillets?|each))?$/i);
+      return count && Number(count[1]) >= servings * 2;
+    });
+  }
+  const autoDinnerAllowed = (recipe) => allowed(recipe) && !doubleChickenPortion(recipe);
+
   const knownProfiles = [
     ['lemonHerb', 'lemon herb'],
     ['smokyPaprika', 'smoky paprika'],
@@ -267,7 +285,7 @@ window.MW = window.MW || {};
   function choose(count, priceMode, opts) {
     opts = opts || {};
     const excluded = new Set(opts.excludeIds || []);
-    const basePool = MW.RECIPES.filter(allowed);
+    const basePool = MW.RECIPES.filter(autoDinnerAllowed);
     let pool = basePool.filter((r) => !excluded.has(r.id));
     if (pool.length < count) pool = basePool.slice();
     const chosen = [];
@@ -337,7 +355,7 @@ window.MW = window.MW || {};
       .filter((x) => x && x.id !== currentId);
     const usedImages = new Set(chosen.map((x) => visualKey(x)).filter(Boolean));
     const context = scoringContext(chosen);
-    return MW.RECIPES.filter((r) => r.id !== currentId && !usedIds.has(r.id) && allowed(r))
+    return MW.RECIPES.filter((r) => r.id !== currentId && !usedIds.has(r.id) && autoDinnerAllowed(r))
       .map((r) => ({
         recipe: r,
         repeatsImage: usedImages.has(visualKey(r)),
@@ -366,7 +384,7 @@ window.MW = window.MW || {};
       (r) =>
         r.id !== currentId &&
         !usedIds.has(r.id) &&
-        allowed(r) &&
+        autoDinnerAllowed(r) &&
         !isNearClone(r, chosen) &&
         !images.has(visualKey(r)),
     );
@@ -606,6 +624,8 @@ window.MW = window.MW || {};
 
   MW.planner = {
     allowed,
+    autoDinnerAllowed,
+    doubleChickenPortion,
     flavourProfile,
     flavourFamily,
     buildWeek,
@@ -672,7 +692,7 @@ window.MW = window.MW || {};
           let pick = null,
             bestScore = -Infinity;
           for (const candidate of MW.RECIPES) {
-            if (used.has(candidate.id) || !allowed(candidate)) continue;
+            if (used.has(candidate.id) || !autoDinnerAllowed(candidate)) continue;
             const score = candidateScore(candidate, chosen, Boolean(s.plan.priceMode), context);
             if (!pick || score > bestScore) {
               pick = candidate;
@@ -950,7 +970,7 @@ window.MW = window.MW || {};
 
     // Rank broadly with the lightweight recipe cost model, then use exact basket
     // pricing only for complete candidate weeks. Exact totals still decide success.
-    const priced = MW.RECIPES.filter((r) => planner.allowed(r))
+    const priced = MW.RECIPES.filter((r) => planner.autoDinnerAllowed(r))
       .map((r) => ({
         r,
         cost: valueCost(r),
@@ -1164,7 +1184,7 @@ window.MW = window.MW || {};
     };
     const variedSet = (recipes) => varietyIssues(recipes) === 0;
 
-    const base = MW.RECIPES.filter((r) => planner.allowed(r) && !currentIds.has(r.id));
+    const base = MW.RECIPES.filter((r) => planner.autoDinnerAllowed(r) && !currentIds.has(r.id));
     const priced = base
       .map((r) => ({ r, cost: valueCost(r), premium: premiumPenalty(r) }))
       .sort((a, b) => a.cost + a.premium * 1.8 - (b.cost + b.premium * 1.8))
