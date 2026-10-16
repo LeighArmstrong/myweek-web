@@ -118,7 +118,197 @@ window.MW = window.MW || {};
     });
   }
 
+  // Separate quantity-aware cupboard and basket progress from the regenerated
+  // shopping estimate. A recipe change may increase requirements, but must not
+  // turn previously completed quantities back into unchecked purchases.
+  function progressState(state = MW.state.get()) {
+    if (!state.week) return null;
+    const week = state.week;
+    if (!week.shopProgress || typeof week.shopProgress !== 'object' || Array.isArray(week.shopProgress))
+      week.shopProgress = {
+        stage:
+          week.delivery && ['order-placed', 'delivery-checked'].includes(week.status)
+            ? 'ordered'
+            : 'cupboard',
+        items: {},
+      };
+    const progress = week.shopProgress;
+    if (!['cupboard', 'basket', 'ordered'].includes(progress.stage)) progress.stage = 'cupboard';
+    if (!progress.items || typeof progress.items !== 'object' || Array.isArray(progress.items))
+      progress.items = {};
+    return progress;
+  }
+
+  function shoppingAmount(row) {
+    const text = String(row.displayAmount || row.inventoryAmount || '').trim();
+    const parsed = MW.inventory.parseAmount(text);
+    return { text, parsed: parsed && parsed.value > 0 ? parsed : null };
+  }
+  function asUnit(text, unit, name) {
+    const parsed = MW.inventory.parseAmount(text);
+    if (!parsed) return 0;
+    const value = MW.inventory.valueInUnit(parsed, unit, name);
+    return Number.isFinite(value) && value > 0 ? value : 0;
+  }
+  function stageAmount(record, stage, row, required) {
+    if (!record) return 0;
+    const text = record[stage + 'Amount'] || '';
+    if (required.parsed) return asUnit(text, required.parsed.unit, row.name);
+    return record[stage + 'Text'] === required.text ? 1 : 0;
+  }
+  function progressFor(row, state = MW.state.get()) {
+    const progress = progressState(state);
+    const record = progress && progress.items[row.key];
+    const required = shoppingAmount(row);
+    const total = required.parsed ? required.parsed.value : 1;
+    const home = stageAmount(record, 'home', row, required);
+    const basket = stageAmount(record, 'basket', row, required);
+    const legacy = stageAmount(record, 'legacy', row, required);
+    const covered = Math.min(total, home + basket + legacy);
+    const remaining = Math.max(0, total - covered);
+    const previousUnmeasured =
+      !required.parsed &&
+      Boolean(record?.homeText || record?.basketText || record?.legacyText) &&
+      !Boolean(home || basket || legacy);
+    const complete = remaining <= 0.000001;
+    const partial = (covered > 0 && !complete) || previousUnmeasured;
+    const remainingText = required.parsed
+      ? MW.inventory.formatAmount({ value: remaining, unit: required.parsed.unit })
+      : required.text;
+    return {
+      complete,
+      partial,
+      remaining,
+      remainingText,
+      covered,
+      home: Math.min(total, home),
+      legacy: Math.min(Math.max(0, total - home), legacy),
+      basket: Math.min(Math.max(0, total - home - legacy), basket),
+      total,
+      unit: required.parsed ? required.parsed.unit : null,
+      unknown: !required.parsed,
+      stage: progress ? progress.stage : 'cupboard',
+      hasSavedProgress: Boolean(record),
+    };
+  }
+  function takeLegacyCheck(row, state) {
+    const progress = progressState(state);
+    const key = String(row.key);
+    if (progress.items[key]) return;
+    if (!state.ui?.shopChecks?.[key]) return;
+    const requirement = shoppingAmount(row);
+    progress.items[key] = requirement.parsed
+      ? { legacyAmount: MW.inventory.formatAmount(requirement.parsed) }
+      : { legacyText: requirement.text };
+  }
+  function reconcileProgress(rows, state = MW.state.get()) {
+    const progress = progressState(state);
+    if (!progress) return null;
+    for (const row of rows) {
+      takeLegacyCheck(row, state);
+      if (state.ui && state.ui.shopChecks) state.ui.shopChecks[row.key] = progressFor(row, state).complete;
+    }
+    return progress;
+  }
+  function markProgress(row, state = MW.state.get()) {
+    const progress = reconcileProgress([row], state);
+    if (!progress) return null;
+    const previous = progressFor(row, state);
+    const stage = progress.stage === 'cupboard' ? 'home' : 'basket';
+    const record = progress.items[row.key] || {};
+    const other = stage === 'home' ? 'basket' : 'home';
+    if (previous.complete) {
+      // Undo the portion checked in this stage first. If it was completed at
+      // home, it can still be corrected while shopping online.
+      const remove =
+        record[stage + 'Amount'] || record[stage + 'Text']
+          ? stage
+          : record.legacyAmount || record.legacyText
+            ? 'legacy'
+            : other;
+      delete record[remove + 'Amount'];
+      delete record[remove + 'Text'];
+    } else {
+      const needed = shoppingAmount(row);
+      if (needed.parsed) {
+        const old = asUnit(record[stage + 'Amount'], needed.parsed.unit, row.name);
+        record[stage + 'Amount'] = MW.inventory.formatAmount({
+          value: old + previous.remaining,
+          unit: needed.parsed.unit,
+        });
+        delete record[stage + 'Text'];
+      } else {
+        record[stage + 'Text'] = needed.text;
+        delete record[stage + 'Amount'];
+      }
+    }
+    progress.items[row.key] = record;
+    const result = progressFor(row, state);
+    state.ui.shopChecks = state.ui.shopChecks || {};
+    state.ui.shopChecks[row.key] = result.complete;
+    MW.state.save();
+    return result;
+  }
+  function setStage(stage, state = MW.state.get()) {
+    const progress = progressState(state);
+    if (!progress || !['cupboard', 'basket', 'ordered'].includes(stage)) return null;
+    progress.stage = stage;
+    MW.state.save();
+    return progress.stage;
+  }
+  function coveredInventory(state = MW.state.get()) {
+    const covered = new Map();
+    for (const item of state.week?.inventoryUsed || []) {
+      if (!item || item.implicit || !item.name) continue;
+      const parsed = MW.inventory.parseAmount(item.amountText);
+      const key = MW.inventory.stockKey(item.name) + '|' + (parsed?.unit || String(item.amountText));
+      const old = covered.get(key);
+      if (old && parsed && old.amount && old.amount.unit === parsed.unit) {
+        old.amount.value += parsed.value;
+        old.partial = old.partial || Boolean(item.partial);
+      } else if (!old) {
+        covered.set(key, {
+          name: item.name,
+          amount: parsed ? { ...parsed } : null,
+          rawAmount: item.amountText || '',
+          partial: Boolean(item.partial),
+        });
+      }
+    }
+    return [...covered.values()].map((item) => ({
+      name: item.name,
+      amountText: item.amount ? MW.inventory.formatAmount(item.amount) : item.rawAmount,
+      partial: item.partial,
+    }));
+  }
+
+  function purchaseLines(rows, state = MW.state.get()) {
+    return (rows || []).flatMap((row) => {
+      const progress = progressFor(row, state);
+      if (!progress.basket && !progress.legacy) return [];
+      // A tick accounts for the recipe quantity needed. The actual item in
+      // the online basket may be a larger retail pack: keep its original
+      // inventoryAmount and let delivery confirmation record what arrived.
+      return [
+        {
+          ...row,
+          checked: true,
+          basketCheckedAmount: progress.unit
+            ? MW.inventory.formatAmount({ value: progress.basket + progress.legacy, unit: progress.unit })
+            : row.displayAmount,
+        },
+      ];
+    });
+  }
+
   MW.shopping = {
+    purchaseLines,
+    progressState,
+    progressFor,
+    reconcileProgress,
+    markProgress,
+    setStage,
+    coveredInventory,
     scaleAmount,
     signature,
     substitutionMap,
@@ -174,7 +364,12 @@ window.MW = window.MW || {};
         planSignature: signature(),
         createdAt: new Date().toISOString(),
       };
-      if (!options.preserveChecks) s.ui.shopChecks = {};
+      const rows = Object.entries(groups || {}).flatMap(([group, items]) =>
+        items.map((item) => ({ ...item, key: group + '|' + item.name })),
+      );
+      reconcileProgress(rows, s);
+      // Shopping progress belongs to the week and survives recalculations.
+      // Only a new week resets it, never a changed ingredient or recipe.
       MW.state.log('shop_built', {
         count: s.week.shop.itemCount,
         estimatedTotal: s.week.shop.estimatedTotal,

@@ -118,7 +118,7 @@ window.MW = window.MW || {};
       if (!known) unresolved++;
       if (known && !buyExplicitly && !options.ignoreInventory && !force.has(norm(name))) {
         const match = MW.inventory.find(name);
-        if (match && MW.inventory.parseAmount(match.item.amountText)) {
+        if (match && !match.item.starterUnverified && MW.inventory.parseAmount(match.item.amountText)) {
           const key = match.key + '|' + entry.unit;
           if (!remaining.has(key)) remaining.set(key, stockQuantity(match.item.amountText, entry));
           const have = remaining.get(key);

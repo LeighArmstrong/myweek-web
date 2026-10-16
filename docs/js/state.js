@@ -36,24 +36,8 @@ window.MW = window.MW || {};
         lunchStyles: ['any'],
       },
       preferences: { scores: {}, recentMeals: [], favourites: {} },
-      inventory: {
-        salt: { name: 'Salt', amountText: '500 g', updatedAt: new Date().toISOString() },
-        'black pepper': { name: 'Black pepper', amountText: '100 g', updatedAt: new Date().toISOString() },
-        'cooking oil': { name: 'Cooking oil', amountText: '500 ml', updatedAt: new Date().toISOString() },
-        paprika: { name: 'Paprika', amountText: '100 g', updatedAt: new Date().toISOString() },
-        'ground cumin': { name: 'Ground cumin', amountText: '100 g', updatedAt: new Date().toISOString() },
-        'chilli powder': { name: 'Chilli powder', amountText: '100 g', updatedAt: new Date().toISOString() },
-        oregano: { name: 'Oregano', amountText: '50 g', updatedAt: new Date().toISOString() },
-        'garlic granules': {
-          name: 'Garlic granules',
-          amountText: '100 g',
-          updatedAt: new Date().toISOString(),
-        },
-        'mixed herbs': { name: 'Mixed herbs', amountText: '50 g', updatedAt: new Date().toISOString() },
-        'soy sauce': { name: 'Soy sauce', amountText: '150 ml', updatedAt: new Date().toISOString() },
-        'bbq sauce': { name: 'BBQ sauce', amountText: '250 ml', updatedAt: new Date().toISOString() },
-        'basmati rice': { name: 'Basmati rice', amountText: '1000 g', updatedAt: new Date().toISOString() },
-      },
+      // Never assume a new household has starter stock that it has not confirmed.
+      inventory: {},
       pantry: {},
       regulars: [
         {
@@ -179,8 +163,33 @@ window.MW = window.MW || {};
     if (!x.foodProfile.lunchStyles.length || x.foodProfile.lunchStyles.includes('any'))
       x.foodProfile.lunchStyles = ['any'];
     x.inventory = x.inventory || {};
-    // Build seeds are only for a genuinely fresh installation. Never merge a
-    // newer build seed into saved user data during an app update or migration.
+    // Older installations included example stock quantities. Preserve those
+    // records, but do not claim the household owns them until confirmed.
+    const oldStarterAmounts = {
+      salt: '500 g',
+      'black pepper': '100 g',
+      'cooking oil': '500 ml',
+      paprika: '100 g',
+      'ground cumin': '100 g',
+      'chilli powder': '100 g',
+      oregano: '50 g',
+      'garlic granules': '100 g',
+      'mixed herbs': '50 g',
+      'soy sauce': '150 ml',
+      'bbq sauce': '250 ml',
+      'basmati rice': '1000 g',
+    };
+    const accountCreated = Date.parse(x.createdAt || '');
+    const isUnchangedStarter = ([key, item]) =>
+      item &&
+      oldStarterAmounts[key] === String(item.amountText || '').trim() &&
+      Number.isFinite(accountCreated) &&
+      Number.isFinite(Date.parse(item.updatedAt || '')) &&
+      Math.abs(Date.parse(item.updatedAt) - accountCreated) < 30000;
+    // Only recognise the original seeded group, not individually entered
+    // ingredients which happen to have the same quantity as a historical seed.
+    const hasOriginalStarterSet = Object.entries(x.inventory).filter(isUnchangedStarter).length >= 8;
+    // Never merge stock from a newer build into saved user data.
     for (const [key, item] of Object.entries(x.inventory)) {
       const amount = String((item && item.amountText) || '').trim(),
         m = amount.match(/^([0-9]+(?:\.[0-9]+)?)/);
@@ -191,6 +200,16 @@ window.MW = window.MW || {};
       delete item.status;
       delete item.confidence;
       item.updatedAt = item.updatedAt || new Date().toISOString();
+      const firstSavedAt = Date.parse(item.updatedAt);
+      if (
+        hasOriginalStarterSet &&
+        item.starterUnverified == null &&
+        Number.isFinite(accountCreated) &&
+        Number.isFinite(firstSavedAt) &&
+        Math.abs(firstSavedAt - accountCreated) < 30000 &&
+        oldStarterAmounts[key] === amount
+      )
+        item.starterUnverified = true;
     }
     // Legacy pantry flags without a measured quantity are deliberately not
     // migrated. Inventory now means a real amount that can be added to and

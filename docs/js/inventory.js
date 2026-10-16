@@ -195,7 +195,7 @@ window.MW = window.MW || {};
 
   function covers(name, requiredText) {
     const match = find(name);
-    if (!match) return false;
+    if (!match || match.item.starterUnverified) return false;
     const have = parseAmount(match.item.amountText),
       need = parseAmount(requiredText);
     const needed = have && need ? valueInUnit(need, have.unit, name) : null;
@@ -282,8 +282,14 @@ window.MW = window.MW || {};
       MW.foodIdentity && MW.foodIdentity.resolveExact ? MW.foodIdentity.resolveExact(clean) : null;
     const canonical = (resolved && resolved.canonical) || stockKey(clean);
     const match = find(canonical),
-      have = match && parseAmount(match.item.amountText),
+      have = match && !match.item.starterUnverified && parseAmount(match.item.amountText),
       incomingInHave = have ? valueInUnit(incoming, have.unit, clean) : null;
+    if (have && !Number.isFinite(incomingInHave))
+      throw new Error(
+        'The purchased quantity cannot be combined safely with the existing cupboard units for ' +
+          clean +
+          '. Please review that item first.',
+      );
     const total =
       have && Number.isFinite(incomingInHave)
         ? { value: have.value + incomingInHave, unit: have.unit }
@@ -349,7 +355,7 @@ window.MW = window.MW || {};
     const uncertain = [];
     for (const use of uses || []) {
       const key = Object.keys(state.inventory).find((k) => stockKey(k) === stockKey(use.name));
-      if (!key) continue;
+      if (!key || state.inventory[key].starterUnverified) continue;
       const item = state.inventory[key],
         have = parseAmount(item.amountText),
         used = parseAmount(use.amountText),
@@ -427,7 +433,39 @@ window.MW = window.MW || {};
     });
   }
 
+  function confirmStarterStock() {
+    return MW.state.transaction((st) => {
+      let confirmed = 0;
+      for (const item of Object.values(st.inventory || {})) {
+        if (!item.starterUnverified) continue;
+        item.starterUnverified = false;
+        item.updatedAt = new Date().toISOString();
+        confirmed++;
+      }
+      st.events = st.events || [];
+      st.events.push({
+        at: new Date().toISOString(),
+        type: 'starter_stock_confirmed',
+        data: { count: confirmed },
+      });
+      st.events = st.events.slice(-500);
+      return confirmed;
+    });
+  }
+  function clearAll() {
+    return MW.state.transaction((st) => {
+      const count = Object.keys(st.inventory || {}).length;
+      st.inventory = {};
+      st.events = st.events || [];
+      st.events.push({ at: new Date().toISOString(), type: 'cupboard_cleared', data: { count } });
+      st.events = st.events.slice(-500);
+      return count;
+    });
+  }
+
   MW.inventory = {
+    confirmStarterStock,
+    clearAll,
     applyUse,
     stockKey,
     find,

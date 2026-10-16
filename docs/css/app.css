@@ -11519,3 +11519,172 @@ body #app main.shell.onboarding-account > .onboard-content {
   margin: 0 auto;
   box-sizing: border-box;
 }
+
+/* Shopping has one rendered copy of each item; filtered sections stay hidden. */
+.retail-group[hidden] {
+  display: none;
+}
+.shop-stage-notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 9px 13px;
+  margin-bottom: 11px;
+  border: 1px solid #e2eae5;
+  border-radius: 13px;
+  background: #fafcfb;
+}
+.shop-stage-notice .eyebrow {
+  margin: 0;
+  color: #327a5b;
+}
+.shop-stage-notice p {
+  margin: 0;
+  flex-basis: 100%;
+  color: #5b6e63;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.shop-stage-notice button {
+  border: 0;
+  background: none;
+  padding: 3px 0;
+  color: var(--green-deep);
+  text-decoration: underline;
+  font-size: 12px;
+  font-weight: 750;
+}
+.shop-item.partly-done .shop-check {
+  color: var(--green-deep);
+  background: #e7f5ec;
+  border-color: #76b695;
+}
+.shop-fulfilment-note {
+  display: block;
+  margin-top: 5px;
+  color: var(--green-deep);
+  font-size: 11px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+.shop-item.done .shop-fulfilment-note {
+  opacity: 1;
+  text-decoration: none;
+}
+.shop-stock-covered {
+  border: 1px solid #d7e8db;
+  border-radius: 14px;
+  background: #f7fbf8;
+  margin: 0 0 12px;
+}
+.shop-stock-covered summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  padding: 9px 13px;
+  gap: 9px;
+  color: var(--green-deep);
+  font-weight: 780;
+  font-size: 12px;
+}
+.shop-stock-covered summary i:last-child {
+  margin-left: auto;
+}
+.shop-stock-covered-list {
+  padding: 1px 12px 10px;
+  display: grid;
+  gap: 7px;
+}
+.shop-stock-covered-item {
+  display: flex;
+  gap: 9px;
+  padding: 6px 0;
+  border-top: 1px solid #e4eee8;
+}
+.shop-stock-covered-item strong,
+.shop-stock-covered-item small {
+  display: block;
+}
+.shop-stock-covered-item strong {
+  font-size: 12px;
+}
+.shop-stock-covered-item small {
+  font-size: 11px;
+  color: #54715e;
+}
+.stock-covered-tick {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  color: #fff;
+  background: var(--green);
+}
+@media (min-width: 700px) and (orientation: landscape) {
+  .shopping-check-page .essential-row.active {
+    grid-template-columns: minmax(0, 1fr) auto minmax(164px, 216px);
+  }
+  .shopping-check-page .essential-row.active .qty-stepper {
+    grid-column: 3;
+    grid-row: 1;
+    width: 100%;
+    margin-top: 0;
+    justify-self: end;
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+  }
+}
+.appbar-actions > button.is-current {
+  color: var(--green-deep);
+}
+.appbar-actions > button.is-current::after {
+  content: '';
+  position: absolute;
+  bottom: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 13px;
+  height: 2px;
+  border-radius: 9px;
+  background: var(--green);
+}
+.appbar-actions > button {
+  position: relative;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shop-item,
+  .appbar-actions > button {
+    transition-duration: 0ms;
+  }
+}
+
+.cupboard-starter-warning {
+  border: 1px solid #e8d8a3;
+  background: #fffbef;
+  color: #664d18;
+  padding: 15px;
+  border-radius: 16px;
+  margin: 12px 0;
+}
+.cupboard-starter-warning strong {
+  display: block;
+  font-size: 15px;
+}
+.cupboard-starter-warning p {
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 7px 0 12px;
+}
+.cupboard-starter-warning .btn {
+  width: auto;
+  max-width: 100%;
+}
+.cupboard-clear {
+  display: block;
+  margin: 16px auto;
+  padding: 12px;
+}

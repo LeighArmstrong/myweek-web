@@ -21,6 +21,7 @@
       packSize: x.packSize || null,
       packs: Number.isFinite(Number(x.packs)) ? Number(x.packs) : null,
       checked: Boolean(x.checked),
+      basketCheckedAmount: x.basketCheckedAmount || '',
       reasons: Array.isArray(x.reasons) ? x.reasons.slice() : [],
       substitution: x.substitution ? Object.assign({}, x.substitution) : null,
     };
@@ -50,6 +51,24 @@
       return st.week.delivery;
     });
   }
+  // Checklist edits after placing an order can still correct which items are
+  // actually in the basket. Once a delivery is confirmed, its inventory ledger
+  // is immutable and later checklist changes cannot silently alter it.
+  function updatePending(items) {
+    const st = MW.state.get();
+    const existing = st.week && st.week.delivery;
+    if (!existing || !Array.isArray(existing.items) || existing.confirmed) return existing || null;
+    const snapshots = (items || []).map(snapshotItem);
+    if (JSON.stringify(existing.items) === JSON.stringify(snapshots)) return existing;
+    return MW.state.transaction((state) => {
+      const order = state.week?.delivery;
+      if (!order || order.confirmed) return order || null;
+      order.items = snapshots;
+      order.pendingEditedAt = now();
+      recordEvent(state, 'pending_order_items_corrected', { itemCount: snapshots.length });
+      return order;
+    });
+  }
   const parse = (text) => MW.inventory.parseAmount(String(text || '').trim());
   const fmt = (x) => MW.inventory.formatAmount(x);
   function planned(x) {
@@ -71,8 +90,8 @@
     state.inventory = state.inventory || {};
     const key = inventoryKey(state, name),
       item = state.inventory[key],
-      have = item ? parse(item.amountText) : null;
-    if (item && String(item.amountText || '').trim() && !have)
+      have = item && !item.starterUnverified ? parse(item.amountText) : null;
+    if (item && !item.starterUnverified && String(item.amountText || '').trim() && !have)
       throw new Error('Check cupboard quantity for ' + name + ' before confirming.');
     let targetUnit = unit,
       deltaInTarget = delta,
@@ -206,5 +225,5 @@
       return d;
     });
   }
-  MW.delivery = { begin, reconcile };
+  MW.delivery = { begin, updatePending, reconcile };
 })();

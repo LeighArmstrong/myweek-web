@@ -1522,14 +1522,26 @@ window.MW = window.MW || {};
       '</div>' +
       (st.onboarded
         ? '<div class="appbar-actions">' +
-          '<button type="button" class="favourites-shortcut" id="favouritesButton" aria-label="Favourites" title="Favourites">' +
+          '<button type="button" class="favourites-shortcut' +
+          (st.ui.screen === 'favourites' ? ' is-current' : '') +
+          '" id="favouritesButton" aria-label="Favourites"' +
+          (st.ui.screen === 'favourites' ? ' aria-current="page"' : '') +
+          ' title="Favourites">' +
           icon('heart') +
           '</button>' +
-          '<button type="button" class="account-shortcut" id="accountTopButton" aria-label="' +
+          '<button type="button" class="account-shortcut' +
+          (st.ui.screen === 'account' ? ' is-current' : '') +
+          '" id="accountTopButton"' +
+          (st.ui.screen === 'account' ? ' aria-current="page"' : '') +
+          ' aria-label="' +
           (MW.accounts.status().user ? 'Account & sync' : 'Sign in') +
           '" title="Account">' +
           icon('circle-user') +
-          '</button><button type="button" class="settings-button" id="settingsButton" aria-label="Settings">' +
+          '</button><button type="button" class="settings-button' +
+          (st.ui.screen === 'settings' ? ' is-current' : '') +
+          '" id="settingsButton" aria-label="Settings"' +
+          (st.ui.screen === 'settings' ? ' aria-current="page"' : '') +
+          '>' +
           icon('gear') +
           '</button></div>'
         : '') +
@@ -2654,11 +2666,11 @@ window.MW = window.MW || {};
     );
     let shop = st.week && st.week.shop;
     const currentSignature = MW.shopping && MW.shopping.signature ? MW.shopping.signature() : null;
-    if (!orderLocked && (!shop || (currentSignature && shop.planSignature !== currentSignature))) {
+    if (!shop || (!orderLocked && currentSignature && shop.planSignature !== currentSignature)) {
       try {
         shop = MW.shopping.build({
           savingMode: st.plan.priceMode,
-          preserveChecks: Boolean(shop),
+          preserveChecks: true,
         });
       } catch (e) {
         return go('check');
@@ -2671,19 +2683,13 @@ window.MW = window.MW || {};
       ? MW.retailGroups.order
       : ['Fruit & Veg', 'Chilled', 'Cupboard', 'Frozen', 'Bakery', 'Household', 'Other'];
     const sourceGroups = Object.keys(shop.groups || {});
-    const rawItems = orderLocked
-      ? delivery.items.map((x) => ({
-          ...x,
-          key: x.key,
-          sourceGroup: x.sourceGroup || 'Ingredients',
-        }))
-      : sourceGroups.flatMap((g) =>
-          shop.groups[g].map((x) => ({
-            key: g + '|' + x.name,
-            sourceGroup: g,
-            ...x,
-          })),
-        );
+    const rawItems = sourceGroups.flatMap((g) =>
+      shop.groups[g].map((x) => ({
+        ...x,
+        key: g + '|' + x.name,
+        sourceGroup: g,
+      })),
+    );
     const allItems = rawItems.map((x) => {
       const substitution =
         x.substitution ||
@@ -2691,8 +2697,11 @@ window.MW = window.MW || {};
         null;
       return { ...x, group: x.group || retailSection(x), substitution };
     });
+    const progress = MW.shopping.reconcileProgress(allItems, st);
+    const stage = progress.stage;
+    const inventoryCovered = MW.shopping.coveredInventory(st);
     const retailGroups = retailOrder.filter((g) => allItems.some((x) => x.group === g));
-    const done = allItems.filter((x) => checks[x.key]).length;
+    const done = allItems.filter((x) => MW.shopping.progressFor(x, st).complete).length;
     const pct = allItems.length ? Math.round((done / allItems.length) * 100) : 0;
     const substitutionCount = allItems.filter((x) => x.substitution).length;
     const receiptTotal =
@@ -2709,6 +2718,8 @@ window.MW = window.MW || {};
           (x.savingNote ? ' · ' + esc(x.savingNote) : '')
         );
       }
+      if (!delivery.items.some((item) => item.key === x.key))
+        return esc(x.displayAmount) + ' · Not included in the confirmed order';
       const actual =
           (delivery.actualAmounts && delivery.actualAmounts[x.key]) || (sub && sub.replacementAmount) || '0',
         short = delivery.shortfallAmounts && delivery.shortfallAmounts[x.key],
@@ -2724,6 +2735,7 @@ window.MW = window.MW || {};
       );
     };
     const itemHtml = (x) => {
+      const fulfilment = MW.shopping.progressFor(x, st);
       const sub = x.substitution,
         shownName = sub ? sub.replacementName : x.name;
       const subNote = sub
@@ -2742,6 +2754,21 @@ window.MW = window.MW || {};
             ' Recipe uses ' +
             esc((x.sourceAmounts || x.amounts || []).join(' + ')) +
             ' · check this pack is enough</span>'
+          : '';
+      const progressNote = fulfilment.partial
+        ? '<span class="shop-fulfilment-note">' +
+          esc(MW.inventory.formatAmount({ value: fulfilment.covered, unit: fulfilment.unit || 'count' })) +
+          ' accounted for · ' +
+          esc(fulfilment.remainingText) +
+          ' remaining</span>'
+        : fulfilment.complete
+          ? '<span class="shop-fulfilment-note">' +
+            (fulfilment.legacy && !fulfilment.home && !fulfilment.basket
+              ? 'Previously checked'
+              : fulfilment.home && !fulfilment.basket
+                ? 'At home'
+                : 'In shopping basket') +
+            '</span>'
           : '';
       const price =
         !sub && Number.isFinite(Number(x.estimatedPrice))
@@ -2765,13 +2792,13 @@ window.MW = window.MW || {};
         (sub ? 'has-substitution ' : '') +
         (orderLocked ? 'order-locked' : '') +
         '"><button class="shop-item ' +
-        (checks[x.key] ? 'done' : '') +
+        (fulfilment.complete ? 'done' : fulfilment.partial ? 'partly-done' : '') +
         '" data-key="' +
         esc(x.key) +
-        '" ' +
-        (orderLocked ? 'disabled' : '') +
-        '><span class="shop-check">' +
-        (checks[x.key] ? icon('check') : '') +
+        '" aria-pressed="' +
+        fulfilment.complete +
+        '"><span class="shop-check">' +
+        (fulfilment.complete ? icon('check') : fulfilment.partial ? icon('minus') : '') +
         '</span><span class="shop-info"><strong>' +
         esc(ingredientName(shownName)) +
         '</strong><small>' +
@@ -2779,6 +2806,7 @@ window.MW = window.MW || {};
         '</small>' +
         subNote +
         quantityNote +
+        progressNote +
         '</span>' +
         price +
         '<span class="shop-reason">' +
@@ -2789,7 +2817,9 @@ window.MW = window.MW || {};
       );
     };
     const groupHtml = (g) =>
-      '<section class="retail-group"><header><span class="retail-icon">' +
+      '<section class="retail-group" data-retail-section="' +
+      esc(g) +
+      '"><header><span class="retail-icon">' +
       icon(
         g === 'Fruit & Veg'
           ? 'leaf'
@@ -2839,11 +2869,14 @@ window.MW = window.MW || {};
             '</small></span><i class="fa-solid fa-chevron-right"></i></button>'
           : '';
 
-    const postOrderActions = orderLocked
-      ? delivery.confirmed
-        ? '<div class="plan-actions"><button class="btn secondary" id="checkDeliveryBottom">Review quantities</button><button class="btn primary" id="continuePlan">View meal plan</button></div>'
-        : '<div class="plan-actions"><button class="btn secondary" id="checkDeliveryBottom">Check quantities</button><button class="btn primary" id="continuePlan">View meal plan</button></div>'
-      : '<div class="plan-actions"><button class="btn secondary" id="guided">Guided shop</button><button class="btn primary" id="doneShop">Order placed</button></div>';
+    const postOrderActions =
+      stage === 'cupboard'
+        ? '<div class="plan-actions"><button class="btn secondary" id="openCupboardBottom">My cupboard</button><button class="btn primary" id="startBasket">Continue to shopping</button></div>'
+        : orderLocked
+          ? '<div class="plan-actions"><button class="btn secondary" id="checkDeliveryBottom">' +
+            (delivery.confirmed ? 'Review delivery' : 'Check delivery') +
+            '</button><button class="btn primary" id="continuePlan">Back to meals</button></div>'
+          : '<div class="plan-actions"><button class="btn secondary" id="guided">Guided shop</button><button class="btn primary" id="doneShop">Order placed</button></div>';
     const totalValue = receiptTotal != null ? receiptTotal : shop.estimatedTotal;
     const totalMeta =
       receiptTotal != null
@@ -2853,6 +2886,36 @@ window.MW = window.MW || {};
           : shop.savingMode
             ? 'after ~' + money(shop.estimatedSavings) + ' saving'
             : 'Estimate';
+
+    const stageMessage =
+      stage === 'cupboard'
+        ? 'Tick ingredients you already have. Your saved cupboard quantities are checked automatically.'
+        : orderLocked
+          ? 'Order recorded. You can still tick or correct this list; delivery quantities are checked separately.'
+          : 'Tick the remaining ingredients as you add them to your online basket. Previous ticks are saved.';
+    const stockPanel = inventoryCovered.length
+      ? '<details class="shop-stock-covered" id="shopStockCovered"><summary>' +
+        icon('check-circle') +
+        ' ' +
+        inventoryCovered.length +
+        ' ingredients automatically covered by your cupboard ' +
+        icon('chevron-down') +
+        '</summary><div class="shop-stock-covered-list">' +
+        inventoryCovered
+          .map(
+            (x) =>
+              '<div class="shop-stock-covered-item"><span class="stock-covered-tick">' +
+              icon('check') +
+              '</span><span><strong>' +
+              esc(ingredientName(x.name)) +
+              '</strong><small>' +
+              esc(x.amountText) +
+              (x.partial ? ' at home; buy the remainder below' : ' already at home') +
+              '</small></span></div>',
+          )
+          .join('') +
+        '</div></details>'
+      : '';
 
     const sectionChoice =
       '<div class="shop-section-choice"><select id="shopSection" aria-label="Shopping section"><option value="__all">All items · ' +
@@ -2875,7 +2938,18 @@ window.MW = window.MW || {};
       '</div>';
 
     root.innerHTML = shell(
-      '<div class="shop-list-toolbar"><span class="eyebrow">SHOW ITEMS</span>' +
+      '<section class="shop-stage-notice"><span class="eyebrow">' +
+        (stage === 'cupboard'
+          ? '1 · CHECK YOUR CUPBOARDS'
+          : orderLocked
+            ? 'ORDER RECORDED'
+            : '2 · ONLINE SHOPPING') +
+        '</span><p>' +
+        esc(stageMessage) +
+        '</p>' +
+        (stage === 'basket' ? '<button type="button" id="backToCupboard">Review what I have</button>' : '') +
+        '</section>' +
+        '<div class="shop-list-toolbar"><span class="eyebrow">SHOW ITEMS</span>' +
         sectionChoice +
         '</div>' +
         '<section class="page-head shop-head"><div class="shop-summary"><div class="shop-total"><details><summary><strong>' +
@@ -2885,7 +2959,7 @@ window.MW = window.MW || {};
         '</span>' +
         icon('chevron-down') +
         '</summary><p>' +
-        (orderLocked ? 'Original shopping list for this week. ' : '') +
+        (orderLocked ? 'You can still correct your checklist. ' : '') +
         esc(shop.priceRetailer || st.household.retailer) +
         (shop.priceAsOf ? ' · updated ' + esc(shop.priceAsOf) : '') +
         '. Prices are estimates; swaps may change the total.</p></details></div><section class="shop-progress" id="shopProgress"><div><strong id="shopProgressCount">' +
@@ -2908,58 +2982,42 @@ window.MW = window.MW || {};
               '</button>') +
         '</section>' +
         deliveryNotice +
+        stockPanel +
         '<section class="shop-surface"><div class="shop-group show grouped-shop" data-shopgroup="__all">' +
         groupedHtml +
-        '</div>' +
-        retailGroups
-          .map(
-            (g) =>
-              '<div class="shop-group grouped-shop" data-shopgroup="' +
-              esc(g) +
-              '">' +
-              groupHtml(g) +
-              '</div>',
-          )
-          .join('') +
-        '</section>' +
+        '</div></section>' +
         postOrderActions,
       'shop',
-      { title: orderLocked ? 'Order' : 'Shop' },
+      { title: 'Shop' },
     );
 
-    document.getElementById('shopSection').onchange = (event) => {
-      root
-        .querySelectorAll('.shop-group')
-        .forEach((group) => group.classList.toggle('show', group.dataset.shopgroup === event.target.value));
+    const sectionSelect = document.getElementById('shopSection');
+    const applySection = (value) => {
+      const selected = retailGroups.includes(value) ? value : '__all';
+      sectionSelect.value = selected;
+      const visibleGroup = root.querySelector('.shop-group');
+      if (visibleGroup) visibleGroup.dataset.shopgroup = selected;
+      root.querySelectorAll('.retail-group[data-retail-section]').forEach((section) => {
+        section.hidden = selected !== '__all' && section.dataset.retailSection !== selected;
+      });
+    };
+    applySection(st.ui.shoppingSection || '__all');
+    sectionSelect.onchange = (event) => {
+      st.ui.shoppingSection = event.target.value;
+      MW.state.save();
+      applySection(event.target.value);
     };
     bindIngredientActions(root);
-    root.querySelectorAll('.shop-item').forEach(
-      (b) =>
-        (b.onclick = () => {
-          st.ui.shopChecks = st.ui.shopChecks || {};
-          const key = b.dataset.key;
-          const checked = !st.ui.shopChecks[key];
-          st.ui.shopChecks[key] = checked;
-          MW.state.save();
-          root.querySelectorAll('.shop-item').forEach((item) => {
-            if (item.dataset.key !== key) return;
-            item.classList.toggle('done', checked);
-            const mark = item.querySelector('.shop-check');
-            if (mark) mark.innerHTML = checked ? icon('check') : '';
-            item.classList.remove('just-checked');
-            if (checked) {
-              void item.offsetWidth;
-              item.classList.add('just-checked');
-            }
-          });
-          const newDone = allItems.filter((x) => st.ui.shopChecks[x.key]).length;
-          const newPct = allItems.length ? Math.round((newDone / allItems.length) * 100) : 0;
-          const count = document.getElementById('shopProgressCount');
-          const bar = document.getElementById('shopProgressBar');
-          if (count) count.textContent = newDone + ' of ' + allItems.length;
-          if (bar) bar.style.width = newPct + '%';
-        }),
-    );
+    root.querySelectorAll('.shop-item').forEach((button) => {
+      button.onclick = () => {
+        const row = allItems.find((item) => item.key === button.dataset.key);
+        if (!row) return;
+        MW.shopping.markProgress(row, st);
+        if (orderLocked && !delivery.confirmed)
+          MW.delivery.updatePending(MW.shopping.purchaseLines(allItems));
+        samePage(shopReview);
+      };
+    });
     const lower = document.getElementById('lowerShop');
     if (lower)
       lower.onclick = (e) =>
@@ -2985,7 +3043,7 @@ window.MW = window.MW || {};
     if (guided)
       guided.onclick = () => {
         const flat = allItems
-          .filter((x) => !checks[x.key])
+          .filter((x) => !MW.shopping.progressFor(x, st).complete)
           .map((x) => ({
             name: x.name,
             amount: x.displayAmount,
@@ -3007,9 +3065,25 @@ window.MW = window.MW || {};
     const doneShop = document.getElementById('doneShop');
     if (doneShop)
       doneShop.onclick = () => {
-        MW.delivery.begin(allItems.map((x) => ({ ...x, checked: Boolean(checks[x.key]) })));
-        go('week');
+        MW.delivery.begin(MW.shopping.purchaseLines(allItems, st));
+        MW.shopping.setStage('ordered');
+        samePage(shopReview);
       };
+    const startBasket = document.getElementById('startBasket');
+    if (startBasket)
+      startBasket.onclick = () => {
+        MW.shopping.setStage('basket', st);
+        samePage(shopReview);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      };
+    const returnCupboard = document.getElementById('backToCupboard');
+    if (returnCupboard)
+      returnCupboard.onclick = () => {
+        MW.shopping.setStage('cupboard', st);
+        samePage(shopReview);
+      };
+    const openCupboard = document.getElementById('openCupboardBottom');
+    if (openCupboard) openCupboard.onclick = () => go('cupboard');
     const continuePlan = document.getElementById('continuePlan');
     if (continuePlan) continuePlan.onclick = () => go('week');
     bindNav();
@@ -3066,10 +3140,8 @@ window.MW = window.MW || {};
     );
     function next(status) {
       q.done.push({ name: item.name, status });
-      if (status === 'added' || status === 'substituted') {
-        st.ui.shopChecks = st.ui.shopChecks || {};
-        st.ui.shopChecks[item.key] = true;
-      }
+      if (status === 'added' || status === 'substituted')
+        MW.shopping.markProgress({ ...item, displayAmount: item.amount }, st);
       q.index++;
       MW.state.save();
       samePage(guidedShopping, 'continuity-forward');
@@ -3107,7 +3179,8 @@ window.MW = window.MW || {};
           };
         }),
       );
-      MW.delivery.begin(items);
+      MW.delivery.begin(MW.shopping.purchaseLines(items, st));
+      MW.shopping.setStage('ordered');
     }
     const delivery = s().week.delivery,
       items = delivery.items,
@@ -5808,6 +5881,7 @@ window.MW = window.MW || {};
       .map(([key, item]) => ({ ...item, _key: key }))
       .filter((x) => MW.inventory.parseAmount(x.amountText))
       .sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const unverifiedStarterCount = items.filter((x) => x.starterUnverified).length;
     const wholeStockUnits = wholeInventoryUnits;
     const unitOptions = inventoryUnitOptions;
     const itemRow = (x) => {
@@ -5841,7 +5915,11 @@ window.MW = window.MW || {};
         '"><div class="cupboard-item-name"><strong>' +
         esc(ingredientName(x.name)) +
         '</strong><small class="cupboard-save-note">' +
-        (linked ? 'Recognised ingredient' : 'Custom item · Not linked to recipes') +
+        (x.starterUnverified
+          ? 'Starter estimate · Review before automatic use'
+          : linked
+            ? 'Recognised ingredient'
+            : 'Custom item · Not linked to recipes') +
         '</small>' +
         (linked ? usageMarkup : '') +
         '</div><div class="stock-quantity cupboard-current-quantity"><input class="stock-current-amount" type="number" inputmode="decimal" min="0" step="' +
@@ -5876,16 +5954,45 @@ window.MW = window.MW || {};
         '</span></div><button id="addStock" aria-label="Add inventory item">' +
         icon('plus') +
         '</button></section>' +
+        (unverifiedStarterCount
+          ? '<section class="cupboard-starter-warning"><strong>Check your starter quantities</strong><p>' +
+            unverifiedStarterCount +
+            ' amounts were originally suggested by an older version of MyWeek. They are not automatically counted until you check them.</p>' +
+            '<button type="button" class="btn secondary" id="confirmStarterStock">I have checked these quantities</button></section>'
+          : '') +
         '<div class="cupboard-list">' +
         (items.length
           ? items.map(itemRow).join('')
           : '<div class="empty-state">' +
             icon('box-open') +
             '<h2>No cupboard items yet</h2><p>Add anything you already have and My Week will count it down as recipes use it.</p></div>') +
-        '</div>',
+        '</div>' +
+        (items.length
+          ? '<button type="button" class="text-action cupboard-clear" id="clearCupboard">Clear all cupboard stock</button>'
+          : ''),
       'more',
     );
     document.getElementById('back').onclick = () => go('settings');
+    const confirmStarter = document.getElementById('confirmStarterStock');
+    if (confirmStarter)
+      confirmStarter.onclick = () => {
+        if (
+          !confirm(
+            'Have you checked the quantities of these starter ingredients against what you actually own?',
+          )
+        )
+          return;
+        MW.inventory.confirmStarterStock();
+        samePage(cupboard);
+      };
+    const clearCupboard = document.getElementById('clearCupboard');
+    if (clearCupboard)
+      clearCupboard.onclick = () => {
+        if (!confirm('Clear all cupboard quantities? Your meals and completed shopping checks will be kept.'))
+          return;
+        MW.inventory.clearAll();
+        samePage(cupboard);
+      };
     const stockName = document.getElementById('stockName'),
       stockMatchStatus = document.getElementById('stockMatchStatus'),
       stockAmount = document.getElementById('stockAmount'),

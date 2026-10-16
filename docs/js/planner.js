@@ -434,12 +434,14 @@ window.MW = window.MW || {};
     return {
       week: s.week ? JSON.parse(JSON.stringify(s.week)) : null,
       weekHistory: Array.isArray(s.weekHistory) ? JSON.parse(JSON.stringify(s.weekHistory)) : [],
+      shopChecks: { ...(s.ui?.shopChecks || {}) },
     };
   }
 
   function restorePlanningState(s, snapshot) {
     s.week = snapshot.week;
     s.weekHistory = snapshot.weekHistory;
+    if (s.ui) s.ui.shopChecks = snapshot.shopChecks;
     MW.state.save();
   }
 
@@ -514,6 +516,7 @@ window.MW = window.MW || {};
       const lunch = randomLunchAlternative(previous.lunchId);
       if ((s.plan.lunchDays || []).length && !lunch) throw new Error(lunchEligibilityFailureMessage());
       const hadShop = Boolean(previous.shop);
+      const sameWeek = previous.weekKey === currentWeekKey();
 
       s.week = {
         createdAt: new Date().toISOString(),
@@ -535,7 +538,10 @@ window.MW = window.MW || {};
         inventoryUsed: [],
         forceBuy: Array.isArray(previous.forceBuy) ? previous.forceBuy.slice() : [],
         savingMode: Boolean(s.plan.priceMode),
+        shoppingSubstitutions: sameWeek ? { ...(previous.shoppingSubstitutions || {}) } : {},
+        shopProgress: sameWeek ? previous.shopProgress || null : null,
       };
+      if (!sameWeek) s.ui.shopChecks = {};
       MW.state.log('week_regenerated', {
         previousRecipeIds: previousIds,
         recipeIds: s.week.meals.map((x) => x.recipeId),
@@ -543,7 +549,14 @@ window.MW = window.MW || {};
         lunchId: s.week.lunchId || '',
       });
       MW.state.save();
+      s.week.regenerationExcludedIds = previousIds;
       enforceGeneratedBudget('regenerate');
+      delete s.week.regenerationExcludedIds;
+      MW.state.save();
+      if (previousIds.length && s.week.meals.every((x) => previousIds.includes(x.recipeId)))
+        throw new Error(
+          'My Week could not find a genuinely different set of suitable dinners. Your existing plan has been kept.',
+        );
       if (hadShop && opts.rebuildShop !== false && MW.shopping)
         MW.shopping.build({ savingMode: Boolean(s.plan.priceMode), preserveChecks: true });
       return s.week;
@@ -580,6 +593,8 @@ window.MW = window.MW || {};
       const previous = s.week || {};
       if (previous.weekKey && previous.weekKey !== currentWeekKey()) {
         MW.weeks.archive(s, previous);
+        s.ui.shopChecks = {};
+        s.ui.shoppingSection = '__all';
       }
       const lunchPool = MW.LUNCHES.filter(lunchAllowed);
       const existingLunch = lunchPool.find((x) => x.id === previous.lunchId);
@@ -970,7 +985,8 @@ window.MW = window.MW || {};
 
     // Rank broadly with the lightweight recipe cost model, then use exact basket
     // pricing only for complete candidate weeks. Exact totals still decide success.
-    const priced = MW.RECIPES.filter((r) => planner.autoDinnerAllowed(r))
+    const excludedIds = new Set(options.excludeIds || MW.state.get().week?.regenerationExcludedIds || []);
+    const priced = MW.RECIPES.filter((r) => planner.autoDinnerAllowed(r) && !excludedIds.has(r.id))
       .map((r) => ({
         r,
         cost: valueCost(r),
