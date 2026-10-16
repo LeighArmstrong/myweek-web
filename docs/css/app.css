@@ -10945,17 +10945,33 @@ body:not(.cooking-active) .appbar .appbar-actions > button i {
   }
 }
 .meal-photo-wrap .favourite-toggle {
-  top: 5px;
-  right: 5px;
-  width: 24px;
-  height: 24px;
-  border-radius: 8px;
+  top: -5px;
+  right: -5px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 .meal-photo-wrap .favourite-toggle i {
+  position: relative;
+  z-index: 1;
   font-size: 12px;
 }
 .meal-photo-wrap .favourite-toggle::before {
-  inset: -10px;
+  inset: 10px;
+  border: 1px solid rgba(225, 217, 220, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 3px 10px rgba(74, 36, 47, 0.07);
+  pointer-events: none;
+}
+.meal-photo-wrap .favourite-toggle.is-saved::before {
+  border-color: #efc1d0;
+  background: rgba(255, 255, 255, 0.97);
+}
+.meal-photo-wrap .favourite-toggle::after {
+  inset: 13px;
 }
 .recipe-hero > .favourite-toggle {
   top: 12px;
@@ -11929,7 +11945,20 @@ body #app main.shell.onboarding-account > .onboard-content {
   .shop-overview .shop-summary {
     grid-template-columns: 150px minmax(190px, 1fr);
     gap: 28px;
+    align-items: stretch;
+  }
+  /* In landscape, align the price itself with the bar and their two captions.
+     Centring the outer blocks alone left the bar visibly too low. */
+  .shop-overview .shop-progress {
+    grid-template-rows: minmax(0, 1fr) auto;
     align-items: center;
+  }
+  .shop-overview .shop-progress .progress {
+    grid-row: 1;
+  }
+  .shop-overview .shop-progress > div:first-child {
+    grid-column: 1;
+    grid-row: 2;
   }
   /* The generic page-heading bottom margin was leaving 22px of empty space
      below the price and progress in wide layouts. Match the 12px gap above. */
