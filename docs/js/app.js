@@ -11,6 +11,9 @@ window.MW = window.MW || {};
   let libraryFilterEvents = null;
   MW.onboarding.startViewport();
   const navStack = [];
+  // The last main tab remains the directional reference while a header shortcut
+  // (Favourites, Account or Settings) is open.
+  let lastMainTabIndex = null;
   const keepScreenAwakeEnabled = MW.screenAwake.enabled;
   const wakeLockSupported = MW.screenAwake.supported;
   function refreshKeepAwakeControls() {
@@ -90,6 +93,8 @@ window.MW = window.MW || {};
         'motion-continuity-back',
         'motion-flow-forward',
         'motion-flow-back',
+        'motion-tab-forward',
+        'motion-tab-back',
       ].forEach((x) => page.classList.remove(x));
   };
   const animatePage = (motion) => {
@@ -104,9 +109,17 @@ window.MW = window.MW || {};
       'motion-continuity-back',
       'motion-flow-forward',
       'motion-flow-back',
+      'motion-tab-forward',
+      'motion-tab-back',
     ].forEach((x) => page.classList.remove(x));
     void page.offsetWidth;
-    page.classList.add('page-enter', motionClass(motion || pendingMotion));
+    const type = motionClass(motion || pendingMotion);
+    page.classList.add('page-enter', type);
+    // Fallback WebViews do not clear this class via the View Transition API.
+    // Remove it when the short entrance has finished, including after a rapid tap.
+    setTimeout(() => {
+      page.classList.remove('page-enter', type);
+    }, 320);
   };
   const pageObserver = new MutationObserver(() => {
     if (!animateNextPage) return;
@@ -159,8 +172,8 @@ window.MW = window.MW || {};
   function transitionRender(motion, fn) {
     finishInterruptedMotion();
     pendingMotion = motion || 'context';
-    // Bottom navigation is a context switch, not a travelling page. Painting it
-    // immediately avoids showing two different screen titles at the same time.
+    // Bottom tabs get their own directional movement. Header and bottom bar
+    // are separately named view-transition elements and remain stationary.
     if (reducedMotion() || pendingMotion === 'context') {
       animateNextPage = false;
       clearMotionDataset();
@@ -172,6 +185,12 @@ window.MW = window.MW || {};
       animateNextPage = false;
       const transition = document.startViewTransition(() => fn());
       activeViewTransition = transition;
+      // Skipping an in-flight animation deliberately rejects its ready promise.
+      // Observe that cancellation so rapid taps cannot emit page errors.
+      Promise.resolve(transition.ready).catch(() => {});
+      Promise.resolve(transition.updateCallbackDone).catch((error) => {
+        console.error('Could not render the requested page', error);
+      });
       Promise.resolve(transition.finished)
         .catch(() => {})
         .finally(() => {
@@ -212,7 +231,6 @@ window.MW = window.MW || {};
     const labelled = {
       savingToggle: 'Lower-cost planning',
       homeSavingToggle: 'Lower-cost planning',
-      normalPrice: 'Lower-cost planning',
       profileName: 'First name',
       retailer: 'Supermarket',
       budget: 'Weekly food budget',
@@ -285,6 +303,10 @@ window.MW = window.MW || {};
     if (['check', 'shopreview', 'shopping', 'delivery'].includes(screen)) return 'shop';
     if (['settings', 'cupboard', 'sync', 'account'].includes(screen)) return 'more';
     return screen;
+  };
+  const tabIndex = (screen) => {
+    const family = screenFamily(screen);
+    return { week: 0, recipes: 1, shop: 2, more: 3 }[family] ?? -1;
   };
   const motionFor = (from, to) => {
     from = String(from || '');
@@ -1588,15 +1610,23 @@ window.MW = window.MW || {};
         MW.state.save();
         notice.remove();
       };
-    root.querySelectorAll('[data-nav]').forEach(
-      (b) =>
-        (b.onclick = () => {
-          const target = b.dataset.nav;
-          if (target === 'shopreview' && (!s().week || !s().week.shop))
-            return go('check', { motion: 'context' });
-          go(target, { motion: 'context' });
-        }),
-    );
+    root.querySelectorAll('[data-nav]').forEach((button) => {
+      button.onclick = () => {
+        const selected = button.dataset.nav;
+        const destination = selected === 'shopreview' && (!s().week || !s().week.shop) ? 'check' : selected;
+        const fromIndex = tabIndex(s().ui.screen);
+        const previous = fromIndex >= 0 ? fromIndex : lastMainTabIndex;
+        const next = tabIndex(destination);
+        const motion =
+          previous == null || next < 0 || previous === next
+            ? 'context'
+            : next > previous
+              ? 'tab-forward'
+              : 'tab-back';
+        lastMainTabIndex = next >= 0 ? next : previous;
+        go(destination, { motion });
+      };
+    });
     const settings = document.getElementById('settingsButton');
     if (settings) settings.onclick = () => go('settings', { motion: 'drill-forward' });
     const account = document.getElementById('accountButton');
@@ -2960,16 +2990,6 @@ window.MW = window.MW || {};
         '</strong><span> checked</span></div><div class="progress"><span id="shopProgressBar" style="width:' +
         pct +
         '%"></span></div></section></div>' +
-        (orderLocked
-          ? ''
-          : shop.savingMode
-            ? '<label class="shop-price-mode"><span>Lower-cost meals<small>~' +
-              money(shop.estimatedSavings) +
-              ' saving</small></span><span class="toggle"><input id="normalPrice" type="checkbox" checked><span></span></span></label>'
-            : '<button type="button" class="shop-price-action" id="lowerShop">' +
-              'Find cheaper meals ' +
-              icon('chevron-right') +
-              '</button>') +
         '</section></div>' +
         '<div class="shop-list-toolbar"><span class="eyebrow">FILTER ITEMS</span>' +
         sectionChoice +
@@ -3011,27 +3031,6 @@ window.MW = window.MW || {};
         samePage(shopReview);
       };
     });
-    const lower = document.getElementById('lowerShop');
-    if (lower)
-      lower.onclick = (e) =>
-        withLoading(e.currentTarget, () => {
-          MW.planner.rebuildForPriceMode(true);
-          MW.shopping.build({ savingMode: true });
-          samePage(shopReview);
-        });
-    const normal = document.getElementById('normalPrice');
-    if (normal)
-      normal.onchange = (e) => {
-        const enabled = e.currentTarget.checked;
-        if (!enabled) {
-          MW.planner.rebuildForPriceMode(false);
-          MW.shopping.build({ savingMode: false });
-          samePage(shopReview);
-          return;
-        }
-        MW.shopping.build({ savingMode: true });
-        samePage(shopReview);
-      };
     const guided = document.getElementById('guided');
     if (guided)
       guided.onclick = () => {

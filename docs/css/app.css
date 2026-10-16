@@ -1037,36 +1037,6 @@ p {
   font-size: 13px;
   line-height: 1.5;
 }
-.shop-price-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0;
-  background: transparent;
-  border: 0;
-  color: var(--green-deep);
-  font-size: 12px;
-  font-weight: 750;
-}
-.shop-price-action i:last-child {
-  font-size: 9px;
-}
-.shop-price-mode {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 44px;
-  color: var(--green-deep);
-  font-size: 12px;
-  font-weight: 750;
-}
-.shop-price-mode small {
-  display: block;
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 3px;
-}
 .shop-progress {
   display: grid;
   gap: 5px;
@@ -5998,7 +5968,7 @@ body:not(.cooking-active) .shell {
     box-shadow: 0 0 0 8px rgba(36, 166, 111, 0.06);
   }
 }
-.page-enter > *:not(.bottom-nav) {
+.page-enter:not(.motion-tab-forward):not(.motion-tab-back) > *:not(.bottom-nav) {
   animation: mwContentIn 0.34s cubic-bezier(0.2, 0.72, 0.25, 1) both !important;
 }
 .btn.primary,
@@ -11745,20 +11715,6 @@ body #app main.shell.onboarding-account > .onboard-content {
 .shop-overview .shop-progress .progress {
   min-height: 5px;
 }
-.shop-overview .shop-price-action {
-  align-self: center;
-  display: inline-flex;
-  justify-content: flex-end;
-  max-width: 132px;
-  gap: 5px;
-  text-align: right;
-  font-size: 12px;
-  line-height: 1.35;
-}
-.shop-overview .shop-price-mode {
-  align-self: center;
-  max-width: 160px;
-}
 .shop-list-toolbar {
   min-height: 43px;
   margin: 0 0 11px;
@@ -11941,10 +11897,6 @@ body #app main.shell.onboarding-account > .onboard-content {
   .shop-overview {
     padding: 13px;
   }
-  .shop-overview .shop-price-action {
-    max-width: 116px;
-    font-size: 11px;
-  }
   .shop-surface .retail-group .shop-item {
     gap: 9px;
     padding-left: 11px;
@@ -11978,7 +11930,81 @@ body #app main.shell.onboarding-account > .onboard-content {
     gap: 28px;
     align-items: center;
   }
-  .shop-overview .shop-price-action {
-    max-width: 160px;
+}
+
+/* Main-tab navigation: directional content slide, stable header and tab bar. */
+@keyframes mwTabForwardOld {
+  to {
+    opacity: 0.15;
+    transform: translateX(-22%);
   }
+}
+@keyframes mwTabForwardNew {
+  from {
+    opacity: 0.25;
+    transform: translateX(22%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+@keyframes mwTabBackOld {
+  to {
+    opacity: 0.15;
+    transform: translateX(22%);
+  }
+}
+@keyframes mwTabBackNew {
+  from {
+    opacity: 0.25;
+    transform: translateX(-22%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+html[data-mw-motion='tab-forward']::view-transition-old(root) {
+  animation: mwTabForwardOld 205ms ease-in both;
+}
+html[data-mw-motion='tab-forward']::view-transition-new(root) {
+  animation: mwTabForwardNew 225ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+html[data-mw-motion='tab-back']::view-transition-old(root) {
+  animation: mwTabBackOld 205ms ease-in both;
+}
+html[data-mw-motion='tab-back']::view-transition-new(root) {
+  animation: mwTabBackNew 225ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+html[data-mw-motion='tab-forward']::view-transition-group(mw-appbar),
+html[data-mw-motion='tab-back']::view-transition-group(mw-appbar),
+html[data-mw-motion='tab-forward']::view-transition-group(mw-bottom-nav),
+html[data-mw-motion='tab-back']::view-transition-group(mw-bottom-nav) {
+  animation: none;
+}
+
+/* Older WebViews without View Transitions animate content only. */
+.page-enter.motion-tab-forward,
+.page-enter.motion-tab-back {
+  animation: none;
+}
+.page-enter.motion-tab-forward > :not(.appbar):not(.bottom-nav) {
+  animation: mwTabForwardNew 225ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+.page-enter.motion-tab-back > :not(.appbar):not(.bottom-nav) {
+  animation: mwTabBackNew 225ms cubic-bezier(0.22, 0.72, 0.24, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-mw-motion='tab-forward']::view-transition-old(root),
+  html[data-mw-motion='tab-forward']::view-transition-new(root),
+  html[data-mw-motion='tab-back']::view-transition-old(root),
+  html[data-mw-motion='tab-back']::view-transition-new(root),
+  .page-enter.motion-tab-forward > :not(.appbar):not(.bottom-nav),
+  .page-enter.motion-tab-back > :not(.appbar):not(.bottom-nav) {
+    animation: none;
+  }
+}
+.shop-overview .shop-head {
+  grid-template-columns: minmax(0, 1fr);
 }
