@@ -8407,7 +8407,8 @@ body:not(.cooking-active) .lunch-recipe-hero.text-only {
 .library-search-row {
   margin-bottom: 10px;
   position: relative;
-  z-index: 2;
+  /* Filters must sit above favourites on the recipe cards beneath them. */
+  z-index: 6;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
@@ -11930,6 +11931,12 @@ body #app main.shell.onboarding-account > .onboard-content {
     gap: 28px;
     align-items: center;
   }
+  /* The generic page-heading bottom margin was leaving 22px of empty space
+     below the price and progress in wide layouts. Match the 12px gap above. */
+  .shop-overview .page-head.shop-head {
+    margin: 0 0 11px;
+    align-items: center;
+  }
 }
 
 /* Main-tab navigation: directional content slide, stable header and tab bar. */
@@ -12007,4 +12014,49 @@ html[data-mw-motion='tab-back']::view-transition-group(mw-bottom-nav) {
 }
 .shop-overview .shop-head {
   grid-template-columns: minmax(0, 1fr);
+}
+
+/* A cooking session starts at the first method instruction. Any genuinely
+   useful source preparation notes remain available without another screen. */
+.cook-before-note {
+  margin: 0 0 12px;
+  border: 1px solid #dde9e2;
+  border-radius: 12px;
+  background: #f7fbf8;
+  color: var(--green-deep);
+}
+.cook-before-note summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 13px;
+  font-size: 12px;
+  font-weight: 780;
+  cursor: pointer;
+  list-style: none;
+}
+.cook-before-note summary::-webkit-details-marker {
+  display: none;
+}
+.cook-before-note summary i {
+  font-size: 10px;
+  transition: transform 160ms ease;
+}
+.cook-before-note[open] summary i {
+  transform: rotate(180deg);
+}
+.cook-before-note p {
+  padding: 0 13px 10px;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.cook-before-note p + p {
+  padding-top: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cook-before-note summary i {
+    transition: none;
+  }
 }

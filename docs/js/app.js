@@ -4547,7 +4547,10 @@ window.MW = window.MW || {};
       };
     document.getElementById('startCooking').onclick = () => {
       MW.preparation.begin(r, people);
-      go('cookprep:' + r.id);
+      // Ingredients, equipment and gathering ticks already appear above.
+      // Begin with the first real cooking instruction, not a second checklist.
+      const first = MW.display.method(r).steps[0];
+      go(first ? 'cookstep:' + r.id + ':' + first.sourceIndex : 'recipe:' + r.id);
     };
     bindNav();
   }
@@ -4891,8 +4894,11 @@ window.MW = window.MW || {};
     if (recipeBlocked(r)) return;
     const st = s();
     const active = MW.weeks.cookingWeek(st) && MW.weeks.cookingWeek(st).preparation;
-    if (!active || active.recipeId !== id || active.finished) return go('cookprep:' + id);
-    const steps = MW.display.method(r).steps;
+    // An expired deep link must reopen the recipe instead of presenting a
+    // second ingredients/equipment screen or silently starting new portions.
+    if (!active || active.recipeId !== id || active.finished) return go('recipe:' + id);
+    const method = MW.display.method(r);
+    const steps = method.steps;
     if (!steps.length) return go('recipe:' + id);
     // Saved routes use the source index, so removing a preparation introduction
     // cannot advance an existing cooking session to a different instruction.
@@ -5005,6 +5011,15 @@ window.MW = window.MW || {};
             .join('') +
           '</div></div>'
         : '') +
+      (index === 0 && method.preparation.length
+        ? '<details class="cook-before-note"><summary>Preparation notes ' +
+          icon('chevron-down') +
+          '</summary>' +
+          method.preparation
+            .map((note) => '<p>' + esc(displayInstruction(note, r, factor, people)) + '</p>')
+            .join('') +
+          '</details>'
+        : '') +
       '<div class="cook-action-list">' +
       instructionParts
         .map((part, i) => '<div><span>' + (i + 1) + '</span><p>' + esc(part) + '</p></div>')
@@ -5070,7 +5085,7 @@ window.MW = window.MW || {};
     document.getElementById('closeCook').onclick = () => leaveCookingFlow('recipe:' + id);
     document.getElementById('prevStep').onclick = () => {
       if (index > 0) go('cookstep:' + id + ':' + steps[index - 1].sourceIndex);
-      else go('cookprep:' + id, { motion: 'drill-back', back: true });
+      else go('recipe:' + id, { motion: 'drill-back', back: true });
     };
     document.getElementById('nextStep').onclick = () => {
       if (index < steps.length - 1) go('cookstep:' + id + ':' + steps[index + 1].sourceIndex);
