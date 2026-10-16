@@ -241,9 +241,9 @@ window.MW = window.MW || {};
         };
       case 'queued':
         return {
-          title: 'Waiting to download',
-          message: 'Android is preparing the download. ' + details.label + '.',
-          label: 'Preparing download',
+          title: 'Starting download',
+          message: 'Android is connecting to the update server. ' + details.label + '.',
+          label: 'Starting download…',
           busy: true,
           progressPercent: details.known ? percent : null,
         };
@@ -259,7 +259,7 @@ window.MW = window.MW || {};
         return {
           title: 'Download paused' + (percent ? ' · ' + percent + '%' : ''),
           message: (value.message || 'Waiting for a connection.') + ' ' + details.label + '.',
-          label: 'Waiting for connection',
+          label: 'Waiting to resume',
           busy: true,
           progressPercent: details.known ? percent : null,
         };

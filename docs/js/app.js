@@ -2179,14 +2179,10 @@ window.MW = window.MW || {};
           notice.id = 'homeUpdateNotice';
           notice.className = 'delivery-notice';
           notice.dataset.updateVersionCode = String(result.manifest.versionCode);
-          const installed = String((result.local && result.local.version) || 'unknown');
           notice.innerHTML =
             icon('cloud-arrow-down') +
-            '<span><strong>Update available: ' +
-            esc(result.manifest.versionName) +
-            '</strong><small>Installed ' +
-            esc(installed) +
-            ' · tap to download and verify.</small></span><i class="fa-solid fa-chevron-right"></i>';
+            '<span><strong>Update available</strong><small>Tap to download the latest version.</small></span>' +
+            '<i class="fa-solid fa-chevron-right"></i>';
           intro.insertAdjacentElement('afterend', notice);
           notice.onclick = async () => {
             if (notice.disabled) return;
@@ -2801,17 +2797,19 @@ window.MW = window.MW || {};
         (fulfilment.complete ? icon('check') : fulfilment.partial ? icon('minus') : '') +
         '</span><span class="shop-info"><strong>' +
         esc(ingredientName(shownName)) +
-        '</strong><small>' +
+        '</strong><span class="shop-item-details"><small>' +
         orderLine(x) +
         '</small>' +
+        price +
+        '</span>' +
         subNote +
         quantityNote +
         progressNote +
-        '</span>' +
-        price +
-        '<span class="shop-reason">' +
+        '<span class="shop-reason" title="' +
         esc((x.reasons || [])[0] || '') +
-        '</span></button>' +
+        '">' +
+        esc((x.reasons || [])[0] || '') +
+        '</span></span></button>' +
         more +
         '</div>'
       );
@@ -2889,10 +2887,10 @@ window.MW = window.MW || {};
 
     const stageMessage =
       stage === 'cupboard'
-        ? 'Tick ingredients you already have. Your saved cupboard quantities are checked automatically.'
+        ? 'Tick what you have at home. Saved cupboard stock is recognised automatically.'
         : orderLocked
-          ? 'Order recorded. You can still tick or correct this list; delivery quantities are checked separately.'
-          : 'Tick the remaining ingredients as you add them to your online basket. Previous ticks are saved.';
+          ? 'Order recorded. You can still edit this list and check delivery separately.'
+          : 'Tick items as you add them to your basket. Earlier ticks stay saved.';
     const stockPanel = inventoryCovered.length
       ? '<details class="shop-stock-covered" id="shopStockCovered"><summary>' +
         icon('check-circle') +
@@ -2938,20 +2936,13 @@ window.MW = window.MW || {};
       '</div>';
 
     root.innerHTML = shell(
-      '<section class="shop-stage-notice"><span class="eyebrow">' +
-        (stage === 'cupboard'
-          ? '1 · CHECK YOUR CUPBOARDS'
-          : orderLocked
-            ? 'ORDER RECORDED'
-            : '2 · ONLINE SHOPPING') +
+      '<div class="shop-overview"><section class="shop-stage-notice"><span class="eyebrow">' +
+        (stage === 'cupboard' ? '1 · CHECK CUPBOARDS' : orderLocked ? 'ORDER PLACED' : '2 · ONLINE BASKET') +
         '</span><p>' +
         esc(stageMessage) +
         '</p>' +
         (stage === 'basket' ? '<button type="button" id="backToCupboard">Review what I have</button>' : '') +
         '</section>' +
-        '<div class="shop-list-toolbar"><span class="eyebrow">SHOW ITEMS</span>' +
-        sectionChoice +
-        '</div>' +
         '<section class="page-head shop-head"><div class="shop-summary"><div class="shop-total"><details><summary><strong>' +
         money(totalValue) +
         '</strong><span>' +
@@ -2976,11 +2967,13 @@ window.MW = window.MW || {};
               money(shop.estimatedSavings) +
               ' saving</small></span><span class="toggle"><input id="normalPrice" type="checkbox" checked><span></span></span></label>'
             : '<button type="button" class="shop-price-action" id="lowerShop">' +
-              icon('sterling-sign') +
-              ' Find cheaper meals ' +
+              'Find cheaper meals ' +
               icon('chevron-right') +
               '</button>') +
-        '</section>' +
+        '</section></div>' +
+        '<div class="shop-list-toolbar"><span class="eyebrow">FILTER ITEMS</span>' +
+        sectionChoice +
+        '</div>' +
         deliveryNotice +
         stockPanel +
         '<section class="shop-surface"><div class="shop-group show grouped-shop" data-shopgroup="__all">' +
