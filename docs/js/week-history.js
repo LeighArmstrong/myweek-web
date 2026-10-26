@@ -49,7 +49,6 @@ window.MW = window.MW || {};
       byKey = new Map();
     for (const w of Array.isArray(st.weekHistory) ? st.weekHistory : [])
       if (validWeek(w) && w.weekKey < current) byKey.set(w.weekKey, w);
-    if (validWeek(st.week) && st.week.weekKey < current) byKey.set(st.week.weekKey, st.week);
     return [...byKey.values()].sort((a, b) => b.weekKey.localeCompare(a.weekKey));
   }
   function selected(st = MW.state.get()) {

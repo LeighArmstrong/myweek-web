@@ -30,10 +30,12 @@ window.MW = window.MW || {};
   function initial() {
     const st = MW.state.get();
     return {
-      name: (st.profile && st.profile.name) || '',
       people: Number(st.household && st.household.people) || 2,
-      budget: Number(st.household && st.household.budget) || 70,
+      budget:
+        Number(st.household && st.household.budget) ||
+        MW.markets.forCountry(st.household && st.household.country).defaultBudget,
       retailer: (st.household && st.household.retailer) || "Sainsbury's",
+      country: MW.markets.normalise(st.household && st.household.country),
       dinners: (st.plan && st.plan.dinnerDays && st.plan.dinnerDays.length) || 6,
       lunches: Array.isArray(st.plan && st.plan.lunchDays) ? st.plan.lunchDays.length : 5,
       lunchPeople: Number(st.plan && st.plan.lunchPeople) || 1,
@@ -180,7 +182,7 @@ window.MW = window.MW || {};
     if (step === 1) {
       visual = '<img src="assets/onboarding/onboarding-hero.webp" alt="">';
       title = 'Dinner for ' + (draft.people === 1 ? 'one' : draft.people === 2 ? 'two' : draft.people);
-      detail = '£' + Math.round(draft.budget) + ' weekly budget';
+      detail = MW.markets.money(Math.round(draft.budget), draft.country) + ' weekly budget';
     }
     if (step === 2) {
       visual =
@@ -287,7 +289,7 @@ window.MW = window.MW || {};
       '</span><p><strong>Plan your meals</strong><small>Delicious recipes tailored to you</small></p></div>' +
       '<div><span>' +
       icon('cart-shopping') +
-      '</span><p><strong>Build your shopping list</strong><small>Get everything you need in one place</small></p></div>' +
+      '</span><p><strong>Automatic shopping list</strong><small>Ingredients appear when you choose meals</small></p></div>' +
       '<div><span>' +
       icon('heart') +
       '</span><p><strong>Eat well, your way</strong><small>Options for all diets, tastes and budgets</small></p></div>' +
@@ -305,18 +307,24 @@ window.MW = window.MW || {};
     return (
       heading('1', 'YOUR HOUSEHOLD', 'Who’s eating?', 'Set your portions and budget.', 'users') +
       '<section class="onboard-card form-card">' +
-      '<label>First name<input id="obName" value="' +
-      esc(draft.name) +
-      '" placeholder="Your name" autocomplete="given-name"></label>' +
       choiceGroup(
         'People usually eating dinner',
         countRow('obPeople', [1, 2, 3, 4, 5, 6], draft.people),
         'users',
       ) +
-      '<div class="onboard-two"><label>Weekly food budget<div class="prefix-input"><span>£</span><input id="obBudget" type="number" min="20" step="5" value="' +
+      '<label>Country' +
+      selectControl(
+        'obCountry',
+        MW.markets.choices.map((x) => x.label),
+        MW.markets.forCountry(draft.country).label,
+      ) +
+      '</label>' +
+      '<div class="onboard-two"><label>Weekly food budget<div class="prefix-input"><span>' +
+      MW.markets.forCountry(draft.country).currencySymbol +
+      '</span><input id="obBudget" type="number" min="20" step="5" value="' +
       esc(draft.budget) +
       '"></div></label><label>Supermarket' +
-      selectControl('obRetailer', MW.RETAILERS, draft.retailer) +
+      selectControl('obRetailer', MW.markets.availableRetailers(draft.country), draft.retailer) +
       '</label></div>' +
       '</section>' +
       nextButton()
@@ -480,9 +488,9 @@ window.MW = window.MW || {};
       (equip.length ? esc(equip.slice(0, 3).join(' · ')) : 'No specialist appliances') +
       '</small></div>' +
       '<div><span>' +
-      icon('sterling-sign') +
-      '</span><strong>£' +
-      Math.round(draft.budget) +
+      icon(MW.markets.forCountry(draft.country).currencyIcon) +
+      '</span><strong>' +
+      MW.markets.money(Math.round(draft.budget), draft.country) +
       ' target</strong><small>' +
       esc(draft.retailer) +
       '</small></div>' +
@@ -493,10 +501,15 @@ window.MW = window.MW || {};
 
   function persist() {
     const st = MW.state.get();
-    st.profile.name = String(draft.name || '').trim();
     st.household.people = Math.max(1, Number(draft.people) || 2);
-    st.household.budget = Math.max(1, Number(draft.budget) || 70);
-    st.household.retailer = draft.retailer || "Sainsbury's";
+    st.household.budget = Math.max(
+      1,
+      Number(draft.budget) || MW.markets.forCountry(draft.country).defaultBudget,
+    );
+    st.household.country = MW.markets.normalise(draft.country);
+    st.household.retailer = MW.markets.validRetailer(st.household.country, draft.retailer)
+      ? draft.retailer
+      : MW.markets.forCountry(st.household.country).defaultRetailer;
     st.household.effort = draft.effort || 'mixed';
     const avoided = MW.foodIdentity
       ? MW.foodIdentity.parseList(draft.avoid)
@@ -564,6 +577,7 @@ window.MW = window.MW || {};
     if (v.allergens.some((id) => !MW.food.allergens.some((x) => x.id === id)))
       throw new Error('Unrecognised saved allergy selection');
     draft = JSON.parse(JSON.stringify(v));
+    draft.country = MW.markets.normalise(draft.country);
     step = saved.step;
     return true;
   }
@@ -667,10 +681,10 @@ window.MW = window.MW || {};
   }
 
   function captureInputs(root) {
-    const name = root.querySelector('#obName');
-    if (name) draft.name = name.value;
     const budget = root.querySelector('#obBudget');
-    if (budget) draft.budget = Number(budget.value) || 70;
+    if (budget) draft.budget = Number(budget.value) || MW.markets.forCountry(draft.country).defaultBudget;
+    const country = root.querySelector('#obCountry');
+    if (country) draft.country = MW.markets.fromLabel(country.value);
     const retailer = root.querySelector('#obRetailer');
     if (retailer) draft.retailer = retailer.value;
     const avoid = root.querySelector('#obAvoid');
@@ -728,7 +742,22 @@ window.MW = window.MW || {};
     bindMulti(root, 'obGoals', 'goals');
     bindMulti(root, 'obAllergens', 'allergens');
     bindMulti(root, 'obEquipment', 'equipment');
-    for (const id of ['obName', 'obBudget', 'obRetailer', 'obAvoid']) {
+    const countrySelect = root.querySelector('#obCountry');
+    if (countrySelect)
+      countrySelect.addEventListener('change', () => {
+        const prior = draft.country;
+        captureInputs(root);
+        if (prior !== draft.country) {
+          const market = MW.markets.forCountry(draft.country);
+          const previousMarket = MW.markets.forCountry(prior);
+          if (Number(draft.budget) === previousMarket.defaultBudget) draft.budget = market.defaultBudget;
+          draft.retailer = MW.markets.validRetailer(draft.country, draft.retailer)
+            ? draft.retailer
+            : market.defaultRetailer;
+        }
+        render(root, MW.onboarding._finish, { preserveScroll: true });
+      });
+    for (const id of ['obBudget', 'obRetailer', 'obAvoid']) {
       const input = root.querySelector('#' + id);
       if (input)
         input.addEventListener(id === 'obRetailer' ? 'change' : 'input', () => {

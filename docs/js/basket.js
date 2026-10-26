@@ -70,7 +70,9 @@ window.MW = window.MW || {};
     options = options || {};
     const s = MW.state.get(),
       p = MW.pricing;
-    const savingMode = options.savingMode == null ? Boolean(s.plan.priceMode) : Boolean(options.savingMode);
+    const unpriced = MW.markets && !MW.markets.hasPricing();
+    const savingMode =
+      !unpriced && (options.savingMode == null ? Boolean(s.plan.priceMode) : Boolean(options.savingMode));
     const force = new Set(((s.week && s.week.forceBuy) || []).map(norm));
     const remaining = new Map(),
       buckets = new Map(),
@@ -226,7 +228,8 @@ window.MW = window.MW || {};
     const groups = Object.create(null),
       lines = [];
     let total = 0,
-      normalTotal = 0;
+      normalTotal = 0,
+      pricesMissing = 0;
     for (const b of buckets.values()) {
       const e = b.entry;
       const purchaseNeed =
@@ -284,17 +287,66 @@ window.MW = window.MW || {};
         x.inventoryAmount = x.displayAmount;
         x.priceConfidence = 'unpriced-estimate';
       }
+      if (unpriced) {
+        // Only a matched, measured country record can provide a pack estimate.
+        // An unknown item never inherits an old UK price or a synthetic zero.
+        const marketRecord =
+          e &&
+          e.country === MW.markets.current() &&
+          e.catalogueType === 'country-benchmark' &&
+          Number.isFinite(e.price) &&
+          Number.isFinite(e.packQty) &&
+          e.packQty > 0 &&
+          !b.unknown;
+        if (marketRecord) {
+          x.priceConfidence =
+            e.retailerPriceMethod === 'relative-basket-average-estimate'
+              ? 'retailer-average-estimate'
+              : 'dated-country-benchmark';
+          x.retailEvidence = {
+            source: e.source,
+            url: e.sourceUrl,
+            observedAt: e.asOf,
+            sourceRetailers: e.sourceRetailers || [],
+            retailer: e.selectedRetailer || null,
+            estimateMethod: e.retailerPriceMethod || 'country-benchmark',
+          };
+          x.priceLabel = e.label;
+          x.inventoryAmount = retailAmount;
+        } else {
+          x.displayAmount = b.amounts.join(' + ');
+          x.inventoryAmount = x.displayAmount;
+          x.estimatedPrice = null;
+          x.normalEstimatedPrice = null;
+          x.cost = null;
+          x.normalCost = null;
+          x.packPrice = null;
+          x.packSize = null;
+          x.packs = null;
+          x.retailEvidence = null;
+          x.priceConfidence =
+            MW.markets.current() === 'AU' ? 'australian-price-unavailable' : 'market-price-unavailable';
+          x.priceLabel = 'No country benchmark for this ingredient';
+          x.label = x.name;
+          pricesMissing++;
+          if (e) matched--;
+        }
+      }
       if (!groups[x.category]) groups[x.category] = [];
       groups[x.category].push(x);
       lines.push(x);
-      total += x.estimatedPrice;
-      normalTotal += x.normalEstimatedPrice;
+      if (Number.isFinite(x.estimatedPrice)) {
+        total += x.estimatedPrice;
+        normalTotal += x.normalEstimatedPrice;
+      }
     }
     Object.values(groups).forEach((rows) => rows.sort((a, b) => a.name.localeCompare(b.name)));
+    const completePrices = !unpriced || (pricesMissing === 0 && unresolved === 0);
     return {
-      total: round(total),
-      normalTotal: round(normalTotal),
-      saving: round(Math.max(0, normalTotal - total)),
+      total: completePrices ? round(total) : null,
+      pricedSubtotal: round(total),
+      normalTotal: completePrices ? round(normalTotal) : null,
+      saving: completePrices ? round(Math.max(0, normalTotal - total)) : null,
       unresolved,
       lines,
       groups,
@@ -302,6 +354,10 @@ window.MW = window.MW || {};
       lunchPortions,
       matched,
       savingMode,
+      pricingAvailable: completePrices,
+      pricedLineCount: lines.length - pricesMissing,
+      missingPriceCount: pricesMissing,
+      currency: MW.markets.forCountry().currency,
     };
   }
   function recipeEstimate(recipe, people, ignoreInventory = true) {

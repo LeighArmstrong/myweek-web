@@ -316,6 +316,23 @@ window.MW = window.MW || {};
   function specialEvidence(recipe, name, stepText) {
     const n = normalise(name),
       t = normalise(stepText);
+    // A combined herb packet may be prepared in two separate sentences.
+    if (n === 'coriander and mint') {
+      const corianderPrepared =
+        /\b(?:chop|strip|pick|tear|add|mix|sprinkle|scatter)\b[^.!?]{0,110}\bcoriander\b/.test(t);
+      const mintPrepared = /\b(?:chop|strip|pick|tear|add|mix|sprinkle|scatter)\b[^.!?]{0,110}\bmint\b/.test(
+        t,
+      );
+      return corianderPrepared || mintPrepared;
+    }
+    // A single packet of seasonal salad may be called "your salad".
+    // Only count its preparation or addition, not a finished-dish reference.
+    if (n === 'seasonal salad') {
+      const leafyRows = countMatchingIngredients(recipe, (ingredient) =>
+        /\b(?:seasonal salad|baby leaf|salad leaves|wild rocket|lettuce)\b/.test(ingredient),
+      );
+      return leafyRows === 1 && /\b(?:wash|add|mix|toss)\b[^.!?]{0,115}\bsalad\b/.test(t);
+    }
     if (/\bgarlic clove\b/.test(n)) {
       const clean = t.replace(/\bgarlic\s+(?:bread|baguette|butter|oil|sauce|paste|mayo(?:nnaise)?)\b/g, ' ');
       if (!/\bgarlic\b/.test(clean)) return false;
@@ -328,7 +345,8 @@ window.MW = window.MW || {};
     if (n === 'black pepper')
       return /\bblack pepper\b/.test(t) || /\bsalt and pepper\b/.test(t) || /\bseason(?:ing|ed)?\b/.test(t);
     if (n === 'salt') return /\bsalt\b/.test(t) || /\bseason(?:ing|ed)?\b/.test(t);
-    if (/\b(?:cooking oil|oil for cooking)\b/.test(n)) return /\boil\b/.test(t) && !/\bolive oil\b/.test(t);
+    if (/\b(?:cooking oil|oil for cooking|vegetable oil)\b/.test(n))
+      return /\boil\b/.test(t) && !/\bolive oil\b/.test(t);
     if (/\bolive oil\b/.test(n)) {
       if (isQualified(name)) return qualifiedReference(recipe, name, stepText);
       return (
@@ -536,7 +554,7 @@ window.MW = window.MW || {};
     return unique[0] || base.find((t) => !rootGeneric.has(t)) || base[0] || '';
   }
   const interactionAction =
-    '(?:mash|add|stir(?: in| through)?|mix(?: in| through)?|combine|fold|toss|stir fry|fry|cook|roast|bake|simmer|boil|pour|scatter|spread|drizzl(?:e|ing|ed)|coat|dip|top|season|melt|whisk|sprinkl(?:e|ing|ed)|crumbl(?:e|ing|ed)|squeeze|dissolve|put|pop|place|lay|transfer|arrange|return|tip|heat|warm|brush|rub|marinate|peel|deseed|chop|dice|slice|cut|halve|quarter|grate|crush|mince|trim|drain|rinse|zest|juice|shred|tear|pick|pat dry|pat|wash|soak|toast|reserve|set aside|spoon|dollop|smear|swirl|dress|garnish|pack|fill|stuff|wrap|roll|shape|press|glaze|dust|remove|bring|pile|break(?: up)?|divide|butter|crack)';
+    '(?:mash|add|stir(?: in| through)?|mix(?: in| through)?|combine|fold|toss|stir fry|fry|cook|roast|bake|simmer|boil|pour|scatter|spread|drizzl(?:e|ing|ed)|coat|dip|top|season|melt|whisk|sprinkl(?:e|ing|ed)|crumbl(?:e|ing|ed)|squeeze|dissolve|put|pop|place|lay|transfer|arrange|return|tip|heat|warm|brush|rub|marinate|peel|deseed|chop|dice|slice|cut|halve|quarter|grate|crush|mince|trim|drain|rinse|zest|juice|shred|tear|pick|pat dry|pat|wash|soak|toast|reserve|set aside|spoon|dollop|smear|swirl|dress|garnish|finish with|pack|fill|stuff|wrap|roll|shape|press|glaze|dust|remove|bring|pile|break(?: up)?|divide|butter|crack)';
   const clauseCache = new Map(),
     activeRegexCache = new Map(),
     purposeRegexCache = new Map(),
@@ -716,7 +734,8 @@ window.MW = window.MW || {};
       if (/\bbutter\s+(?:the\s+)?(?:bread|bun|roll|toast)\b/i.test(probe)) return true;
     }
     if (n === 'peas') probe = probe.replace(/\bpea pods?\b/gi, 'pods');
-    if (/\b(?:cooking oil|oil for cooking)\b/.test(n)) probe = probe.replace(/\bolive oil\b/gi, 'olive');
+    if (/\b(?:cooking oil|oil for cooking|vegetable oil)\b/.test(n))
+      probe = probe.replace(/\bolive oil\b/gi, 'olive');
     if (/\b(?:red|yellow|green|bell) pepper\b/.test(n))
       probe = probe.replace(/\bblack pepper\b|\bsalt and pepper\b/gi, 'seasoning');
     if (
@@ -730,9 +749,16 @@ window.MW = window.MW || {};
           'prepared sauce',
         )
         .replace(/\bpassata\b/gi, 'prepared sauce');
+    if (
+      n === 'vegetable oil' &&
+      /\bvegetable oil\b/.test(normalise(probe)) &&
+      /\boil\b/.test(normalise(probe))
+    )
+      return true;
     if (isQualified(row[1]) && hasPhrase(probe, row[1]) && activePhrase(probe, row[1])) return true;
     if (hasPhrase(probe, row[1]) && /\b(?:spread|coat|rub|marinat)\w*\b/.test(normalise(probe))) return true;
     const semantic = specialEvidence(recipe, row[1], probe);
+    if (n === 'coriander and mint' || n === 'seasonal salad') return semantic;
     if (/\bgarlic clove\b/.test(n)) return semantic;
     if (isQualified(row[1])) return semantic || qualifiedReference(recipe, row[1], probe);
     if (n === 'salt' || n === 'black pepper' || (n === 'pepper' && openEndedAmount(row[0]))) return semantic;
@@ -761,7 +787,7 @@ window.MW = window.MW || {};
     }
     const root = rootToken(recipe, ingredientIndex, probe);
     const compound =
-      /\b(?:paste|puree|concentrate|sauce|dressing|stock|vinegar|ketchup|jam|dip|bread|ciabatta|baguette)\b/.test(
+      /\b(?:paste|puree|concentrate|sauce|dressing|stock|vinegar|ketchup|jam|dip|bread|ciabatta|baguette|passata)\b/.test(
         n,
       );
     const ambiguousRoot =
@@ -866,7 +892,18 @@ window.MW = window.MW || {};
             : ev.matched
               ? ev.reason
               : 'active-ingredient-reference';
-        if (ev.matched || usage)
+        const falsePassataSalsa =
+          ev.reason === 'source-step-id' &&
+          !ev.lexical &&
+          !usage &&
+          /\bpassata\b/i.test(recipe.ingredients[ingredientIndex][1]) &&
+          /\btomato (?:salsa|salad)\b/i.test(step) &&
+          (recipe.ingredients || []).some(
+            ([, name]) =>
+              /\btomato(?:es)?\b/i.test(name) &&
+              !/\b(?:passata|paste|puree|concentrate|sauce|stock|ketchup|dressing)\b/i.test(name),
+          );
+        if ((ev.matched || usage) && !falsePassataSalsa)
           hits.push({
             stepIndex,
             reason,

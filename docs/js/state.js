@@ -14,6 +14,7 @@ window.MW = window.MW || {};
         people: 2,
         budget: 70,
         retailer: "Sainsbury's",
+        country: 'GB',
         effort: 'mixed',
         restrictions: [],
         dislikes: [],
@@ -99,7 +100,13 @@ window.MW = window.MW || {};
     x.profile = x.profile || { name: '' };
     x.household = x.household || fresh().household;
     x.household.people = Number(x.household.people) || 2;
-    x.household.budget = Number(x.household.budget) || 70;
+    x.household.country = MW.markets.normalise(x.household.country);
+    // Earlier development snapshots contained this optional field; it is no longer collected.
+    delete x.household.postcode;
+    if (!MW.markets.validRetailer(x.household.country, x.household.retailer))
+      x.household.retailer = MW.markets.forCountry(x.household.country).defaultRetailer;
+    x.household.budget =
+      Number(x.household.budget) || MW.markets.forCountry(x.household.country).defaultBudget;
     x.household.restrictions = Array.isArray(x.household.restrictions) ? x.household.restrictions : [];
     x.household.dislikes = Array.isArray(x.household.dislikes) ? x.household.dislikes : [];
     x.household.foodAliases =
@@ -130,7 +137,7 @@ window.MW = window.MW || {};
     if (!Array.isArray(x.plan.lunchDays)) x.plan.lunchDays = lunchDefaults.slice();
     if (!Number.isFinite(Number(x.plan.lunchPeople))) x.plan.lunchPeople = 1;
     x.plan.lunchPeople = Math.max(1, Math.min(x.household.people, Number(x.plan.lunchPeople) || 1));
-    x.plan.priceMode = Boolean(x.plan.priceMode);
+    x.plan.priceMode = Boolean(x.plan.priceMode) && MW.markets.canPlanWithPrices(x.household.country);
     x.foodProfile = x.foodProfile || {};
     if (!['omnivore', 'vegetarian', 'vegan', 'pescatarian'].includes(x.foodProfile.diet))
       x.foodProfile.diet = 'omnivore';

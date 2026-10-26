@@ -108,6 +108,8 @@ window.MW = window.MW || {};
       lunchDays: (plan.lunchDays || []).slice(),
       lunchPeople: Number(plan.lunchPeople) || 1,
       people: Number(plan.people) || 2,
+      country: (s.household && s.household.country) || 'GB',
+      retailer: (s.household && s.household.retailer) || '',
       regulars: (s.regulars || []).filter((x) => x.selected).map((x) => [x.id, x.count, x.unit]),
       extras: (w.extras || []).map((x) => [x.name, x.qty, x.estimatedCost]),
       forceBuy: (w.forceBuy || []).slice().sort(),
@@ -115,6 +117,8 @@ window.MW = window.MW || {};
       savingMode: Boolean(s.plan.priceMode),
       priceAsOf: (MW.pricing && MW.pricing.asOf) || '',
       priceRevision: (MW.pricing && MW.pricing.revision) || '',
+      countryPriceRevision:
+        MW.cataloguePrices?.revision?.((s.household && s.household.country) || 'GB') || '',
     });
   }
 
@@ -127,13 +131,11 @@ window.MW = window.MW || {};
     if (!week.shopProgress || typeof week.shopProgress !== 'object' || Array.isArray(week.shopProgress))
       week.shopProgress = {
         stage:
-          week.delivery && ['order-placed', 'delivery-checked'].includes(week.status)
-            ? 'ordered'
-            : 'cupboard',
+          week.delivery && ['order-placed', 'delivery-checked'].includes(week.status) ? 'ordered' : 'basket',
         items: {},
       };
     const progress = week.shopProgress;
-    if (!['cupboard', 'basket', 'ordered'].includes(progress.stage)) progress.stage = 'cupboard';
+    if (!['cupboard', 'basket', 'ordered'].includes(progress.stage)) progress.stage = 'basket';
     if (!progress.items || typeof progress.items !== 'object' || Array.isArray(progress.items))
       progress.items = {};
     return progress;
@@ -301,8 +303,77 @@ window.MW = window.MW || {};
     });
   }
 
+  function editableWeek(st) {
+    if (!st.week) throw new Error('Choose your meals before editing your shopping list.');
+    if (st.week.delivery || ['order-placed', 'delivery-checked'].includes(st.week.status))
+      throw new Error('Your order has already been placed.');
+  }
+  function addExtra(name) {
+    name = String(name || '')
+      .trim()
+      .replace(/\s+/g, ' ');
+    if (!name || name.length > 100) throw new Error('Enter an item name of up to 100 characters.');
+    return MW.state.transaction((st) => {
+      editableWeek(st);
+      st.week.extras = Array.isArray(st.week.extras) ? st.week.extras : [];
+      if (st.week.extras.some((row) => norm(row.name) === norm(name)))
+        throw new Error('This item is already on your shopping list.');
+      const extra = { name, qty: '1', category: 'Extras', estimatedCost: 2.5 };
+      st.week.extras.push(extra);
+      return extra;
+    });
+  }
+  function removeExtra(name) {
+    return MW.state.transaction((st) => {
+      editableWeek(st);
+      const extras = st.week.extras || [],
+        index = extras.findIndex((row) => norm(row.name) === norm(name));
+      if (index < 0) return false;
+      extras.splice(index, 1);
+      // If a removed extra was its own retail line, a future re-add should not
+      // inherit a checkout tick from an item that no longer existed.
+      const alsoRegular = (st.regulars || []).some((row) => row.selected && norm(row.name) === norm(name));
+      if (!alsoRegular) {
+        for (const [group, rows] of Object.entries(st.week.shop?.groups || {})) {
+          for (const row of rows || []) {
+            if (norm(row.name) !== norm(name)) continue;
+            if (!(row.reasons || []).every((reason) => reason === 'Added this week')) continue;
+            const key = group + '|' + row.name;
+            if (st.week.shopProgress?.items) delete st.week.shopProgress.items[key];
+            if (st.ui?.shopChecks) delete st.ui.shopChecks[key];
+            if (st.week.shoppingSubstitutions) delete st.week.shoppingSubstitutions[key];
+          }
+        }
+      }
+      return true;
+    });
+  }
+  function setRegular(id, selected) {
+    return MW.state.transaction((st) => {
+      editableWeek(st);
+      const item = (st.regulars || []).find((row) => row.id === id);
+      if (!item) return false;
+      item.selected = Boolean(selected);
+      return true;
+    });
+  }
+  function changeRegularCount(id, change) {
+    return MW.state.transaction((st) => {
+      editableWeek(st);
+      const item = (st.regulars || []).find((row) => row.id === id);
+      if (!item || !Number.isInteger(change) || !change) return false;
+      item.count = Math.min(99, Math.max(1, (Number(item.count) || 1) + change));
+      item.selected = true;
+      return true;
+    });
+  }
+
   MW.shopping = {
     purchaseLines,
+    addExtra,
+    removeExtra,
+    setRegular,
+    changeRegularCount,
     progressState,
     progressFor,
     reconcileProgress,
@@ -320,7 +391,9 @@ window.MW = window.MW || {};
       const s = MW.state.get();
       if (!s.week || !Array.isArray(s.week.meals)) throw new Error('No weekly plan is available yet.');
       options = options || {};
-      const savingMode = options.savingMode == null ? Boolean(s.plan.priceMode) : Boolean(options.savingMode);
+      const unpriced = MW.markets && !MW.markets.hasPricing();
+      const savingMode =
+        !unpriced && (options.savingMode == null ? Boolean(s.plan.priceMode) : Boolean(options.savingMode));
       const estimate = MW.basket.calculate(s.week.meals, {
         savingMode,
         people: MW.weeks.currentPlanning(s).people,
@@ -348,15 +421,25 @@ window.MW = window.MW || {};
       }
       s.week.shop = {
         groups,
-        estimatedTotal: Math.round(estimated * 100) / 100,
-        rawEstimate: Math.round(raw * 100) / 100,
-        estimatedSavings: Math.round(estimatedSavings * 100) / 100,
+        estimatedTotal: estimated == null ? null : Math.round(estimated * 100) / 100,
+        pricedSubtotal: Number.isFinite(estimate.pricedSubtotal) ? estimate.pricedSubtotal : null,
+        pricedLineCount: estimate.pricedLineCount,
+        missingPriceCount: estimate.missingPriceCount,
+        rawEstimate: raw == null ? null : Math.round(raw * 100) / 100,
+        estimatedSavings: estimatedSavings == null ? null : Math.round(estimatedSavings * 100) / 100,
+        pricingStatus: unpriced
+          ? estimated == null
+            ? 'country-benchmark-partial'
+            : 'country-benchmark-complete'
+          : 'uk-estimate',
+        currency: MW.markets.forCountry().currency,
+        country: s.household.country || 'GB',
         savingMode,
         savingTips,
         itemCount: estimate.lines.length,
         lunchPortions,
         priceAsOf: (MW.pricing && MW.pricing.asOf) || null,
-        priceRetailer: (MW.pricing && MW.pricing.retailer) || s.household.retailer,
+        priceRetailer: s.household.retailer,
         priceCoverage: estimate.lines.length
           ? Math.round((estimate.matched / estimate.lines.length) * 100)
           : 100,

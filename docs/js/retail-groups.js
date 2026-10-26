@@ -23,22 +23,24 @@ window.MW = window.MW || {};
     ],
     [
       'Cupboard',
-      /(coconut milk|chopped tomatoes|tinned tomatoes|canned tomatoes|passata|tomato puree|sun dried tomato|sweetcorn|chickpeas?|black beans?|butter beans?|kidney beans?|cannellini beans?|borlotti beans?|mixed beans?|5 bean medley|lentils?|\btuna\b|rice|pasta|spaghetti|penne|fusilli|orzo|noodles?|couscous|bulgur|oats?|cereal|flour|sugar(?! snap)|stock cube|stock paste|\bstock\b|spice|seasoning|paprika|cumin|garam masala|turmeric|chilli powder|curry powder|ras el hanout|sumac|cardamom|nigella|oregano|rosemary|mixed herbs|cinnamon|whole cloves|sesame seeds|chia seeds?|fennel seeds?|chilli flakes|dried bay leaf|dried thyme|dried sage|oil|olive oil|vinegar|balsamic|soy sauce|teriyaki|sweet chilli|bbq sauce|harissa|miso|tahini|peanut butter|maple syrup|honey|mustard|pesto|salt|black pepper|paste|sauce|chutney|jam|jelly|relish|mayonnaise|mayo|aioli|molasses|mirin|sriracha|hoisin|oyster sauce|ketjap|tabasco|olives?|capers?|cashew|almonds?|pecan|pine nuts?|walnuts?|pumpkin seeds?|sultanas?|raisins?|dried apricots?|prunes?|coconut flakes|pistachios|quinoa|desiccated coconut|chopped dates|agave nectar|gnocchi|lasagne sheets|linguine|macaroni|farfalle|orecchiette|tortiglioni|cooked spelt|gravy powder|vanilla extract|ranch dressing|jerk seasoning|caribbean style jerk|tandoori masala|truffle zest|compote|pine kernel|shichimi togarashi)/,
-    ],
-    [
-      'Fruit & Veg',
-      /(apples?|bananas?|grapes?|lemons?|limes?|orange|satsuma|nectarine|peach|plum|pear|berries|kiwi|mango|passion fruit|pomegranate|rhubarb|pepper|tomato|spinach|rocket|kale|cavolo nero|onion|shallot|garlic|carrot|parsnip|potato|courgette|aubergine|broccoli|romanesco|cauliflower|cabbage|cucumber|lettuce|salad leaves|baby leaf|seasonal salad|coriander|parsley|mint|basil|chives|dill|sage|tarragon|thyme|avocado|mushroom|sweet potato|butternut|pumpkin|spring onion|fresh ginger|ginger|green beans|runner beans|broad beans|pak choi|bok choy|celery|young pea pods?|sweet pea pods?|sugar snap peas?|mange ?tout|fresh edamame(?: beans)?|edamame beans?|baby corn|corn on the cob|asparagus(?: spears)?|brussels sprouts?|purple sprouting broccoli|sprouting broccoli|radishes?|beetroot|leeks?|fennel|peas?|samphire|spring greens|red chilli|green chilli|soffritto)/,
+      /(coconut milk|chopped tomatoes|tinned tomatoes|canned tomatoes|passata|tomato puree|sun dried tomato|sweetcorn|chickpeas?|black beans?|butter beans?|kidney beans?|cannellini beans?|borlotti beans?|mixed beans?|5 bean medley|lentils?|\btuna\b|rice|pasta|spaghetti|penne|fusilli|orzo|noodles?|couscous|bulgur|oats?|cereal|flour|sugar(?! snap)|stock cube|stock paste|\bstock\b|spice|seasoning|paprika|cumin|garam masala|turmeric|chilli powder|curry powder|ras el hanout|sumac|cardamom|nigella|oregano|rosemary|mixed herbs|cinnamon|whole cloves|sesame seeds|chia seeds?|fennel seeds?|chilli flakes|dried bay leaf|dried thyme|dried sage|oil|olive oil|vinegar|balsamic|soy sauce|teriyaki|sweet chilli|bbq sauce|harissa|miso|tahini|peanut butter|maple syrup|honey|mustard|pesto|salt|black pepper|paste|sauce|chutney|jam|jelly|relish|mayonnaise|mayo|aioli|molasses|mirin|sriracha|hoisin|oyster sauce|ketjap|tabasco|olives?|capers?|cashew|almonds?|pecan|pine nuts?|walnuts?|pumpkin seeds?|sultanas?|raisins?|dried apricots?|prunes?|coconut flakes|pistachios|quinoa|desiccated coconut|chopped dates|agave nectar|gnocchi|lasagne sheets|linguine|macaroni|farfalle|orecchiette|tortiglioni|cooked spelt|gravy powder|stuffing mix|vanilla extract|ranch dressing|jerk seasoning|caribbean style jerk|tandoori masala|truffle zest|compote|pine kernel|shichimi togarashi)/,
     ],
     [
       'Chilled',
       /(chicken|turkey|beef|steak|venison|pork|lamb|duck|bacon|gammon|ham|prosciutto|chorizo|salmon|cod|prawn|basa|haddock|hake|pollock|sea bream|mackerel|mussels?|crab meat|fish|sausage|halloumi|cheese|parmesan|feta|mozzarella|burrata|camembert|paneer|pecorino|red leicester|yoghurt|yogurt|milk|creme fraiche|crème fraîche|cream|butter|egg|tofu|hummus|houmous|falafel|meatless farm mince|vegan mince|plant based|plant-based|meat free|meat-free|fresh tagliatelle|fresh orecchiette|tortelloni|girasoli|ravioli|nduja|vegan nduja|vegan burger|burger patties|cultured coconut)/,
     ],
+    [
+      'Fruit & Veg',
+      /(apples?|bananas?|grapes?|lemons?|limes?|orange|satsuma|nectarine|peach|plum|pear|berries|kiwi|mango|passion fruit|pomegranate|rhubarb|pepper|tomato|spinach|rocket|kale|cavolo nero|onion|shallot|garlic|carrot|parsnip|potato|courgette|aubergine|broccoli|romanesco|cauliflower|cabbage|cucumber|lettuce|salad leaves|baby leaf|seasonal salad|coriander|parsley|mint|basil|chives|dill|\bsage\b|tarragon|thyme|avocado|mushroom|sweet potato|butternut|pumpkin|spring onion|fresh ginger|ginger|green beans|runner beans|broad beans|pak choi|bok choy|celery|young pea pods?|sweet pea pods?|sugar snap peas?|mange ?tout|fresh edamame(?: beans)?|edamame beans?|baby corn|corn on the cob|asparagus(?: spears)?|brussels sprouts?|purple sprouting broccoli|sprouting broccoli|radishes?|beetroot|leeks?|fennel|peas?|samphire|spring greens|red chilli|green chilli|soffritto)/,
+    ],
   ];
   function section(name, sourceGroup) {
     const n = norm(name),
-      source = norm(sourceGroup),
-      text = n + ' ' + source;
-    for (const [group, re] of rules) if (re.test(text)) return group;
+      source = norm(sourceGroup);
+    // Identify the item first. A recipe/source group must never override a
+    // known ingredient category, such as sausages or flavoured yoghurt.
+    for (const [group, re] of rules) if (re.test(n)) return group;
+    for (const [group, re] of rules) if (re.test(source)) return group;
     return 'Other';
   }
   MW.retailGroups = {

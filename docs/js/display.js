@@ -35,12 +35,47 @@ window.MW = window.MW || {};
       .replace(/\s{2,}/g, ' ')
       .trim();
   }
-  function ingredient(value) {
-    return sentenceCase(plainIngredientNames(value));
+  // Inflect countable nouns only for unitless quantities. Weighted ingredient
+  // amounts are not counts and must keep the original ingredient name.
+  const countableIngredientPlurals = Object.freeze({
+    clove: 'cloves',
+    onion: 'onions',
+    carrot: 'carrots',
+    potato: 'potatoes',
+    tomato: 'tomatoes',
+    egg: 'eggs',
+    lemon: 'lemons',
+    lime: 'limes',
+    sausage: 'sausages',
+    fillet: 'fillets',
+    breast: 'breasts',
+    courgette: 'courgettes',
+    leaf: 'leaves',
+    chilli: 'chillies',
+    tortilla: 'tortillas',
+    wrap: 'wraps',
+    cube: 'cubes',
+    rasher: 'rashers',
+    stick: 'sticks',
+  });
+  function ingredient(value, quantity) {
+    const label = sentenceCase(plainIngredientNames(value));
+    const count = String(quantity == null ? '' : quantity)
+      .trim()
+      .replace(/\s+total$/i, '');
+    if (!/^\d+(?:\.\d+)?$/.test(count) || Number(count) <= 1) return label;
+    const ending = label.match(/\b([A-Za-z]+)$/);
+    const plural = ending && countableIngredientPlurals[ending[1].toLowerCase()];
+    if (!plural) return label;
+    const adjusted = /^[A-Z]/.test(ending[1]) ? plural[0].toUpperCase() + plural.slice(1) : plural;
+    return label.slice(0, -ending[1].length) + adjusted;
   }
 
   function amount(value) {
     let text = String(value == null ? '' : value).trim();
+    // Meal-kit source amounts such as "2 total" and "125 g total" are
+    // quantities, not units. Keep the number but omit the supplier suffix.
+    if (/^[0-9]/.test(text)) text = text.replace(/\s+total$/i, '');
     const m = text.match(
       /^([0-9]+(?:\.[0-9]+)?)\s+(slice|pack|tin|can|carton|bottle|clove|nest|fillet|wrap|tortilla|stick|banana|sachet|bunch|ball|rasher|pouch)$/i,
     );

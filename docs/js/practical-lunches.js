@@ -31,7 +31,7 @@ const rows=[
  sourceUrl:'https://www.bbcgoodfood.com/recipes/chicken-tzatziki-wraps/',
  sourceImageUrl:'https://images.immediate.co.uk/production/volatile/sites/30/2023/10/Chicken-and-tzatziki-wraps-fb41f04.jpg?quality=90&resize=708%2C643',
  ingredients:[['1','cucumber'],['250 g','Greek yoghurt'],['500 g','chicken breast'],['2 tbsp','olive oil'],['4','tortilla wraps'],['4','tomatoes']],
- steps:['Coarsely grate most of the cucumber and mix it with the yoghurt. Slice the remaining cucumber and tomatoes.','Slice the chicken, season it and coat with half the oil. Heat the remaining oil in a frying pan over medium heat and cook the chicken for 8 to 10 minutes, turning, until golden and cooked through.','Warm the wraps briefly. Spread with tzatziki, add the chicken, tomato and sliced cucumber, then fold in the sides and roll tightly.']
+ steps:['Coarsely grate most of the cucumber and squeeze out the excess water. Stir it into the yoghurt, then slice the remaining cucumber and tomatoes.','Slice the chicken, season it and coat with half the oil. Heat the remaining oil in a frying pan over medium heat and cook the chicken for 8 to 10 minutes, turning, until golden and cooked through.','Warm the wraps briefly. Spread with tzatziki, add the chicken, tomato and sliced cucumber, then fold in the sides and roll tightly.']
 },{
  id:'practical-goodfood-overnight-oats',sourceId:'goodfood-overnight-oats',title:'Overnight oats',
  subtitle:'Oats, yoghurt, berries, honey and nut butter',servings:1,time:10,prepStyle:'no-cook',lunchBucket:'other',practicalLunch:true,light:true,
@@ -46,7 +46,7 @@ const rows=[
  sourceUrl:'https://www.bbcgoodfood.com/recipes/lunchbox-pasta-salad',
  sourceImageUrl:'https://images.immediate.co.uk/production/volatile/sites/30/2020/08/lunchbox-pasta-salad-2932c62.jpg?quality=90&resize=440%2C400',
  ingredients:[['400 g','pasta'],['4 tbsp','green pesto'],['1 tbsp','mayonnaise'],['2 tbsp','Greek yoghurt'],['0.5','lemon'],['100 g','peas'],['100 g','green beans'],['100 g','cherry tomatoes'],['200 g','ham']],
- steps:['Cook the pasta in boiling water until just tender. Add the peas and chopped green beans for the final 2 minutes, then drain well. Stir through the pesto and leave to cool.','Mix the mayonnaise, yoghurt and lemon juice. Once the pasta is cool, stir in the dressing and quartered tomatoes, then divide into lunch boxes and add the ham. Keep chilled until needed.']
+ steps:['Cook the pasta in boiling water until just tender. Add the peas and chopped green beans for the final 3-4 minutes, until the beans are tender and the peas are piping hot, then drain well. Stir through the pesto and leave to cool.','Mix the mayonnaise, yoghurt and lemon juice. Once the pasta is cool, stir in the dressing and quartered tomatoes, then divide into lunch boxes and add the ham. Keep chilled until needed.']
 },
 {
  id:'practical-goodfood-tuna-pasta-salad',sourceId:'goodfood-tuna-pasta-salad',title:'Tuna pasta salad',
@@ -70,7 +70,7 @@ const rows=[
  sourceUrl:'https://www.bbcgoodfood.com/recipes/veggie-olive-wraps-mustard-vinaigrette/',
  sourceImageUrl:'https://images.immediate.co.uk/production/volatile/sites/30/2020/08/olive-wrap-c866064.jpg?quality=90&resize=440%2C400',
  ingredients:[['1','carrot'],['80 g','red cabbage'],['2','spring onions'],['1','courgette'],['10 g','fresh basil'],['5','green olives'],['0.5 tsp','English mustard powder'],['2 tsp','extra virgin rapeseed oil'],['1 tbsp','apple cider vinegar'],['1','large seeded tortilla wrap']],
- steps:['Coarsely grate the carrot, finely shred the red cabbage, slice the spring onions and grate the courgette. Tear the basil and roughly chop the olives.','Whisk the mustard powder with the rapeseed oil and cider vinegar, then toss it through the prepared vegetables and olives.','Lay out the tortilla, pile the dressed vegetables into the centre, fold in the sides and roll tightly. Wrap or box it for lunch and keep chilled until needed.']
+ steps:['Coarsely grate the carrot, finely shred the red cabbage and slice the spring onions. Grate the courgette and squeeze out the excess moisture, then tear the basil and roughly chop the olives.','Whisk the mustard powder with the rapeseed oil and cider vinegar, then toss it through the prepared vegetables and olives.','Lay out the tortilla, pile the dressed vegetables into the centre, fold in the sides and roll tightly. Wrap or box it for lunch and keep chilled until needed.']
 },
 {
  id:'practical-goodfood-chia-almond-overnight-oats',sourceId:'goodfood-chia-almond-overnight-oats',title:'Chia & almond overnight oats',
@@ -85,12 +85,12 @@ const rows=[
  subtitle:'Tuna mayo with celery, red onion, cucumber and crisp lettuce',servings:2,time:10,prepStyle:'no-cook',lunchBucket:'sandwich',practicalLunch:true,
  sourceUrl:'https://www.bbcgoodfood.com/recipes/tuna-salad-sandwich',
  sourceImageUrl:'https://images.immediate.co.uk/production/volatile/sites/30/2024/04/TunaSandwich-81a36a8.jpg?quality=90&resize=708%2C643',
- ingredients:[['1 tin','Tinned tuna'],['0.5','Celery'],['0.5','Red onion'],['5 tsp','Mayonnaise'],['0.25 tsp','Paprika'],['4 slices','Bread'],['8 slices','Cucumber'],['4 leaves','Lettuce']],
- steps:['Drain the tuna well. Finely dice the celery and red onion, then mix them with the tuna, most of the mayonnaise and a small pinch of paprika. Season to taste.','Divide the tuna filling between two slices of bread. Add the cucumber and lettuce, spread the remaining mayonnaise over the other slices, close the sandwiches and halve them. Keep chilled until lunch.']
+ ingredients:[['1 tin','Tinned tuna'],['0.5 stick','Celery'],['0.5','Red onion'],['5 tsp','Mayonnaise'],['0.25 tsp','Paprika'],['4 slices','Bread'],['8 slices','Cucumber'],['4 leaves','Lettuce']],
+ steps:['Drain the tuna well. Finely dice half a celery stick and half the red onion. Mix with the tuna, 4 tsp mayonnaise and the paprika, then season to taste.','Divide the tuna filling between two slices of bread. Add the cucumber and lettuce, then spread the remaining 1 tsp mayonnaise over the other slices. Close the sandwiches, cut each in half and keep chilled until lunch.']
 },
 {
  id:'practical-goodfood-caprese-sandwich',sourceId:'goodfood-caprese-sandwich',title:'Caprese sandwich',
- subtitle:'Mozzarella, tomato, pesto, rocket and basil in bread or focaccia',servings:4,time:10,prepStyle:'no-cook',lunchBucket:'sandwich',practicalLunch:true,
+ subtitle:'Mozzarella, tomato, pesto, rocket and basil on fresh bread',servings:4,time:10,prepStyle:'no-cook',lunchBucket:'sandwich',practicalLunch:true,
  sourceUrl:'https://www.bbcgoodfood.com/recipes/caprese-sandwich',
  sourceImageUrl:'https://images.immediate.co.uk/production/volatile/sites/30/2022/05/Caprese-sandwich-e1fb6a4.jpg?quality=90&resize=708%2C643',
  ingredients:[['8 slices','Bread'],['2 tbsp','Basil pesto'],['2 tsp','Extra virgin olive oil'],['1 handful','Rocket'],['250 g','Mozzarella'],['2','Tomato'],['1 small handful','Fresh basil'],['0.5','Red onion'],['2 tsp','Balsamic vinegar']],
@@ -102,7 +102,7 @@ const rows=[
  sourceUrl:'https://www.bbcgoodfood.com/recipes/red-lentil-chickpea-chilli-soup',
  sourceImageUrl:'https://images.immediate.co.uk/production/volatile/sites/30/2020/08/recipe-image-legacy-id-265545_11-90c5919.jpg?quality=90&resize=440%2C400',
  ingredients:[['2 tsp','cumin seeds'],['0.5 tsp','chilli flakes'],['1 tbsp','olive oil'],['1','red onion'],['140 g','red lentils'],['2','vegetable stock cubes'],['400 g','tinned chopped tomatoes'],['200 g','chickpeas'],['20 g','fresh coriander'],['4 tbsp','Greek yoghurt']],
- steps:['Heat a large saucepan over medium heat and toast the cumin seeds and chilli flakes for about 1 minute until fragrant.','Add the olive oil and chopped red onion. Cook for about 5 minutes until softened.','Add the red lentils, stock made with 850 ml hot water and the tomatoes. Bring to the boil, then simmer for about 15 minutes until the lentils are soft.','Blend to a rough puree, return to the pan and stir in the drained chickpeas. Heat through, season, then stir in most of the coriander. Serve with the yoghurt and remaining coriander.']
+ steps:['Heat a large saucepan over medium heat and toast the cumin seeds and chilli flakes for about 1 minute until fragrant.','Add the olive oil and chopped red onion. Cook for about 5 minutes until softened.','Add the red lentils, stock made with 850 ml hot water and the tomatoes. Bring to the boil, then simmer for about 15 minutes until the lentils are soft.','Let the soup cool slightly, then blend in batches to a rough puree. Return it to the pan, stir in the drained chickpeas and heat until piping hot. Season, add most of the coriander and serve with the yoghurt and remaining coriander.']
 }
 ];for(const r of rows){
  Object.assign(r,common);

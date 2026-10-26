@@ -3102,10 +3102,34 @@ window.MW = window.MW || {};
 
   const entryCache = new Map();
   function entryFor(name) {
-    const key = String(name || '');
+    const retailer = MW.state?.get()?.household?.retailer || '';
+    const key = JSON.stringify([String(name || ''), retailer, MW.cataloguePrices?.revision?.('GB') || '']);
     if (entryCache.has(key)) return entryCache.get(key);
     const n = norm(name);
-    const e = exact.get(n) || contextualEntry(name) || legacyEntryFor(name) || null;
+    const original = exact.get(n) || contextualEntry(name) || legacyEntryFor(name) || null;
+    // The shared country catalogue supplies UK prices; retain the established
+    // ingredient matching and conversion behaviour while its adapter is in use.
+    const record =
+      original && original !== water ? MW.cataloguePrices?.forLegacyEntry?.(original, 'GB') : null;
+    const retailerPrice = record && MW.cataloguePrices.priceFor(record, retailer);
+    const relativePrice = record?.price > 0 ? retailerPrice / record.price : 1;
+    const e = record
+      ? {
+          ...original,
+          ...record.conversionHints,
+          packQty: record.packQty,
+          unit: record.unit,
+          price: retailerPrice,
+          savingPrice:
+            record.savingPrice == null
+              ? undefined
+              : Math.round(record.savingPrice * relativePrice * 100) / 100,
+          retailerPriceMethod:
+            record.retailerPrices?.[retailer] == null
+              ? 'country-benchmark'
+              : 'relative-basket-average-estimate',
+        }
+      : original;
     if (e) {
       e.marketChecked = false;
       e.marketAverage = false;
@@ -3169,6 +3193,34 @@ window.MW = window.MW || {};
       .replace(/,/g, '')
       .replace(/pot\(s\)/g, 'pot');
     if (!raw) return null;
+    // Convert cookbook measures only when explicit product-specific yield data
+    // is available. Fractions of whole produce are rounded to packs in the
+    // basket engine, not in this conversion.
+    const practicalMeasure = raw.match(/^([0-9]+(?:\.[0-9]+)?)\s+(small\s+)?(slices?|leaves?|handfuls?)$/);
+    if (practicalMeasure) {
+      const count = Number(practicalMeasure[1]);
+      const measure = practicalMeasure[3];
+      const piece = /^slices?$/.test(measure)
+        ? 'sliceWeight'
+        : /^leaves?$/.test(measure)
+          ? 'leafWeight'
+          : 'handfulWeight';
+      if (piece === 'sliceWeight' && entry.unit === 'slice') return count;
+      const weight = Number(entry[piece]);
+      if (!(weight > 0)) return null;
+      if (entry.unit === 'g') return count * weight;
+      if (entry.unit === 'each' && Number(entry.eachWeight) > 0)
+        return (count * weight) / Number(entry.eachWeight);
+      return null;
+    }
+    if (
+      /^[0-9]+(?:\.[0-9]+)?\s+pinch(?:es)?$/.test(raw) &&
+      /chilli flakes/i.test(entry.label) &&
+      entry.unit === 'g'
+    )
+      return Number.parseFloat(raw) * 0.25;
+    if (/^\d+(?:\.\d+)?$/.test(raw) && /dried bay leaves/i.test(entry.label) && entry.unit === 'g')
+      return Number(raw) * 0.2;
     if (raw === 'to taste' || raw === 'as needed') {
       const fallback = {
         g: 10,

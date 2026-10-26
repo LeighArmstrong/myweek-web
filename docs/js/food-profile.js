@@ -231,6 +231,10 @@ window.MW = window.MW || {};
     'avocado',
   ];
 
+  // Food restrictions still treat stock, sauces and gelatine as animal-derived.
+  // A preference for a meat or fish dinner, however, must not count a
+  // vegetarian tofu dish with a splash of Worcestershire sauce as fish.
+  const proteinMeatTerms = meatTerms.filter((term) => !['gelatine', 'gelatin', 'lard'].includes(term));
   const hasAny = (text, terms) =>
     terms.some((term) => new RegExp('(?:^| )' + term + '(?:s|es)?(?: |$)').test(text));
   const plantMilkSafeText = (text) =>
@@ -263,15 +267,26 @@ window.MW = window.MW || {};
     );
     const plantSafe = plantMilkSafeText(text);
     const proteinText = text
-      .replace(/vegan (?:fish sauce|nduja|xo sauce)/g, 'plant substitute')
+      .replace(
+        /(?:vegan|vegetarian|veggie|plant based|meat free|meatless) (?:fish sauce|nduja|xo sauce)/g,
+        'plant substitute',
+      )
+      .replace(/meatless farm sausages?/g, 'plant substitute')
       .replace(
         /(?:vegan|vegetarian|veggie|plant based|meat free|meatless) (?:chicken|beef|pork|lamb|turkey|duck|bacon|ham|sausage|sausages|meatball|meatballs|fish|tuna|salmon|prawn|prawns)/g,
         'plant substitute',
       );
+    const proteinIngredients = proteinText
+      .replace(/\b(?:beef|chicken|fish|pork|lamb|turkey) stock\b/g, 'stock')
+      .replace(/\b(?:fish|oyster|anchovy|worcester|worcestershire) sauce\b/g, 'seasoning');
     const data = {
       text,
       plantSafe,
+      // The following two flags are for diet/allergen exclusions.
       hasMeat: hasAny(proteinText, meatTerms),
+      // This stricter flag is for the affirmative 'meat or fish' preference.
+      hasMeatOrFishProtein:
+        hasAny(proteinIngredients, proteinMeatTerms) || hasAny(proteinIngredients, fishTerms),
       hasAnimalRennet: hasAny(text, ['parmigiano reggiano']),
       hasFish:
         hasAny(proteinText, fishTerms) ||
@@ -292,7 +307,7 @@ window.MW = window.MW || {};
     const veganSafe = noMeatFish && !a.hasAnimalDairy && !a.hasAnimal && !a.hasAnimalRennet;
     if (diet === 'meat-or-fish') {
       if (verified && (e.vegan || e.vegetarian) && noMeatFish) return false;
-      return a.hasMeat || a.hasFish;
+      return a.hasMeatOrFishProtein;
     }
     if (diet === 'vegetarian') {
       if (verified && (e.vegan || e.vegetarian) && noMeatFish && !a.hasAnimalRennet) return true;
