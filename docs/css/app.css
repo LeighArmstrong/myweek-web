@@ -12545,11 +12545,9 @@ body.mw-tour-open {
 @keyframes mw-tour-card-enter {
   from {
     opacity: 0;
-    transform: translateY(6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
 @media (max-height: 500px) {

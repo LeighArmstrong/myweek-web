@@ -12,8 +12,8 @@ window.MW = window.MW || {};
       screen: 'week',
       section: 'My Week',
       selector: '.day-strip',
-      title: 'Your week',
-      copy: 'Tap a day to see or change the meals planned for it.',
+      title: 'Plan each day',
+      copy: 'Tap a day to turn lunch or dinner on or off, or choose what to cook.',
     },
     {
       screen: 'week',
@@ -276,6 +276,95 @@ window.MW = window.MW || {};
     if (!active || active.generation !== generation) return;
   }
 
+  const TOUR_GAP = 14;
+  const TOUR_PAD = 4;
+  const TOUR_MARGIN = 12;
+
+  function targetCornerRadii(target, width, height) {
+    const computed = window.getComputedStyle(target);
+    const cap = Math.min(width, height) / 2;
+    const cssValue = (value, axis) => {
+      const token = String(value || '0').split(' ')[0];
+      const number = parseFloat(token);
+      if (!Number.isFinite(number)) return 0;
+      return Math.max(0, token.includes('%') ? (number * axis) / 100 : number);
+    };
+    const corners = [
+      computed.borderTopLeftRadius,
+      computed.borderTopRightRadius,
+      computed.borderBottomRightRadius,
+      computed.borderBottomLeftRadius,
+    ];
+    const minSide = Math.min(width, height);
+    return corners.map((value) => {
+      const x = cssValue(value, width);
+      const y = cssValue(value.includes(' ') ? value.split(' ')[1] : value, height);
+      // The cutout is padded beyond the real element; its corner grows
+      // by exactly the same padding rather than using a universal radius.
+      return Math.min(cap, Math.max(0, Math.min(x, y) + TOUR_PAD), minSide / 2);
+    });
+  }
+
+  function roundedCutoutPath(x, y, width, height, radii) {
+    const [tl, tr, br, bl] = radii;
+    const right = x + width;
+    const bottom = y + height;
+    return [
+      'M',
+      x + tl,
+      y,
+      'L',
+      right - tr,
+      y,
+      'Q',
+      right,
+      y,
+      right,
+      y + tr,
+      'L',
+      right,
+      bottom - br,
+      'Q',
+      right,
+      bottom,
+      right - br,
+      bottom,
+      'L',
+      x + bl,
+      bottom,
+      'Q',
+      x,
+      bottom,
+      x,
+      bottom - bl,
+      'L',
+      x,
+      y + tl,
+      'Q',
+      x,
+      y,
+      x + tl,
+      y,
+      'Z',
+    ].join(' ');
+  }
+
+  function spotlightRect(target) {
+    const rect = target.getBoundingClientRect();
+    const x = Math.max(0, rect.left - TOUR_PAD);
+    const y = Math.max(0, rect.top - TOUR_PAD);
+    const right = Math.min(window.innerWidth, rect.right + TOUR_PAD);
+    const bottom = Math.min(window.innerHeight, rect.bottom + TOUR_PAD);
+    return {
+      x,
+      y,
+      right,
+      bottom,
+      width: Math.max(1, right - x),
+      height: Math.max(1, bottom - y),
+    };
+  }
+
   function svgElement(name, attributes) {
     const element = document.createElementNS('http://www.w3.org/2000/svg', name);
     for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
@@ -283,9 +372,8 @@ window.MW = window.MW || {};
   }
 
   function showSpotlight(shell, target) {
-    // A true rounded cut-out leaves the original control entirely untouched.
-    // The transparent SVG receives no pointer events; document capture guards
-    // every other button while allowing taps on the requested navigation tab.
+    // A transparent hole with the target's real corner shape. No glow,
+    // added white border, or extra space in the underlying screen.
     const overlay = document.createElement('div');
     overlay.className = 'mw-tour-overlay';
     overlay.setAttribute('aria-hidden', 'true');
@@ -293,7 +381,7 @@ window.MW = window.MW || {};
     const defs = svgElement('defs', {});
     const mask = svgElement('mask', { id: 'mwTourMask', maskUnits: 'userSpaceOnUse' });
     const body = svgElement('rect', { fill: 'white' });
-    const hole = svgElement('rect', { class: 'mw-tour-hole', rx: 9, fill: 'black' });
+    const hole = svgElement('path', { class: 'mw-tour-hole', fill: 'black' });
     const shade = svgElement('rect', {
       class: 'mw-tour-shade',
       fill: 'rgba(17, 32, 26, 0.66)',
@@ -308,24 +396,16 @@ window.MW = window.MW || {};
       if (!target.isConnected) return;
       const width = window.innerWidth;
       const height = window.innerHeight;
-      const bounds = target.getBoundingClientRect();
-      const pad = target.closest('.bottom-nav,.appbar') ? 3 : 6;
-      const left = Math.max(0, Math.floor(bounds.left - pad));
-      const top = Math.max(0, Math.floor(bounds.top - pad));
-      const right = Math.min(width, Math.ceil(bounds.right + pad));
-      const bottom = Math.min(height, Math.ceil(bounds.bottom + pad));
-      const view = { x: 0, y: 0, width, height };
+      const rect = spotlightRect(target);
+      const radii = targetCornerRadii(target, rect.width, rect.height);
       svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
       for (const shape of [body, shade]) {
-        for (const [key, value] of Object.entries(view)) shape.setAttribute(key, String(value));
+        for (const [key, value] of Object.entries({ x: 0, y: 0, width, height }))
+          shape.setAttribute(key, String(value));
       }
-      for (const [key, value] of Object.entries({
-        x: left,
-        y: top,
-        width: Math.max(1, right - left),
-        height: Math.max(1, bottom - top),
-      }))
-        hole.setAttribute(key, String(value));
+      hole.setAttribute('d', roundedCutoutPath(rect.x, rect.y, rect.width, rect.height, radii));
+      for (const [key, value] of Object.entries(rect)) hole.setAttribute('data-' + key, String(value));
+      hole.setAttribute('data-radii', radii.map((v) => v.toFixed(2)).join(','));
       mask.setAttribute('x', '0');
       mask.setAttribute('y', '0');
       mask.setAttribute('width', String(width));
@@ -335,71 +415,116 @@ window.MW = window.MW || {};
     return refresh;
   }
 
-  function positionCard(card, target) {
+  function cardPlacementCandidates(card, target) {
+    const bounds = spotlightRect(target);
     const width = window.innerWidth;
     const height = window.innerHeight;
     const navTop = root.querySelector('.bottom-nav')?.getBoundingClientRect().top ?? height;
-    const bounds = target.getBoundingClientRect();
-    const panelHeight = card.getBoundingClientRect().height;
-    const panelWidth = card.getBoundingClientRect().width;
-    const margin = 12;
-    const maxTop = Math.max(margin, Math.min(height - 12, navTop - 8) - panelHeight);
-    const maxLeft = Math.max(16, width - panelWidth - 16);
+    const limitBottom = Math.min(height - TOUR_MARGIN, navTop - 8);
+    const cardRect = card.getBoundingClientRect();
+    const panelWidth = cardRect.width;
+    const panelHeight = cardRect.height;
+    const maxX = Math.max(16, width - panelWidth - 16);
     const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
-    const centreX = (bounds.left + bounds.right) / 2;
-    let x = clamp(centreX - panelWidth / 2, 16, maxLeft);
-    let y;
-    if (target.closest('.bottom-nav')) {
-      // The instruction belongs immediately ABOVE the exact tab, never at
-      // the top of the page or over the navigation bar as a whole.
-      y = clamp(bounds.top - panelHeight - 14, margin, maxTop);
-      card.classList.add('mw-tour-card-tab');
-      card.style.setProperty('--mw-tour-arrow-x', clamp(centreX - x, 16, panelWidth - 16) + 'px');
-    } else if (target.closest('.appbar')) {
-      y = clamp(bounds.bottom + 14, margin, maxTop);
-      x = clamp(bounds.right - panelWidth, 16, maxLeft);
-    } else {
-      const overlaps = (a, b) =>
-        Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
-        Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
-      const controls = Array.from(
-        root.querySelectorAll(
-          '.shell button,.shell input,.shell select,.shell textarea,.shell [role="button"]',
-        ),
-      )
-        .filter(
-          (element) =>
-            !card.contains(element) &&
-            element !== target &&
-            !target.contains(element) &&
-            !element.contains(target) &&
-            element.getClientRects().length > 0,
-        )
-        .map((element) => element.getBoundingClientRect());
-      const candidates = [
-        bounds.bottom + 12,
-        bounds.top - panelHeight - 12,
-        margin,
-        maxTop,
-        (margin + maxTop) / 2,
-      ];
-      const xCandidates = [x, 16, maxLeft];
-      let best = { score: Infinity, top: margin, left: x };
-      for (const cx of xCandidates)
-        for (const cy of candidates) {
-          const top = clamp(cy, margin, maxTop);
-          const left = clamp(cx, 16, maxLeft);
-          const rect = { top, bottom: top + panelHeight, left, right: left + panelWidth };
-          let score = overlaps(rect, bounds) * 100;
-          for (const other of controls) score += overlaps(rect, other) * 0.2;
-          score += Math.min(Math.abs(rect.top - bounds.bottom), Math.abs(bounds.top - rect.bottom)) * 0.045;
-          if (score < best.score) best = { score, top, left };
-        }
-      y = best.top;
-      x = best.left;
+    const cx = (bounds.x + bounds.right) / 2;
+    const cy = (bounds.y + bounds.bottom) / 2;
+    const centeredX = clamp(cx - panelWidth / 2, 16, maxX);
+    const centeredY = clamp(
+      cy - panelHeight / 2,
+      TOUR_MARGIN,
+      Math.max(TOUR_MARGIN, limitBottom - panelHeight),
+    );
+    const candidates = [];
+    const add = (side, left, top) => {
+      const right = left + panelWidth,
+        bottom = top + panelHeight;
+      if (left >= 15 && right <= width - 15 && top >= TOUR_MARGIN - 0.5 && bottom <= limitBottom + 0.5) {
+        candidates.push({ side, left, top, right, bottom, bounds });
+      }
+    };
+    add('below', centeredX, bounds.bottom + TOUR_GAP);
+    add('above', centeredX, bounds.y - TOUR_GAP - panelHeight);
+    add('right', bounds.right + TOUR_GAP, centeredY);
+    add('left', bounds.x - TOUR_GAP - panelWidth, centeredY);
+    return { candidates, bounds, navTop, limitBottom, cardRect };
+  }
+
+  async function createRoomForCard(card, target, generation) {
+    if (target.closest('.bottom-nav,.appbar')) return;
+    const first = cardPlacementCandidates(card, target);
+    if (first.candidates.length) return;
+    const rect = target.getBoundingClientRect();
+    const requiredTop = first.limitBottom - first.cardRect.height - TOUR_GAP - TOUR_PAD - rect.height;
+    if (rect.top > requiredTop + 2 && window.scrollY > 0) {
+      const distance = Math.min(window.scrollY, Math.ceil(rect.top - requiredTop));
+      window.scrollTo({
+        top: window.scrollY + distance,
+        behavior: prefersReducedMotion() ? 'instant' : 'smooth',
+      });
+      await pause(prefersReducedMotion() ? 35 : 470);
+      if (!active || active.generation !== generation) return;
     }
-    card.style.left = Math.round(x) + 'px';
-    card.style.top = Math.round(y) + 'px';
+    const second = cardPlacementCandidates(card, target);
+    if (!second.candidates.length) {
+      // Only on unusually short screens: keep the gap precise and let the
+      // explanation scroll internally, never cover the cutout itself.
+      const availableBelow = second.limitBottom - second.bounds.bottom - TOUR_GAP;
+      if (availableBelow >= 95) card.style.maxHeight = Math.floor(availableBelow) + 'px';
+    }
+  }
+
+  function positionCard(card, target) {
+    const positioned = cardPlacementCandidates(card, target);
+    const isTab = Boolean(target.closest('.bottom-nav'));
+    const isHeader = Boolean(target.closest('.appbar'));
+    let choices = positioned.candidates;
+    if (isTab) choices = choices.filter((candidate) => candidate.side === 'above');
+    if (isHeader) choices = choices.filter((candidate) => candidate.side === 'below');
+    // The exact measured gap wins over covering unrelated controls. All valid
+    // positions are adjacent to the cutout by the same TOUR_GAP.
+    const controls = Array.from(
+      root.querySelectorAll(
+        '.shell button,.shell input,.shell select,.shell textarea,.shell [role="button"]',
+      ),
+    )
+      .filter(
+        (element) =>
+          !card.contains(element) &&
+          element !== target &&
+          !target.contains(element) &&
+          !element.contains(target) &&
+          element.getClientRects().length > 0,
+      )
+      .map((element) => element.getBoundingClientRect());
+    const intersect = (a, b) =>
+      Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+      Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+    choices.sort((a, b) => {
+      const score = (item) =>
+        controls.reduce((sum, other) => sum + intersect(item, other), 0) +
+        (item.side === 'below' ? 0 : item.side === 'above' ? 1 : 2);
+      return score(a) - score(b);
+    });
+    const candidate = choices[0] || {
+      side: isTab ? 'above' : isHeader ? 'below' : 'below',
+      left: Math.max(16, (window.innerWidth - positioned.cardRect.width) / 2),
+      top: Math.max(
+        TOUR_MARGIN,
+        Math.min(positioned.limitBottom - positioned.cardRect.height, positioned.bounds.bottom + TOUR_GAP),
+      ),
+    };
+    card.style.left = Math.round(candidate.left) + 'px';
+    card.style.top = Math.round(candidate.top) + 'px';
+    card.classList.toggle('mw-tour-card-tab', isTab);
+    if (isTab) {
+      const center = (positioned.bounds.x + positioned.bounds.right) / 2;
+      card.style.setProperty(
+        '--mw-tour-arrow-x',
+        Math.max(16, Math.min(positioned.cardRect.width - 16, center - candidate.left)) + 'px',
+      );
+    } else {
+      card.style.removeProperty('--mw-tour-arrow-x');
+    }
   }
 
   async function present(index) {
@@ -460,6 +585,8 @@ window.MW = window.MW || {};
     card.querySelector('#mwTourSkip').addEventListener('click', () => stop(true));
     card.querySelector('#mwTourNext').addEventListener('click', () => advance());
     shell.append(card);
+    await createRoomForCard(card, target, generation);
+    if (!active || active.generation !== generation || !target.isConnected) return;
     target.classList.add('mw-tour-target');
     const refreshHole = showSpotlight(shell, target);
     document.body.classList.add('mw-tour-open');
