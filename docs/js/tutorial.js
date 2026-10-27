@@ -12,15 +12,15 @@ window.MW = window.MW || {};
       screen: 'week',
       section: 'My Week',
       selector: '.day-strip',
-      title: 'Your meal days',
-      copy: 'These are the days in your plan. Tap a day after the tour to see its meals.',
+      title: 'Your week',
+      copy: 'Tap a day to see or change the meals planned for it.',
     },
     {
       screen: 'week',
       section: 'My Week',
       selector: '.home-quick-actions',
-      title: 'Pick your meals',
-      copy: 'Use these buttons to get new meal ideas or choose meals yourself.',
+      title: 'Choose your meals',
+      copy: 'Use these buttons to generate meals or pick your own.',
     },
     {
       screen: 'week',
@@ -28,14 +28,14 @@ window.MW = window.MW || {};
       selector: '.bottom-nav [data-nav="recipes"]',
       opens: 'recipes',
       title: 'Open All Recipes',
-      copy: 'Tap the All Recipes tab at the bottom.',
+      copy: 'Tap All Recipes in the bottom bar.',
     },
     {
       screen: 'recipes',
       section: 'All Recipes',
       selector: '.library-search-row',
-      title: 'Find something to cook',
-      copy: 'Search for a meal here. Tap the filter icon to narrow the choices.',
+      title: 'Find a recipe',
+      copy: 'Search here for a meal, or use the filter button.',
     },
     {
       screen: 'recipes',
@@ -43,14 +43,14 @@ window.MW = window.MW || {};
       selector: '.bottom-nav [data-nav="myrecipes"]',
       opens: 'myrecipes',
       title: 'Open My Recipes',
-      copy: 'Tap the My Recipes tab at the bottom.',
+      copy: 'Tap My Recipes in the bottom bar.',
     },
     {
       screen: 'myrecipes',
       section: 'My Recipes',
       selector: '.personal-search-row',
-      title: 'Your own recipes',
-      copy: 'Find your favourites here. Tap the + button to add a recipe of your own.',
+      title: 'Your saved recipes',
+      copy: 'Find favourites here. Tap + to add your own recipe.',
     },
     {
       screen: 'myrecipes',
@@ -58,22 +58,32 @@ window.MW = window.MW || {};
       selector: '.bottom-nav [data-nav="shopreview"]',
       opens: 'shopreview',
       title: 'Open Shopping List',
-      copy: 'Tap the Shopping List tab at the bottom.',
+      copy: 'Tap Shopping List in the bottom bar.',
     },
     {
       screen: 'shopreview',
       section: 'Shopping List',
-      selector: '.shop-add-items',
-      title: 'Add an extra item',
-      copy: 'Type any extra shopping here, then tap Add.',
+      selector: '.retail-group header, .shop-list-empty',
+      title: 'Your ingredients, ready to buy',
+      copy: 'Ingredients for the meals in My Week appear here automatically, grouped into a shopping list.',
+      emptyCopy:
+        'Once you plan meals in My Week, their ingredients will appear here automatically, ready to buy.',
       optional: true,
     },
     {
       screen: 'shopreview',
       section: 'Shopping List',
-      selector: '.shop-item-shell',
-      title: 'Tick off what you buy',
-      copy: 'Tap the square next to an item to tick it off while shopping.',
+      selector: '.shop-item-shell .shop-item',
+      title: 'Tick items off',
+      copy: 'Tap an item when you have picked it up. Your ticks stay saved.',
+      optional: true,
+    },
+    {
+      screen: 'shopreview',
+      section: 'Shopping List',
+      selector: '.shop-add-items',
+      title: 'Add anything else',
+      copy: 'Type any other item you need and tap Add.',
       optional: true,
     },
     {
@@ -82,21 +92,14 @@ window.MW = window.MW || {};
       selector: '#settingsButton',
       opens: 'settings',
       title: 'Open Settings',
-      copy: 'Tap the cog at the top right to open Settings.',
+      copy: 'Tap the cog at the top right.',
     },
     {
       screen: 'settings',
       section: 'Settings',
-      selector: '#dinnerDays',
-      title: 'Choose dinner days',
-      copy: 'Turn dinner days on or off here.',
-    },
-    {
-      screen: 'settings',
-      section: 'Settings',
-      selector: '#lunchDays',
-      title: 'Choose lunch days',
-      copy: 'Turn lunch days on or off here. Your changes save automatically.',
+      selector: '#retailer',
+      title: 'Choose your supermarket',
+      copy: 'Pick your supermarket here. You can also change your budget and food preferences in Settings.',
     },
   ];
 
@@ -270,32 +273,46 @@ window.MW = window.MW || {};
     if (!active || active.generation !== generation) return;
   }
 
-  function positionCard(card, target) {
-    const nav = root.querySelector('.bottom-nav');
-    const topLimit = 12;
-    const bottomLimit = Math.min(
-      window.innerHeight - 10,
-      (nav?.getBoundingClientRect().top ?? window.innerHeight) - 8,
-    );
-    const height = card.getBoundingClientRect().height;
-    let bounds = target.getBoundingClientRect();
-    let below = bounds.bottom + 12;
-    let above = bounds.top - height - 12;
-
-    if (below + height > bottomLimit && above < topLimit && !target.closest('.bottom-nav,.appbar')) {
-      const move = bounds.top - 26;
-      window.scrollBy({ top: move, behavior: 'instant' });
-      bounds = target.getBoundingClientRect();
-      below = bounds.bottom + 12;
-      above = bounds.top - height - 12;
+  function placeCardInFlow(card, target) {
+    const shell = root.querySelector('.shell');
+    if (!shell) return false;
+    if (target.closest('.bottom-nav,.appbar')) {
+      shell.querySelector('.appbar')?.after(card);
+      return true;
     }
-    const top =
-      below + height <= bottomLimit
-        ? below
-        : above >= topLimit
-          ? above
-          : Math.max(topLimit, Math.min(below, bottomLimit - height));
-    card.style.top = Math.round(top) + 'px';
+    // Place the explanation immediately before its feature. A normal layout
+    // slot makes it impossible for it to sit on top of a different button.
+    const anchor = target.closest('.retail-group,.settings-section,.shop-item-shell') || target;
+    const parent = anchor.parentElement;
+    if (!parent) return false;
+    parent.insertBefore(card, anchor);
+    return true;
+  }
+
+  async function scrollCardAndFeature(card, target, generation) {
+    if (!active || active.generation !== generation) return;
+    const navigation = root.querySelector('.bottom-nav');
+    const availableBottom = (navigation?.getBoundingClientRect().top ?? window.innerHeight) - 12;
+    const cardBounds = card.getBoundingClientRect();
+    const featureBounds = target.getBoundingClientRect();
+    if (target.closest('.bottom-nav,.appbar')) {
+      // Navigation remains fixed. Its explanation sits just below the normal
+      // page header, so it never overlays shopping rows or header actions.
+      if (window.scrollY > 8) {
+        window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
+        await pause(prefersReducedMotion() ? 35 : 470);
+      }
+      return;
+    }
+    const span = Math.max(cardBounds.height, featureBounds.bottom - cardBounds.top);
+    const desiredTop = Math.max(12, Math.min(75, (availableBottom - span) / 2));
+    const delta = cardBounds.top - desiredTop;
+    if (Math.abs(delta) < 10) return;
+    window.scrollTo({
+      top: Math.max(0, window.scrollY + delta),
+      behavior: prefersReducedMotion() ? 'instant' : 'smooth',
+    });
+    await pause(prefersReducedMotion() ? 35 : 470);
   }
 
   async function present(index) {
@@ -304,7 +321,6 @@ window.MW = window.MW || {};
     active.changing = true;
     clearLayer();
     const step = steps[index];
-    // This normally matches already; only a missing/optional step may need reconciliation.
     if (!openScreen(step.screen)) {
       stop(false);
       return;
@@ -322,6 +338,9 @@ window.MW = window.MW || {};
     }
     await pause(prefersReducedMotion() ? 45 : 145);
     if (!active || active.generation !== generation || !target.isConnected) return;
+
+    // The app moves to the feature first; explanation and spotlight appear only
+    // once the scroll has finished, maintaining a clear point of reference.
     await scrollToFeature(target, generation);
     if (!active || active.generation !== generation || !target.isConnected) return;
 
@@ -331,18 +350,10 @@ window.MW = window.MW || {};
       stop(false);
       return;
     }
-    active.target = target;
-    target.classList.add('mw-tour-target');
-    if (step.opens) target.classList.add('mw-tour-tap');
-    // Both navigation landmarks retain their normal appearance. The active tab remains clear.
-    nav.classList.add('mw-tour-front');
-    if (target.closest('.appbar')) shell.querySelector('.appbar')?.classList.add('mw-tour-front');
 
-    const shade = document.createElement('div');
-    shade.className = 'mw-tour-shade';
-    shade.setAttribute('aria-hidden', 'true');
     const card = document.createElement('section');
     card.className = 'mw-tour-card';
+    card.style.visibility = 'hidden';
     card.setAttribute('role', 'dialog');
     card.setAttribute('aria-modal', 'true');
     card.setAttribute('tabindex', '-1');
@@ -358,18 +369,31 @@ window.MW = window.MW || {};
       '</span><h2 id="mwTourTitle">' +
       step.title +
       '</h2><p id="mwTourCopy">' +
-      step.copy +
-      '</p>' +
-      (step.opens ? '<p class="mw-tour-tap-hint">Tap the highlighted button to continue</p>' : '') +
-      '<div class="mw-tour-actions"><button type="button" class="btn secondary" id="mwTourSkip">Skip tour</button>' +
+      (step.emptyCopy && target.matches('.shop-list-empty') ? step.emptyCopy : step.copy) +
+      '</p><div class="mw-tour-actions"><button type="button" class="btn secondary" id="mwTourSkip">Skip tour</button>' +
       '<button type="button" class="btn primary" id="mwTourNext">' +
-      (index === steps.length - 1 ? 'Finish' : step.opens ? 'Open tab' : 'Next') +
+      (index === steps.length - 1 ? 'Finish' : step.opens ? 'Open' : 'Next') +
       '</button></div>';
     card.querySelector('#mwTourSkip').addEventListener('click', () => stop(true));
     card.querySelector('#mwTourNext').addEventListener('click', () => advance());
+    if (!placeCardInFlow(card, target)) {
+      stop(false);
+      return;
+    }
+    await scrollCardAndFeature(card, target, generation);
+    if (!active || active.generation !== generation || !target.isConnected) return;
+
+    active.target = target;
+    target.classList.add('mw-tour-target');
+    if (step.opens) target.classList.add('mw-tour-tap');
+    nav.classList.add('mw-tour-front');
+    if (target.closest('.appbar')) shell.querySelector('.appbar')?.classList.add('mw-tour-front');
+    const shade = document.createElement('div');
+    shade.className = 'mw-tour-shade';
+    shade.setAttribute('aria-hidden', 'true');
     document.body.classList.add('mw-tour-open');
-    shell.append(shade, card);
-    positionCard(card, target);
+    shell.append(shade);
+    card.style.visibility = '';
     card.focus({ preventScroll: true });
     active.changing = false;
   }

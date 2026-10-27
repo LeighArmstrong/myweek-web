@@ -4878,7 +4878,6 @@ body.cooking-active .cook-scroll {
   body.cooking-active .cook-controls {
     left: 50%;
     right: auto;
-    transform: translateX(-50%);
     width: min(920px, 100%);
     border-radius: 18px 18px 0 0;
   }
@@ -12460,7 +12459,10 @@ html[data-mw-motion='tab-back']::view-transition-group(mw-bottom-nav) {
   }
 }
 
-/* The guided tour keeps MyWeek's real pages and bottom navigation visible. */
+/* Lift the actual control above the shade without a glow or extra white border. */
+body.mw-tour-open .shell {
+  padding-bottom: calc(320px + var(--safe-bottom));
+}
 body.mw-tour-open {
   overflow: hidden;
 }
@@ -12470,7 +12472,7 @@ body.mw-tour-open {
   z-index: 20001;
   background: rgba(20, 35, 29, 0.61);
   touch-action: manipulation;
-  animation: mw-tour-fade 180ms ease-out both;
+  animation: mw-tour-fade 140ms ease-out both;
 }
 .bottom-nav.mw-tour-front {
   z-index: 20003;
@@ -12488,67 +12490,53 @@ body.mw-tour-open {
 .mw-tour-target {
   position: relative;
   z-index: 20002;
-  border-radius: 14px;
-  background: var(--surface);
-  box-shadow:
-    0 0 0 4px var(--surface),
-    0 12px 30px rgba(9, 33, 21, 0.22);
 }
-.mw-tour-target.mw-tour-tap {
-  animation: mw-tour-pulse 1.6s ease-in-out infinite;
+.mw-tour-tap {
+  cursor: pointer;
 }
 .mw-tour-card {
-  position: fixed;
-  left: 50%;
-  top: 12px;
-  bottom: auto;
+  position: relative;
   z-index: 20004;
-  width: min(400px, calc(100vw - 32px));
+  margin: 16px auto 20px;
+  width: min(390px, calc(100vw - 32px));
   max-height: calc(100dvh - 98px - var(--device-safe-bottom));
   overflow-y: auto;
-  transform: translateX(-50%);
-  padding: 19px;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   background: var(--surface);
-  box-shadow: 0 18px 45px rgba(5, 24, 15, 0.24);
+  box-shadow: 0 10px 30px rgba(5, 24, 15, 0.16);
   text-align: left;
-  animation: mw-tour-card-arrive 220ms ease-out both;
+  animation: mw-tour-fade 140ms ease-out both;
 }
 .mw-tour-card:focus {
   outline: none;
 }
 .mw-tour-card .eyebrow {
   display: block;
-  margin: 0 0 9px;
-  letter-spacing: 0.065em;
+  margin: 0 0 7px;
+  letter-spacing: 0.055em;
   color: var(--green-deep);
 }
 .mw-tour-card h2 {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: var(--ink);
-  font-size: 21px;
-  font-weight: 850;
-  letter-spacing: -0.035em;
-  line-height: 1.15;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.18;
 }
 .mw-tour-card p {
   margin: 0;
   color: var(--muted);
   font-size: 14px;
-  line-height: 1.5;
-}
-.mw-tour-card .mw-tour-tap-hint {
-  margin-top: 11px;
-  color: var(--green-deep);
-  font-size: 12px;
-  font-weight: 720;
+  line-height: 1.45;
 }
 .mw-tour-actions {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 19px;
+  margin-top: 13px;
 }
 .mw-tour-actions .btn {
   min-width: 100px;
@@ -12567,49 +12555,21 @@ body.mw-tour-open {
     opacity: 1;
   }
 }
-@keyframes mw-tour-card-arrive {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 10px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-}
-@keyframes mw-tour-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 4px var(--surface),
-      0 0 0 7px rgba(0, 113, 87, 0.17);
-  }
-  50% {
-    box-shadow:
-      0 0 0 4px var(--surface),
-      0 0 0 11px rgba(0, 113, 87, 0.33);
-  }
-}
 @media (max-height: 500px) {
   .mw-tour-card {
     max-height: calc(100dvh - 75px - var(--device-safe-bottom));
-    padding: 13px 16px;
+    padding: 12px 14px;
   }
   .mw-tour-card h2 {
-    font-size: 19px;
-  }
-  .mw-tour-card p {
-    line-height: 1.4;
+    font-size: 18px;
   }
   .mw-tour-actions {
-    margin-top: 11px;
+    margin-top: 10px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .mw-tour-card,
-  .mw-tour-shade,
-  .mw-tour-target {
-    transition: none;
+  .mw-tour-shade {
     animation: none;
   }
 }
