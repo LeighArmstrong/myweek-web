@@ -6,60 +6,113 @@ window.MW = window.MW || {};
   const root = document.getElementById('app');
   if (!root || !MW.state) return;
 
-  // A brief tour of the real screens: it never creates, swaps or checks off user data.
+  // The user opens each new page with its real tab. No recipe or preference is changed.
   const steps = [
     {
       screen: 'week',
+      section: 'My Week',
       selector: '.day-strip',
-      title: 'Your week at a glance',
-      copy: 'See which days have meals planned. Tap a day whenever you want to change its dinner.',
+      title: 'Your meal days',
+      copy: 'These are the days in your plan. Tap a day after the tour to see its meals.',
     },
     {
       screen: 'week',
+      section: 'My Week',
       selector: '.home-quick-actions',
-      title: 'Make the plan yours',
-      copy: 'Generate a fresh selection or choose your own meals. Unfinished dinners are not replaced automatically.',
+      title: 'Pick your meals',
+      copy: 'Use these buttons to get new meal ideas or choose meals yourself.',
+    },
+    {
+      screen: 'week',
+      section: 'My Week',
+      selector: '.bottom-nav [data-nav="recipes"]',
+      opens: 'recipes',
+      title: 'Open All Recipes',
+      copy: 'Tap the All Recipes tab at the bottom.',
     },
     {
       screen: 'recipes',
+      section: 'All Recipes',
       selector: '.library-search-row',
-      title: 'Discover recipes',
-      copy: 'Search or filter meals, then tap any recipe to see its ingredients and cooking guide.',
+      title: 'Find something to cook',
+      copy: 'Search for a meal here. Tap the filter icon to narrow the choices.',
+    },
+    {
+      screen: 'recipes',
+      section: 'All Recipes',
+      selector: '.bottom-nav [data-nav="myrecipes"]',
+      opens: 'myrecipes',
+      title: 'Open My Recipes',
+      copy: 'Tap the My Recipes tab at the bottom.',
     },
     {
       screen: 'myrecipes',
+      section: 'My Recipes',
       selector: '.personal-search-row',
-      title: 'Your saved recipes',
-      copy: 'Find recipes you have favourited here. Use the plus button to add your own.',
+      title: 'Your own recipes',
+      copy: 'Find your favourites here. Tap the + button to add a recipe of your own.',
+    },
+    {
+      screen: 'myrecipes',
+      section: 'My Recipes',
+      selector: '.bottom-nav [data-nav="shopreview"]',
+      opens: 'shopreview',
+      title: 'Open Shopping List',
+      copy: 'Tap the Shopping List tab at the bottom.',
     },
     {
       screen: 'shopreview',
+      section: 'Shopping List',
       selector: '.shop-add-items',
-      title: 'Add anything extra',
-      copy: 'Add items that are not in your recipes. They appear in Additions at the top of the list.',
+      title: 'Add an extra item',
+      copy: 'Type any extra shopping here, then tap Add.',
+      optional: true,
     },
     {
       screen: 'shopreview',
+      section: 'Shopping List',
       selector: '.shop-item-shell',
-      title: 'Tick things off',
-      copy: 'Tick items as you shop. Your checklist stays saved, even if you come back later.',
+      title: 'Tick off what you buy',
+      copy: 'Tap the square next to an item to tick it off while shopping.',
+      optional: true,
+    },
+    {
+      screen: 'shopreview',
+      section: 'Shopping List',
+      selector: '#settingsButton',
+      opens: 'settings',
+      title: 'Open Settings',
+      copy: 'Tap the cog at the top right to open Settings.',
     },
     {
       screen: 'settings',
-      selector: '.settings-section',
-      title: 'Make it yours',
-      copy: 'Change your supermarket, budget and meal preferences in Settings. Changes save automatically.',
+      section: 'Settings',
+      selector: '#dinnerDays',
+      title: 'Choose dinner days',
+      copy: 'Turn dinner days on or off here.',
+    },
+    {
+      screen: 'settings',
+      section: 'Settings',
+      selector: '#lunchDays',
+      title: 'Choose lunch days',
+      copy: 'Turn lunch days on or off here. Your changes save automatically.',
     },
   ];
 
   let active = null;
   let observerQueued = false;
   let internalNavigation = false;
+  const prefersReducedMotion = () =>
+    Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   function clearLayer() {
-    root.querySelectorAll('.mw-tour-target').forEach((el) => el.classList.remove('mw-tour-target'));
-    root.querySelectorAll('.mw-tour-front').forEach((el) => el.classList.remove('mw-tour-front'));
-    root.querySelectorAll('.mw-tour-shade,.mw-tour-card').forEach((el) => el.remove());
+    root
+      .querySelectorAll('.mw-tour-target')
+      .forEach((element) => element.classList.remove('mw-tour-target', 'mw-tour-tap'));
+    root.querySelectorAll('.mw-tour-front').forEach((element) => element.classList.remove('mw-tour-front'));
+    root.querySelectorAll('.mw-tour-shade,.mw-tour-card').forEach((element) => element.remove());
     document.body.classList.remove('mw-tour-open');
   }
 
@@ -74,53 +127,6 @@ window.MW = window.MW || {};
       state.ui.tutorialStatus = 'done';
       MW.state.save();
     }
-  }
-
-  function advance() {
-    if (!active || active.changing) return;
-    const next = active.index + 1;
-    if (next >= steps.length) stop(true);
-    else {
-      active.index = next;
-      present(next).catch(() => stop(false));
-    }
-  }
-
-  function onOutsideTap(event) {
-    if (!active || internalNavigation) return;
-    const card = root.querySelector('.mw-tour-card');
-    if (card && card.contains(event.target) && event.target.closest('button')) return;
-    // Even a tap on another real control should only move the tour, not act on the app.
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    if (!active.changing) advance();
-  }
-
-  function onKeydown(event) {
-    if (!active) return;
-    if (event.key === 'Escape' || event.key === 'Backspace') {
-      event.preventDefault();
-      stop(true);
-    } else if (event.key === 'ArrowRight') {
-      event.preventDefault();
-      advance();
-    } else if (event.key === 'Tab') {
-      const card = root.querySelector('.mw-tour-card');
-      if (!card) return;
-      const skip = card.querySelector('#mwTourSkip');
-      const next = card.querySelector('#mwTourNext');
-      if (event.shiftKey && (document.activeElement === skip || document.activeElement === card)) {
-        event.preventDefault();
-        next.focus();
-      } else if (!event.shiftKey && document.activeElement === next) {
-        event.preventDefault();
-        skip.focus();
-      }
-    }
-  }
-
-  function pause(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   function openScreen(screen) {
@@ -139,43 +145,156 @@ window.MW = window.MW || {};
     return true;
   }
 
+  function afterNavigation(nextIndex) {
+    if (!active) return;
+    active.changing = true;
+    clearLayer();
+    active.index = nextIndex;
+    const generation = ++active.generation;
+    // Let the app's own slide transition show which tab was opened.
+    setTimeout(
+      () => {
+        if (!active || active.generation !== generation) return;
+        present(nextIndex).catch(() => stop(false));
+      },
+      prefersReducedMotion() ? 35 : 330,
+    );
+  }
+
+  function advance(navigatedByUser = false) {
+    if (!active || (active.changing && !navigatedByUser)) return;
+    const index = active.index;
+    const step = steps[index];
+    const next = index + 1;
+    if (next >= steps.length) {
+      stop(true);
+      return;
+    }
+    if (step.opens) {
+      if (!navigatedByUser && !openScreen(step.opens)) {
+        stop(false);
+        return;
+      }
+      afterNavigation(next);
+      return;
+    }
+    active.index = next;
+    present(next).catch(() => stop(false));
+  }
+
+  function onOutsideTap(event) {
+    if (!active || internalNavigation) return;
+    if (active.changing) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      return;
+    }
+    const card = root.querySelector('.mw-tour-card');
+    if (card && card.contains(event.target) && event.target.closest('button')) return;
+    const step = steps[active.index];
+    if (step.opens && active.target && active.target.contains(event.target)) {
+      // Allow this exact highlighted tab's own click handler to navigate.
+      // The next step is shown only once the app's page transition has played.
+      advance(true);
+      return;
+    }
+    // Outside taps still advance, without activating a different control by accident.
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    advance();
+  }
+
+  function onKeydown(event) {
+    if (!active) return;
+    if (event.key === 'Escape' || event.key === 'Backspace') {
+      event.preventDefault();
+      stop(true);
+      return;
+    }
+    if (active.changing) return;
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      advance();
+    } else if (event.key === 'Tab') {
+      const card = root.querySelector('.mw-tour-card');
+      if (!card) return;
+      const controls = [
+        card.querySelector('#mwTourSkip'),
+        ...(steps[active.index].opens && active.target ? [active.target] : []),
+        card.querySelector('#mwTourNext'),
+      ].filter(Boolean);
+      const current = controls.indexOf(document.activeElement);
+      if (event.shiftKey && (current <= 0 || document.activeElement === card)) {
+        event.preventDefault();
+        controls[controls.length - 1].focus();
+      } else if (!event.shiftKey && (current === controls.length - 1 || document.activeElement === card)) {
+        event.preventDefault();
+        controls[0].focus();
+      }
+    }
+  }
+
   async function findTarget(step, generation) {
-    for (let tries = 0; tries < 65; tries++) {
+    for (let attempt = 0; attempt < 75; attempt++) {
       if (!active || active.generation !== generation) return null;
       const target =
         MW.state.get().ui.screen === step.screen ? root.querySelector('.shell ' + step.selector) : null;
       if (target && target.getClientRects().length) return target;
-      await pause(70);
+      await pause(65);
     }
     return null;
+  }
+
+  async function scrollToFeature(target, generation) {
+    if (!target || !target.isConnected) return;
+    const nav = root.querySelector('.bottom-nav');
+    if (target.closest('.bottom-nav')) return;
+    if (target.closest('.appbar')) {
+      if (window.scrollY > 12) {
+        window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
+        await pause(prefersReducedMotion() ? 40 : 470);
+      }
+      return;
+    }
+    const bounds = target.getBoundingClientRect();
+    const availableBottom = nav ? nav.getBoundingClientRect().top : window.innerHeight;
+    const isVisible = bounds.top >= 65 && bounds.bottom <= availableBottom - 22;
+    const desiredTop = Math.min(115, Math.max(65, Math.round(availableBottom * 0.17)));
+    if (isVisible && bounds.top <= desiredTop + 45) return;
+    const before = window.scrollY;
+    const destination = Math.max(0, before + bounds.top - desiredTop);
+    if (Math.abs(destination - before) < 14) return;
+    // No mask or highlight is shown while the screen moves: users can follow the scroll.
+    window.scrollTo({ top: destination, behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
+    await pause(prefersReducedMotion() ? 40 : 470);
+    if (!active || active.generation !== generation) return;
   }
 
   function positionCard(card, target) {
     const nav = root.querySelector('.bottom-nav');
     const topLimit = 12;
     const bottomLimit = Math.min(
-      window.innerHeight - 12,
-      (nav?.getBoundingClientRect().top ?? window.innerHeight) - 10,
+      window.innerHeight - 10,
+      (nav?.getBoundingClientRect().top ?? window.innerHeight) - 8,
     );
     const height = card.getBoundingClientRect().height;
-    let box = target.getBoundingClientRect();
-    let below = box.bottom + 12;
-    let above = box.top - height - 12;
+    let bounds = target.getBoundingClientRect();
+    let below = bounds.bottom + 12;
+    let above = bounds.top - height - 12;
 
-    // On landscape devices there may not initially be room above or below.
-    // Move the real target towards the top rather than placing the card over it.
-    if (below + height > bottomLimit && above < topLimit) {
-      window.scrollBy({ top: box.top - 18, behavior: 'instant' });
-      box = target.getBoundingClientRect();
-      below = box.bottom + 12;
-      above = box.top - height - 12;
+    if (below + height > bottomLimit && above < topLimit && !target.closest('.bottom-nav,.appbar')) {
+      const move = bounds.top - 26;
+      window.scrollBy({ top: move, behavior: 'instant' });
+      bounds = target.getBoundingClientRect();
+      below = bounds.bottom + 12;
+      above = bounds.top - height - 12;
     }
     const top =
       below + height <= bottomLimit
         ? below
         : above >= topLimit
           ? above
-          : Math.min(Math.max(topLimit, below), Math.max(topLimit, bottomLimit - height));
+          : Math.max(topLimit, Math.min(below, bottomLimit - height));
     card.style.top = Math.round(top) + 'px';
   }
 
@@ -185,6 +304,7 @@ window.MW = window.MW || {};
     active.changing = true;
     clearLayer();
     const step = steps[index];
+    // This normally matches already; only a missing/optional step may need reconciliation.
     if (!openScreen(step.screen)) {
       stop(false);
       return;
@@ -192,20 +312,18 @@ window.MW = window.MW || {};
     const target = await findTarget(step, generation);
     if (!active || active.generation !== generation) return;
     if (!target) {
-      // An empty week may have no ingredient rows. Do not trap anyone in the tour.
+      if (!step.optional) {
+        stop(false);
+        return;
+      }
       active.changing = false;
       advance();
       return;
     }
-    // A page transition may finish its own scroll after rendering.
-    await pause(100);
+    await pause(prefersReducedMotion() ? 45 : 145);
     if (!active || active.generation !== generation || !target.isConnected) return;
-    const initial = target.getBoundingClientRect();
-    const bottomNav = root.querySelector('.bottom-nav')?.getBoundingClientRect().top ?? window.innerHeight;
-    if (initial.top < 0 || initial.bottom > bottomNav - 12) {
-      target.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'instant' });
-      window.scrollBy({ top: -Math.min(78, Math.round(window.innerHeight * 0.15)), behavior: 'instant' });
-    }
+    await scrollToFeature(target, generation);
+    if (!active || active.generation !== generation || !target.isConnected) return;
 
     const shell = root.querySelector('.shell');
     const nav = shell?.querySelector('.bottom-nav');
@@ -215,8 +333,10 @@ window.MW = window.MW || {};
     }
     active.target = target;
     target.classList.add('mw-tour-target');
-    // The bottom navigation retains its usual white background and active-tab state.
+    if (step.opens) target.classList.add('mw-tour-tap');
+    // Both navigation landmarks retain their normal appearance. The active tab remains clear.
     nav.classList.add('mw-tour-front');
+    if (target.closest('.appbar')) shell.querySelector('.appbar')?.classList.add('mw-tour-front');
 
     const shade = document.createElement('div');
     shade.className = 'mw-tour-shade';
@@ -229,7 +349,9 @@ window.MW = window.MW || {};
     card.setAttribute('aria-labelledby', 'mwTourTitle');
     card.setAttribute('aria-describedby', 'mwTourCopy');
     card.innerHTML =
-      '<span class="eyebrow">QUICK TOUR · ' +
+      '<span class="eyebrow">' +
+      step.section +
+      ' · ' +
       (index + 1) +
       ' OF ' +
       steps.length +
@@ -237,12 +359,14 @@ window.MW = window.MW || {};
       step.title +
       '</h2><p id="mwTourCopy">' +
       step.copy +
-      '</p><div class="mw-tour-actions"><button type="button" class="btn secondary" id="mwTourSkip">Skip</button>' +
+      '</p>' +
+      (step.opens ? '<p class="mw-tour-tap-hint">Tap the highlighted button to continue</p>' : '') +
+      '<div class="mw-tour-actions"><button type="button" class="btn secondary" id="mwTourSkip">Skip tour</button>' +
       '<button type="button" class="btn primary" id="mwTourNext">' +
-      (index === steps.length - 1 ? 'Finish' : 'Next') +
+      (index === steps.length - 1 ? 'Finish' : step.opens ? 'Open tab' : 'Next') +
       '</button></div>';
     card.querySelector('#mwTourSkip').addEventListener('click', () => stop(true));
-    card.querySelector('#mwTourNext').addEventListener('click', advance);
+    card.querySelector('#mwTourNext').addEventListener('click', () => advance());
     document.body.classList.add('mw-tour-open');
     shell.append(shade, card);
     positionCard(card, target);
@@ -275,19 +399,18 @@ window.MW = window.MW || {};
     section.innerHTML =
       '<button type="button" class="settings-link" id="mwReplayTour">' +
       '<i class="fa-solid fa-circle-question" aria-hidden="true"></i>' +
-      '<span><strong>Show tutorial</strong><small>A quick tour of the essentials</small></span>' +
+      '<span><strong>Show tutorial</strong><small>See how the main screens work</small></span>' +
       '<i class="fa-solid fa-chevron-right" aria-hidden="true"></i></button>';
     status.before(section);
     section.querySelector('button').addEventListener('click', () => {
-      const latest = MW.state.get();
-      latest.ui.tutorialStatus = 'pending';
+      const state = MW.state.get();
+      state.ui.tutorialStatus = 'pending';
       MW.state.save();
       root.querySelector('.bottom-nav [data-nav="week"]')?.click();
     });
   }
 
   function sync() {
-    // During intentional screen navigation the app replaces the whole shell.
     if (active && !active.changing && !root.querySelector('.mw-tour-card')) stop(false);
     addReplayLink();
     maybeStart();

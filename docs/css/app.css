@@ -12460,7 +12460,7 @@ html[data-mw-motion='tab-back']::view-transition-group(mw-bottom-nav) {
   }
 }
 
-/* Screen-by-screen first-use guidance. The real navigation stays in its normal white bar. */
+/* The guided tour keeps MyWeek's real pages and bottom navigation visible. */
 body.mw-tour-open {
   overflow: hidden;
 }
@@ -12468,8 +12468,9 @@ body.mw-tour-open {
   position: fixed;
   inset: 0;
   z-index: 20001;
-  background: rgba(20, 35, 29, 0.62);
+  background: rgba(20, 35, 29, 0.61);
   touch-action: manipulation;
+  animation: mw-tour-fade 180ms ease-out both;
 }
 .bottom-nav.mw-tour-front {
   z-index: 20003;
@@ -12479,6 +12480,11 @@ body.mw-tour-open {
   box-shadow: 0 -8px 28px rgba(31, 65, 52, 0.055);
   backdrop-filter: none;
 }
+.appbar.mw-tour-front {
+  position: relative;
+  z-index: 20003;
+  pointer-events: auto;
+}
 .mw-tour-target {
   position: relative;
   z-index: 20002;
@@ -12487,6 +12493,9 @@ body.mw-tour-open {
   box-shadow:
     0 0 0 4px var(--surface),
     0 12px 30px rgba(9, 33, 21, 0.22);
+}
+.mw-tour-target.mw-tour-tap {
+  animation: mw-tour-pulse 1.6s ease-in-out infinite;
 }
 .mw-tour-card {
   position: fixed;
@@ -12504,14 +12513,15 @@ body.mw-tour-open {
   background: var(--surface);
   box-shadow: 0 18px 45px rgba(5, 24, 15, 0.24);
   text-align: left;
+  animation: mw-tour-card-arrive 220ms ease-out both;
 }
 .mw-tour-card:focus {
-  outline: 0;
+  outline: none;
 }
 .mw-tour-card .eyebrow {
   display: block;
   margin: 0 0 9px;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.065em;
   color: var(--green-deep);
 }
 .mw-tour-card h2 {
@@ -12528,6 +12538,12 @@ body.mw-tour-open {
   font-size: 14px;
   line-height: 1.5;
 }
+.mw-tour-card .mw-tour-tap-hint {
+  margin-top: 11px;
+  color: var(--green-deep);
+  font-size: 12px;
+  font-weight: 720;
+}
 .mw-tour-actions {
   display: flex;
   justify-content: space-between;
@@ -12538,9 +12554,41 @@ body.mw-tour-open {
   min-width: 100px;
   min-height: 44px;
 }
-.mw-tour-actions .btn:focus-visible {
+.mw-tour-actions .btn:focus-visible,
+.mw-tour-target:focus-visible {
   outline: 2px solid var(--green-deep);
   outline-offset: 3px;
+}
+@keyframes mw-tour-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes mw-tour-card-arrive {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+@keyframes mw-tour-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 4px var(--surface),
+      0 0 0 7px rgba(0, 113, 87, 0.17);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px var(--surface),
+      0 0 0 11px rgba(0, 113, 87, 0.33);
+  }
 }
 @media (max-height: 500px) {
   .mw-tour-card {
@@ -12559,6 +12607,7 @@ body.mw-tour-open {
 }
 @media (prefers-reduced-motion: reduce) {
   .mw-tour-card,
+  .mw-tour-shade,
   .mw-tour-target {
     transition: none;
     animation: none;
