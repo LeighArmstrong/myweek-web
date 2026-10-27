@@ -73,9 +73,9 @@ window.MW = window.MW || {};
     {
       screen: 'shopreview',
       section: 'Shopping List',
-      selector: '.shop-item-shell .shop-item',
+      selector: '.shop-item-shell',
       title: 'Tick items off',
-      copy: 'Tap an item when you have picked it up. Your ticks stay saved.',
+      copy: 'Tap the tick box beside an item when you pick it up. Your ticks stay saved.',
       optional: true,
     },
     {
@@ -115,8 +115,11 @@ window.MW = window.MW || {};
       .querySelectorAll('.mw-tour-target')
       .forEach((element) => element.classList.remove('mw-tour-target', 'mw-tour-tap'));
     root.querySelectorAll('.mw-tour-front').forEach((element) => element.classList.remove('mw-tour-front'));
-    root.querySelectorAll('.mw-tour-shade,.mw-tour-card').forEach((element) => element.remove());
+    root
+      .querySelectorAll('.mw-tour-overlay,.mw-tour-shade,.mw-tour-card')
+      .forEach((element) => element.remove());
     document.body.classList.remove('mw-tour-open');
+    if (active) active.refresh = null;
   }
 
   function stop(persist) {
@@ -273,46 +276,130 @@ window.MW = window.MW || {};
     if (!active || active.generation !== generation) return;
   }
 
-  function placeCardInFlow(card, target) {
-    const shell = root.querySelector('.shell');
-    if (!shell) return false;
-    if (target.closest('.bottom-nav,.appbar')) {
-      shell.querySelector('.appbar')?.after(card);
-      return true;
-    }
-    // Place the explanation immediately before its feature. A normal layout
-    // slot makes it impossible for it to sit on top of a different button.
-    const anchor = target.closest('.retail-group,.settings-section,.shop-item-shell') || target;
-    const parent = anchor.parentElement;
-    if (!parent) return false;
-    parent.insertBefore(card, anchor);
-    return true;
+  function svgElement(name, attributes) {
+    const element = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for (const [key, value] of Object.entries(attributes)) element.setAttribute(key, String(value));
+    return element;
   }
 
-  async function scrollCardAndFeature(card, target, generation) {
-    if (!active || active.generation !== generation) return;
-    const navigation = root.querySelector('.bottom-nav');
-    const availableBottom = (navigation?.getBoundingClientRect().top ?? window.innerHeight) - 12;
-    const cardBounds = card.getBoundingClientRect();
-    const featureBounds = target.getBoundingClientRect();
-    if (target.closest('.bottom-nav,.appbar')) {
-      // Navigation remains fixed. Its explanation sits just below the normal
-      // page header, so it never overlays shopping rows or header actions.
-      if (window.scrollY > 8) {
-        window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
-        await pause(prefersReducedMotion() ? 35 : 470);
-      }
-      return;
-    }
-    const span = Math.max(cardBounds.height, featureBounds.bottom - cardBounds.top);
-    const desiredTop = Math.max(12, Math.min(75, (availableBottom - span) / 2));
-    const delta = cardBounds.top - desiredTop;
-    if (Math.abs(delta) < 10) return;
-    window.scrollTo({
-      top: Math.max(0, window.scrollY + delta),
-      behavior: prefersReducedMotion() ? 'instant' : 'smooth',
+  function showSpotlight(shell, target) {
+    // A true rounded cut-out leaves the original control entirely untouched.
+    // The transparent SVG receives no pointer events; document capture guards
+    // every other button while allowing taps on the requested navigation tab.
+    const overlay = document.createElement('div');
+    overlay.className = 'mw-tour-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+    const svg = svgElement('svg', { 'aria-hidden': 'true' });
+    const defs = svgElement('defs', {});
+    const mask = svgElement('mask', { id: 'mwTourMask', maskUnits: 'userSpaceOnUse' });
+    const body = svgElement('rect', { fill: 'white' });
+    const hole = svgElement('rect', { class: 'mw-tour-hole', rx: 9, fill: 'black' });
+    const shade = svgElement('rect', {
+      class: 'mw-tour-shade',
+      fill: 'rgba(17, 32, 26, 0.66)',
+      mask: 'url(#mwTourMask)',
     });
-    await pause(prefersReducedMotion() ? 35 : 470);
+    mask.append(body, hole);
+    defs.append(mask);
+    svg.append(defs, shade);
+    overlay.append(svg);
+    shell.append(overlay);
+    const refresh = () => {
+      if (!target.isConnected) return;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const bounds = target.getBoundingClientRect();
+      const pad = target.closest('.bottom-nav,.appbar') ? 3 : 6;
+      const left = Math.max(0, Math.floor(bounds.left - pad));
+      const top = Math.max(0, Math.floor(bounds.top - pad));
+      const right = Math.min(width, Math.ceil(bounds.right + pad));
+      const bottom = Math.min(height, Math.ceil(bounds.bottom + pad));
+      const view = { x: 0, y: 0, width, height };
+      svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+      for (const shape of [body, shade]) {
+        for (const [key, value] of Object.entries(view)) shape.setAttribute(key, String(value));
+      }
+      for (const [key, value] of Object.entries({
+        x: left,
+        y: top,
+        width: Math.max(1, right - left),
+        height: Math.max(1, bottom - top),
+      }))
+        hole.setAttribute(key, String(value));
+      mask.setAttribute('x', '0');
+      mask.setAttribute('y', '0');
+      mask.setAttribute('width', String(width));
+      mask.setAttribute('height', String(height));
+    };
+    refresh();
+    return refresh;
+  }
+
+  function positionCard(card, target) {
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const navTop = root.querySelector('.bottom-nav')?.getBoundingClientRect().top ?? height;
+    const bounds = target.getBoundingClientRect();
+    const panelHeight = card.getBoundingClientRect().height;
+    const panelWidth = card.getBoundingClientRect().width;
+    const margin = 12;
+    const maxTop = Math.max(margin, Math.min(height - 12, navTop - 8) - panelHeight);
+    const maxLeft = Math.max(16, width - panelWidth - 16);
+    const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+    const centreX = (bounds.left + bounds.right) / 2;
+    let x = clamp(centreX - panelWidth / 2, 16, maxLeft);
+    let y;
+    if (target.closest('.bottom-nav')) {
+      // The instruction belongs immediately ABOVE the exact tab, never at
+      // the top of the page or over the navigation bar as a whole.
+      y = clamp(bounds.top - panelHeight - 14, margin, maxTop);
+      card.classList.add('mw-tour-card-tab');
+      card.style.setProperty('--mw-tour-arrow-x', clamp(centreX - x, 16, panelWidth - 16) + 'px');
+    } else if (target.closest('.appbar')) {
+      y = clamp(bounds.bottom + 14, margin, maxTop);
+      x = clamp(bounds.right - panelWidth, 16, maxLeft);
+    } else {
+      const overlaps = (a, b) =>
+        Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) *
+        Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      const controls = Array.from(
+        root.querySelectorAll(
+          '.shell button,.shell input,.shell select,.shell textarea,.shell [role="button"]',
+        ),
+      )
+        .filter(
+          (element) =>
+            !card.contains(element) &&
+            element !== target &&
+            !target.contains(element) &&
+            !element.contains(target) &&
+            element.getClientRects().length > 0,
+        )
+        .map((element) => element.getBoundingClientRect());
+      const candidates = [
+        bounds.bottom + 12,
+        bounds.top - panelHeight - 12,
+        margin,
+        maxTop,
+        (margin + maxTop) / 2,
+      ];
+      const xCandidates = [x, 16, maxLeft];
+      let best = { score: Infinity, top: margin, left: x };
+      for (const cx of xCandidates)
+        for (const cy of candidates) {
+          const top = clamp(cy, margin, maxTop);
+          const left = clamp(cx, 16, maxLeft);
+          const rect = { top, bottom: top + panelHeight, left, right: left + panelWidth };
+          let score = overlaps(rect, bounds) * 100;
+          for (const other of controls) score += overlaps(rect, other) * 0.2;
+          score += Math.min(Math.abs(rect.top - bounds.bottom), Math.abs(bounds.top - rect.bottom)) * 0.045;
+          if (score < best.score) best = { score, top, left };
+        }
+      y = best.top;
+      x = best.left;
+    }
+    card.style.left = Math.round(x) + 'px';
+    card.style.top = Math.round(y) + 'px';
   }
 
   async function present(index) {
@@ -338,9 +425,6 @@ window.MW = window.MW || {};
     }
     await pause(prefersReducedMotion() ? 45 : 145);
     if (!active || active.generation !== generation || !target.isConnected) return;
-
-    // The app moves to the feature first; explanation and spotlight appear only
-    // once the scroll has finished, maintaining a clear point of reference.
     await scrollToFeature(target, generation);
     if (!active || active.generation !== generation || !target.isConnected) return;
 
@@ -350,7 +434,6 @@ window.MW = window.MW || {};
       stop(false);
       return;
     }
-
     const card = document.createElement('section');
     card.className = 'mw-tour-card';
     card.style.visibility = 'hidden';
@@ -376,23 +459,16 @@ window.MW = window.MW || {};
       '</button></div>';
     card.querySelector('#mwTourSkip').addEventListener('click', () => stop(true));
     card.querySelector('#mwTourNext').addEventListener('click', () => advance());
-    if (!placeCardInFlow(card, target)) {
-      stop(false);
-      return;
-    }
-    await scrollCardAndFeature(card, target, generation);
-    if (!active || active.generation !== generation || !target.isConnected) return;
-
-    active.target = target;
+    shell.append(card);
     target.classList.add('mw-tour-target');
-    if (step.opens) target.classList.add('mw-tour-tap');
-    nav.classList.add('mw-tour-front');
-    if (target.closest('.appbar')) shell.querySelector('.appbar')?.classList.add('mw-tour-front');
-    const shade = document.createElement('div');
-    shade.className = 'mw-tour-shade';
-    shade.setAttribute('aria-hidden', 'true');
+    const refreshHole = showSpotlight(shell, target);
     document.body.classList.add('mw-tour-open');
-    shell.append(shade);
+    active.target = target;
+    active.refresh = () => {
+      refreshHole();
+      if (card.isConnected) positionCard(card, target);
+    };
+    active.refresh();
     card.style.visibility = '';
     card.focus({ preventScroll: true });
     active.changing = false;
@@ -439,6 +515,14 @@ window.MW = window.MW || {};
     addReplayLink();
     maybeStart();
   }
+
+  // Keep the cut-out aligned on orientation changes and screen resizing.
+  const refreshPosition = () => {
+    if (active && !active.changing && active.refresh) active.refresh();
+  };
+  window.addEventListener('resize', refreshPosition);
+  window.addEventListener('orientationchange', refreshPosition);
+  window.addEventListener('scroll', refreshPosition, { passive: true });
 
   const observer = new MutationObserver(() => {
     if (observerQueued) return;
