@@ -1553,6 +1553,7 @@ window.MW = window.MW || {};
   }
 
   window.MyWeekAndroidBack = () => {
+    if (MW.tutorial && MW.tutorial.dismiss()) return true;
     const sheet = document.getElementById('ingredientActionSheet');
     if (sheet) {
       sheet.remove();

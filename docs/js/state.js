@@ -75,7 +75,13 @@ window.MW = window.MW || {};
       week: null,
       weekHistory: [],
       events: [],
-      ui: { screen: 'welcome', shopChecks: {}, dismissedRolloverFor: '', keepScreenAwake: false },
+      ui: {
+        screen: 'welcome',
+        shopChecks: {},
+        dismissedRolloverFor: '',
+        keepScreenAwake: false,
+        tutorialStatus: 'pending',
+      },
     };
     const bp = MW.BUILD_PROFILE || {};
     if (bp.clearDefaultInventory) state.inventory = {};
@@ -263,6 +269,10 @@ window.MW = window.MW || {};
     x.ui.shopChecks = x.ui.shopChecks || {};
     x.ui.dismissedRolloverFor = String(x.ui.dismissedRolloverFor || '');
     x.ui.keepScreenAwake = Boolean(x.ui.keepScreenAwake);
+    // An existing completed household must not receive a surprise tour.
+    // An unfinished setup is still eligible once onboarding is completed.
+    if (!['pending', 'done'].includes(x.ui.tutorialStatus))
+      x.ui.tutorialStatus = x.onboarded ? 'done' : 'pending';
     return x;
   }
 
