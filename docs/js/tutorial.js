@@ -6,36 +6,53 @@ window.MW = window.MW || {};
   const root = document.getElementById('app');
   if (!root || !MW.state) return;
 
-  // The user opens each new page with its real tab. No recipe or preference is changed.
+  // Each highlighted feature explains a real action before leaving its page.
+  // Navigation opens the real tab; the guide never changes meals or settings.
   const steps = [
     {
       screen: 'week',
       section: 'My Week',
       selector: '.day-strip',
-      title: 'Plan each day',
-      copy: 'Tap a day to turn lunch or dinner on or off, or choose what to cook.',
+      title: 'Plan your days',
+      copy: 'Tap a day to choose when you want lunch or dinner. Your unfinished week stays until you change it.',
     },
     {
       screen: 'week',
       section: 'My Week',
       selector: '.home-quick-actions',
       title: 'Choose your meals',
-      copy: 'Use these buttons to generate meals or pick your own.',
+      copy: 'Generate a selection of meals or choose your own. You decide when to change your plan.',
+    },
+    {
+      screen: 'week',
+      section: 'My Week',
+      selector: '.home-featured-actions',
+      title: 'View or change dinner',
+      copy: 'View recipe shows the ingredients and cooking steps. Change offers another dinner for this day.',
+      optional: true,
     },
     {
       screen: 'week',
       section: 'My Week',
       selector: '.bottom-nav [data-nav="recipes"]',
       opens: 'recipes',
-      title: 'Open All Recipes',
-      copy: 'Tap All Recipes in the bottom bar.',
+      title: 'Explore All Recipes',
+      copy: 'Tap All Recipes to browse meals beyond the ones already planned for your week.',
     },
     {
       screen: 'recipes',
       section: 'All Recipes',
       selector: '.library-search-row',
-      title: 'Find a recipe',
-      copy: 'Search here for a meal, or use the filter button.',
+      title: 'Search and filter',
+      copy: 'Search for a dish or ingredient here. Use the filter icon to narrow the results.',
+    },
+    {
+      screen: 'recipes',
+      section: 'All Recipes',
+      selector: '.recipe-category-grid [data-recipe-category], .library-card',
+      title: 'Browse by category',
+      copy: 'Choose a category to find something you fancy, then tap a recipe card to see its details.',
+      optional: true,
     },
     {
       screen: 'recipes',
@@ -43,14 +60,21 @@ window.MW = window.MW || {};
       selector: '.bottom-nav [data-nav="myrecipes"]',
       opens: 'myrecipes',
       title: 'Open My Recipes',
-      copy: 'Tap My Recipes in the bottom bar.',
+      copy: 'This tab keeps the meals you have saved, favourited or added yourself.',
     },
     {
       screen: 'myrecipes',
       section: 'My Recipes',
-      selector: '.personal-search-row',
-      title: 'Your saved recipes',
-      copy: 'Find favourites here. Tap + to add your own recipe.',
+      selector: '.personal-search-row .library-search',
+      title: 'Find your saved recipes',
+      copy: 'Search your own recipes and favourites by name or ingredient.',
+    },
+    {
+      screen: 'myrecipes',
+      section: 'My Recipes',
+      selector: '#importRecipe',
+      title: 'Add a recipe',
+      copy: 'Tap the plus to type your own recipe or import one from a link.',
     },
     {
       screen: 'myrecipes',
@@ -58,33 +82,31 @@ window.MW = window.MW || {};
       selector: '.bottom-nav [data-nav="shopreview"]',
       opens: 'shopreview',
       title: 'Open Shopping List',
-      copy: 'Tap Shopping List in the bottom bar.',
+      copy: 'Your shopping list is built from the meals in My Week.',
     },
     {
       screen: 'shopreview',
       section: 'Shopping List',
-      selector: '.retail-group header, .shop-list-empty',
-      title: 'Your ingredients, ready to buy',
-      copy: 'Ingredients for the meals in My Week appear here automatically, grouped into a shopping list.',
-      emptyCopy:
-        'Once you plan meals in My Week, their ingredients will appear here automatically, ready to buy.',
+      selector: '.retail-group:not([data-retail-section="Additions"]) header, .shop-list-empty',
+      title: 'Your meal ingredients',
+      copy: 'Ingredients for your planned meals appear here automatically, grouped for easier shopping.',
+      emptyCopy: 'When you choose meals in My Week, the ingredients you need will appear here automatically.',
       optional: true,
     },
     {
       screen: 'shopreview',
       section: 'Shopping List',
       selector: '.shop-item-shell',
-      title: 'Tick items off',
-      copy: 'Tap the tick box beside an item when you pick it up. Your ticks stay saved.',
+      title: 'Tick off what you have',
+      copy: 'Tap an item when you pick it up. Your checked items stay saved as you shop.',
       optional: true,
     },
     {
       screen: 'shopreview',
       section: 'Shopping List',
       selector: '.shop-add-items',
-      title: 'Add anything else',
-      copy: 'Type any other item you need and tap Add.',
-      optional: true,
+      title: 'Add extra items',
+      copy: 'This box is for extras such as milk or loo roll, not your meal ingredients. Type an item and tap Add.',
     },
     {
       screen: 'shopreview',
@@ -92,14 +114,35 @@ window.MW = window.MW || {};
       selector: '#settingsButton',
       opens: 'settings',
       title: 'Open Settings',
-      copy: 'Tap the cog at the top right.',
+      copy: 'Tap the cog to set your supermarket, budget and meal preferences.',
     },
     {
       screen: 'settings',
       section: 'Settings',
-      selector: '#settingsSaveStatus',
-      title: 'Make MyWeek yours',
-      copy: 'Choose your supermarket, set your budget and adjust your meal preferences here.',
+      selector: '.settings-section:has(#retailer) .settings-select-control',
+      title: 'Your supermarket',
+      copy: 'Choose where you usually shop. No preferred supermarket uses an average price instead.',
+    },
+    {
+      screen: 'settings',
+      section: 'Settings',
+      selector: '.settings-section:has(#budget) .prefix-input',
+      title: 'Your weekly budget',
+      copy: 'Set the amount you would like your meals to aim for. Changes save automatically.',
+    },
+    {
+      screen: 'settings',
+      section: 'Settings',
+      selector: '.food-settings',
+      title: 'Food preferences',
+      copy: 'Open this section to choose eating styles, allergens and foods you want to avoid.',
+    },
+    {
+      screen: 'settings',
+      section: 'Settings',
+      selector: '.equipment-settings',
+      title: 'Kitchen equipment',
+      copy: 'Open this section to choose the appliances you have. MyWeek uses these to match meals to your kitchen.',
     },
   ];
 
@@ -277,13 +320,20 @@ window.MW = window.MW || {};
   }
 
   const TOUR_GAP = 14;
-  const TOUR_PAD = 4;
+  const TOUR_PAD = 5;
   const TOUR_MARGIN = 12;
-
-  // Uniform visual language: spotlight corners are a soft 14px on every step,
-  // capped by the actual cut-out dimensions rather than copied from unrelated controls.
+  // Outline the complete visible control, not its borderless text input.
+  // Full disclosure cards use the same card token as the explanation panel;
+  // search fields, dropdowns and budget inputs use the control token.
   function targetCornerRadii(target, width, height) {
-    const radius = Math.min(14, width / 2, height / 2);
+    const token = target.matches('.settings-expand') ? '--radius-card' : '--radius-control';
+    const designRadius = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue(token),
+    );
+    if (!Number.isFinite(designRadius) || designRadius <= 0) {
+      throw new Error('MyWeek spotlight radius design token is unavailable');
+    }
+    const radius = Math.min(designRadius, width / 2, height / 2);
     return [radius, radius, radius, radius];
   }
 

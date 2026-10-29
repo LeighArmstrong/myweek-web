@@ -6,6 +6,7 @@ window.MW = window.MW || {};
   let accountEntryChosen = false;
   let pendingMotion = 'context';
   let activeViewTransition = null;
+  let navigationRenderGeneration = 0;
   let libraryObserver = null;
   let libraryFilterEvents = null;
   MW.onboarding.startViewport();
@@ -13,6 +14,9 @@ window.MW = window.MW || {};
   // The last main tab remains the directional reference while a header shortcut
   // (Favourites, Account or Settings) is open.
   let lastMainTabIndex = null;
+  let lastMainTabTapAt = -Infinity;
+  let pendingMainTab = null;
+  let pendingMainTabTimer = null;
   const keepScreenAwakeEnabled = MW.screenAwake.enabled;
   const wakeLockSupported = MW.screenAwake.supported;
   function refreshKeepAwakeControls() {
@@ -169,20 +173,28 @@ window.MW = window.MW || {};
   window.addEventListener('mw:update-state', paintUpdateState);
 
   function transitionRender(motion, fn) {
+    const request = ++navigationRenderGeneration;
+    const interrupted = Boolean(activeViewTransition);
     finishInterruptedMotion();
     pendingMotion = motion || 'context';
-    // Bottom tabs get their own directional movement. Header and bottom bar
-    // are separately named view-transition elements and remain stationary.
-    if (reducedMotion() || pendingMotion === 'context') {
+    // A rapid sequence must never overlap WebKit View Transitions. Show the
+    // latest requested page immediately rather than starting and cancelling
+    // multiple native animations within the same short interaction.
+    const renderLatest = () => {
+      if (request === navigationRenderGeneration) fn();
+    };
+    if (reducedMotion() || pendingMotion === 'context' || interrupted) {
       animateNextPage = false;
       clearMotionDataset();
-      fn();
+      renderLatest();
       return;
     }
+    // Ordinary, unhurried tab changes retain their directional animation.
+    // Header and bottom bar are separately named and stay stationary.
     document.documentElement.dataset.mwMotion = pendingMotion;
     if (typeof document.startViewTransition === 'function') {
       animateNextPage = false;
-      const transition = document.startViewTransition(() => fn());
+      const transition = document.startViewTransition(renderLatest);
       activeViewTransition = transition;
       // Skipping an in-flight animation deliberately rejects its ready promise.
       // Observe that cancellation so rapid taps cannot emit page errors.
@@ -201,7 +213,7 @@ window.MW = window.MW || {};
       return;
     }
     animateNextPage = true;
-    fn();
+    renderLatest();
     requestAnimationFrame(() => setTimeout(clearMotionDataset, 320));
   }
 
@@ -1468,27 +1480,7 @@ window.MW = window.MW || {};
         notice.remove();
       };
     root.querySelectorAll('[data-nav]').forEach((button) => {
-      button.onclick = () => {
-        const selected = button.dataset.nav;
-        const destination = selected;
-        if (selected === 'recipes') {
-          s().ui.libraryQuery = '';
-          s().ui.libraryCategory = '';
-          s().ui.libraryFilters = null;
-        }
-        if (selected === 'myrecipes') s().ui.libraryTargetDay = '';
-        const fromIndex = tabIndex(s().ui.screen);
-        const previous = fromIndex >= 0 ? fromIndex : lastMainTabIndex;
-        const next = tabIndex(destination);
-        const motion =
-          previous == null || next < 0 || previous === next
-            ? 'context'
-            : next > previous
-              ? 'tab-forward'
-              : 'tab-back';
-        lastMainTabIndex = next >= 0 ? next : previous;
-        go(destination, { motion });
-      };
+      button.onclick = () => requestMainTab(button.dataset.nav);
     });
     const settings = document.getElementById('settingsButton');
     if (settings) settings.onclick = () => go('settings', { motion: 'drill-forward' });
@@ -1496,11 +1488,63 @@ window.MW = window.MW || {};
     if (shortcut) shortcut.onclick = () => go('account', { motion: 'drill-forward' });
   }
 
+  function clearPendingMainTab() {
+    if (pendingMainTabTimer != null) clearTimeout(pendingMainTabTimer);
+    pendingMainTabTimer = null;
+    pendingMainTab = null;
+  }
+
+  function navigateMainTab(destination) {
+    if (destination === 'recipes') {
+      s().ui.libraryQuery = '';
+      s().ui.libraryCategory = '';
+      s().ui.libraryFilters = null;
+    }
+    if (destination === 'myrecipes') s().ui.libraryTargetDay = '';
+    const fromIndex = tabIndex(s().ui.screen);
+    const previous = fromIndex >= 0 ? fromIndex : lastMainTabIndex;
+    const next = tabIndex(destination);
+    const motion =
+      previous == null || next < 0 || previous === next
+        ? 'context'
+        : next > previous
+          ? 'tab-forward'
+          : 'tab-back';
+    lastMainTabIndex = next >= 0 ? next : previous;
+    go(destination, { motion, mainNavigation: true });
+  }
+
+  function requestMainTab(destination) {
+    // Render the first tap immediately, then coalesce an implausibly fast
+    // burst to the last destination. This avoids rendering multiple large
+    // recipe and shopping screens within one brief WebKit interaction.
+    const now = performance.now();
+    const rapidTapWindow = Number.parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue('--motion-fast'),
+    );
+    const quietMs = Number.isFinite(rapidTapWindow) && rapidTapWindow > 0 ? rapidTapWindow : 160;
+    const rapid = pendingMainTabTimer != null || now - lastMainTabTapAt < quietMs;
+    lastMainTabTapAt = now;
+    if (!rapid) return navigateMainTab(destination);
+    pendingMainTab = destination;
+    if (pendingMainTabTimer != null) clearTimeout(pendingMainTabTimer);
+    pendingMainTabTimer = setTimeout(() => {
+      const latest = pendingMainTab;
+      pendingMainTabTimer = null;
+      pendingMainTab = null;
+      if (latest) navigateMainTab(latest);
+    }, quietMs);
+  }
+
   function go(screen, options) {
     const st = s(),
       from = st.ui.screen || 'week',
       changed = from !== screen;
     options = options || {};
+    if (!options.mainNavigation) {
+      clearPendingMainTab();
+      lastMainTabTapAt = -Infinity;
+    }
     if (libraryObserver) {
       libraryObserver.disconnect();
       libraryObserver = null;
