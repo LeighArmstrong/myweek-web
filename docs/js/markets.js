@@ -8,7 +8,17 @@ window.MW = window.MW || {};
       currencyIcon: 'sterling-sign',
       pricingAvailable: true,
       locale: 'en-GB',
-      retailers: ["Sainsbury's", 'Tesco', 'Asda', 'Morrisons', 'Ocado', 'Waitrose', 'Aldi', 'Lidl', 'Other'],
+      retailers: [
+        "Sainsbury's",
+        'Tesco',
+        'Asda',
+        'Morrisons',
+        'Ocado',
+        'Waitrose',
+        'Aldi',
+        'Lidl',
+        'No preferred supermarket',
+      ],
       defaultRetailer: "Sainsbury's",
       defaultBudget: 70,
     },
@@ -19,7 +29,7 @@ window.MW = window.MW || {};
       currencyIcon: 'dollar-sign',
       pricingAvailable: false,
       locale: 'en-AU',
-      retailers: ['Woolworths', 'Coles', 'ALDI', 'IGA', 'Other'],
+      retailers: ['Woolworths', 'Coles', 'ALDI', 'IGA', 'No preferred supermarket'],
       defaultRetailer: 'Woolworths',
       defaultBudget: 150,
     },
@@ -31,6 +41,12 @@ window.MW = window.MW || {};
   const forCountry = (code) => markets[normalise(code || current())];
   const choices = Object.keys(markets).map((id) => ({ id, label: markets[id].label }));
   const fromLabel = (label) => choices.find((entry) => entry.label === label)?.id || 'GB';
+  // One country-owned rule for saved and draft budgets. Zero means no spending cap.
+  const normaliseBudget = (code, value) => {
+    const numericInput = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '');
+    const amount = numericInput ? Number(value) : NaN;
+    return Number.isFinite(amount) && amount >= 0 ? amount : forCountry(code).defaultBudget;
+  };
   const hasPricing = (code) => forCountry(code || current()).pricingAvailable === true;
   // A partial catalogue can support honest comparisons on fully priced weeks,
   // without claiming that every recipe ingredient has a reliable local price.
@@ -51,7 +67,14 @@ window.MW = window.MW || {};
     }).format(Number(amount || 0));
   };
   const availableRetailers = (code) => forCountry(code || current()).retailers;
-  const validRetailer = (country, retailer) => availableRetailers(country).includes(retailer);
+  // Canonical retailer identity, including the historical "Other" choice.
+  const normaliseRetailer = (country, retailer) => {
+    const label = String(retailer || '').trim();
+    const choice = label === 'Other' ? 'No preferred supermarket' : label;
+    return availableRetailers(country).includes(choice) ? choice : forCountry(country).defaultRetailer;
+  };
+  const validRetailer = (country, retailer) =>
+    availableRetailers(country).includes(retailer === 'Other' ? 'No preferred supermarket' : retailer);
   const australianRetailerWebsite = (name) =>
     ({
       Woolworths: 'https://www.woolworths.com.au/',
@@ -76,6 +99,32 @@ window.MW = window.MW || {};
 
   const ingredientSearchTerm = (name, code) =>
     normalise(code || current()) === 'AU' ? australianSearchTerm(name) : String(name || '');
+
+  // Settings own the preference; the market owns all country and retailer wording.
+  const alternativeSearchPrompt = (name, code, retailer) => {
+    const market = normalise(code || current());
+    const chosen = normaliseRetailer(market, retailer || MW.state?.get()?.household?.retailer);
+    const location = forCountry(market).label;
+    const storeHint = chosen === 'No preferred supermarket' ? '' : ', preferably at ' + chosen;
+    const limitedRange =
+      (market === 'GB' && ['Aldi', 'Lidl'].includes(chosen)) || (market === 'AU' && chosen === 'ALDI');
+    const variableRange = market === 'AU' && chosen === 'IGA';
+    const rangeHint = limitedRange
+      ? ' Prefer a simple, everyday substitute suitable for a smaller supermarket range.'
+      : variableRange
+        ? ' IGA ranges vary between stores; favour ordinary ingredients over specialist products.'
+        : '';
+    return (
+      'Suggest an easy-to-find supermarket alternative for "' +
+      ingredientSearchTerm(name, market) +
+      '" in ' +
+      location +
+      storeHint +
+      '.' +
+      rangeHint +
+      ' Explain any quantity or cooking adjustments. Do not assume a product is in stock.'
+    );
+  };
 
   // A retailer offer is unusable without AUD, a source, a locality and a pack measure.
   // Reject UK prices, currency conversions and data without redistribution permission.
@@ -136,6 +185,9 @@ window.MW = window.MW || {};
     money,
     availableRetailers,
     validRetailer,
+    normaliseRetailer,
+    normaliseBudget,
+    alternativeSearchPrompt,
     australianRetailerWebsite,
     normalise,
     fromLabel,

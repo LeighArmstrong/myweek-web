@@ -3124,10 +3124,8 @@ window.MW = window.MW || {};
             record.savingPrice == null
               ? undefined
               : Math.round(record.savingPrice * relativePrice * 100) / 100,
-          retailerPriceMethod:
-            record.retailerPrices?.[retailer] == null
-              ? 'country-benchmark'
-              : 'relative-basket-average-estimate',
+          retailerPriceMethod: MW.cataloguePrices.priceMethodFor(record, retailer),
+          retailerAvailability: 'not-verified',
         }
       : original;
     if (e) {

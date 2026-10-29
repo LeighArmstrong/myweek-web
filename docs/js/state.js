@@ -109,10 +109,8 @@ window.MW = window.MW || {};
     x.household.country = MW.markets.normalise(x.household.country);
     // Earlier development snapshots contained this optional field; it is no longer collected.
     delete x.household.postcode;
-    if (!MW.markets.validRetailer(x.household.country, x.household.retailer))
-      x.household.retailer = MW.markets.forCountry(x.household.country).defaultRetailer;
-    x.household.budget =
-      Number(x.household.budget) || MW.markets.forCountry(x.household.country).defaultBudget;
+    x.household.retailer = MW.markets.normaliseRetailer(x.household.country, x.household.retailer);
+    x.household.budget = MW.markets.normaliseBudget(x.household.country, x.household.budget);
     x.household.restrictions = Array.isArray(x.household.restrictions) ? x.household.restrictions : [];
     x.household.dislikes = Array.isArray(x.household.dislikes) ? x.household.dislikes : [];
     x.household.foodAliases =

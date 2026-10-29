@@ -300,9 +300,9 @@ window.MW = window.MW || {};
           !b.unknown;
         if (marketRecord) {
           x.priceConfidence =
-            e.retailerPriceMethod === 'relative-basket-average-estimate'
-              ? 'retailer-average-estimate'
-              : 'dated-country-benchmark';
+            e.retailerPriceMethod === 'country-benchmark'
+              ? 'dated-country-benchmark'
+              : 'retailer-average-estimate';
           x.retailEvidence = {
             source: e.source,
             url: e.sourceUrl,
@@ -310,6 +310,7 @@ window.MW = window.MW || {};
             sourceRetailers: e.sourceRetailers || [],
             retailer: e.selectedRetailer || null,
             estimateMethod: e.retailerPriceMethod || 'country-benchmark',
+            assortment: e.retailerAvailability || 'not-verified',
           };
           x.priceLabel = e.label;
           x.inventoryAmount = retailAmount;

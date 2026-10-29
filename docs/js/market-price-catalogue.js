@@ -100,14 +100,36 @@ window.MW = window.MW || {};
     entry ? legacyEntries[MW.markets.normalise(code)]?.get(legacyKey(entry)) || null : null;
   const priceFor = (record, retailer) => {
     if (!record) return null;
+    // "No preferred supermarket" means a national multi-retailer benchmark,
+    // never the default chain's price masquerading as an unknown shop.
+    if (retailer === 'No preferred supermarket' || retailer === 'Other') {
+      const prices = Object.values(record.retailerPrices || {}).filter(
+        (value) => Number.isFinite(value) && value >= 0,
+      );
+      if (prices.length) {
+        const average = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+        return Math.round(average * 100) / 100;
+      }
+    }
     const price = retailer && record.retailerPrices?.[retailer];
     return Number.isFinite(price) ? price : record.price;
+  };
+  // A value in a retailer column is a modelled estimate, never evidence that
+  // the shop stocks the item. Keep the distinction in one shared owner.
+  const priceMethodFor = (record, retailer) => {
+    if (!record) return 'unpriced';
+    if (retailer === 'No preferred supermarket' || retailer === 'Other')
+      return 'multi-retailer-average-estimate';
+    return Number.isFinite(record.retailerPrices?.[retailer])
+      ? 'relative-basket-average-estimate'
+      : 'country-benchmark';
   };
   const revision = (code) => revisions[MW.markets.normalise(code || MW.markets.current())] || '';
   MW.cataloguePrices = {
     normalise,
     find,
     priceFor,
+    priceMethodFor,
     forCountry,
     forLegacyEntry,
     revision,

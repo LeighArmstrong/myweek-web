@@ -97,9 +97,9 @@ window.MW = window.MW || {};
     {
       screen: 'settings',
       section: 'Settings',
-      selector: '#retailer',
-      title: 'Choose your supermarket',
-      copy: 'Pick your supermarket here. You can also change your budget and food preferences in Settings.',
+      selector: '#settingsSaveStatus',
+      title: 'Make MyWeek yours',
+      copy: 'Choose your supermarket, set your budget and adjust your meal preferences here.',
     },
   ];
 
@@ -280,29 +280,11 @@ window.MW = window.MW || {};
   const TOUR_PAD = 4;
   const TOUR_MARGIN = 12;
 
+  // Uniform visual language: spotlight corners are a soft 14px on every step,
+  // capped by the actual cut-out dimensions rather than copied from unrelated controls.
   function targetCornerRadii(target, width, height) {
-    const computed = window.getComputedStyle(target);
-    const cap = Math.min(width, height) / 2;
-    const cssValue = (value, axis) => {
-      const token = String(value || '0').split(' ')[0];
-      const number = parseFloat(token);
-      if (!Number.isFinite(number)) return 0;
-      return Math.max(0, token.includes('%') ? (number * axis) / 100 : number);
-    };
-    const corners = [
-      computed.borderTopLeftRadius,
-      computed.borderTopRightRadius,
-      computed.borderBottomRightRadius,
-      computed.borderBottomLeftRadius,
-    ];
-    const minSide = Math.min(width, height);
-    return corners.map((value) => {
-      const x = cssValue(value, width);
-      const y = cssValue(value.includes(' ') ? value.split(' ')[1] : value, height);
-      // The cutout is padded beyond the real element; its corner grows
-      // by exactly the same padding rather than using a universal radius.
-      return Math.min(cap, Math.max(0, Math.min(x, y) + TOUR_PAD), minSide / 2);
-    });
+    const radius = Math.min(14, width / 2, height / 2);
+    return [radius, radius, radius, radius];
   }
 
   function roundedCutoutPath(x, y, width, height, radii) {

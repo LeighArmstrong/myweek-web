@@ -25,8 +25,8 @@ window.MW = window.MW || {};
       unit: row.unit,
       price: MW.cataloguePrices.priceFor(row, retailer),
       selectedRetailer: retailer,
-      retailerPriceMethod:
-        row.retailerPrices?.[retailer] == null ? 'country-benchmark' : 'relative-basket-average-estimate',
+      retailerPriceMethod: MW.cataloguePrices.priceMethodFor(row, retailer),
+      retailerAvailability: 'not-verified',
       label: row.name,
       confidence: 'dated-country-benchmark',
       asOf: row.observedAt,

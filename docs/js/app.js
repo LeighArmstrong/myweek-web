@@ -466,12 +466,7 @@ window.MW = window.MW || {};
           '<option value="' + esc(v) + '" ' + (v === selected ? 'selected' : '') + '>' + esc(l) + '</option>',
       )
       .join('');
-  const alternativeSearchPrompt = (name) =>
-    'Find me a suitable, easy to find ' +
-    (MW.markets.current() === 'AU' ? 'Australian' : 'UK') +
-    ' supermarket alternative for "' +
-    (MW.markets.ingredientSearchTerm ? MW.markets.ingredientSearchTerm(name) : String(name || '').trim()) +
-    '". Explain the best substitute and any quantity or cooking adjustment I should make.';
+  const alternativeSearchPrompt = (name) => MW.markets.alternativeSearchPrompt(name);
   const alternativeAiModeUrl = (name) =>
     'https://www.google.com/search?udm=50&q=' + encodeURIComponent(alternativeSearchPrompt(name));
   const alternativeSearchFallbackUrl = (name) =>
@@ -512,13 +507,15 @@ window.MW = window.MW || {};
         alternativeLabel = options.alternativeLabel ? String(options.alternativeLabel) : '',
         eyebrow = String(options.eyebrow || 'PLEASE CHECK');
       backdrop.innerHTML =
-        '<section class="ingredient-action-sheet" role="alertdialog" aria-modal="true" aria-labelledby="confirmActionTitle" aria-describedby="confirmActionMessage"><div class="ingredient-action-handle"></div><div class="ingredient-action-head"><div><span class="eyebrow">' +
+        '<section class="ingredient-action-sheet" role="dialog" aria-modal="true" aria-labelledby="confirmActionTitle" aria-describedby="confirmActionMessage"><div class="ingredient-action-handle"></div><div class="ingredient-action-head"><div><span class="eyebrow">' +
         esc(eyebrow) +
         '</span><h2 id="confirmActionTitle">' +
         esc(title) +
         '</h2></div><button type="button" class="ingredient-action-close" aria-label="Close">' +
         icon('xmark') +
-        '</button></div><p id="confirmActionMessage" class="operation-error">' +
+        '</button></div><p id="confirmActionMessage" class="' +
+        (options.friendly ? 'setting-help' : 'operation-error') +
+        '">' +
         esc(message) +
         '</p><div class="shop-swap-actions' +
         (alternativeLabel ? ' has-alternative' : '') +
@@ -1685,6 +1682,23 @@ window.MW = window.MW || {};
               accountScreen(true, 'signin');
               window.scrollTo(0, 0);
             },
+            async () => {
+              const confirmed = await confirmAction({
+                eyebrow: 'YOUR CHOICE',
+                title: 'Continue as guest?',
+                message:
+                  'Your meals and lists stay on this device. They won’t sync, and may be lost if you delete the app.',
+                confirmLabel: 'Continue as guest',
+                cancelLabel: 'Go back',
+                friendly: true,
+              });
+              if (!confirmed) return;
+              // Account ownership already maintains an isolated local guest scope.
+              // Onboarding writes there normally; sign-in later offers safe transfer.
+              accountEntryChosen = true;
+              welcome();
+              window.scrollTo(0, 0);
+            },
           );
         return accountScreen(true);
       }
@@ -1807,12 +1821,14 @@ window.MW = window.MW || {};
           })
         : null;
     const plannedCost = marketBasket ? marketBasket.total : calculatedCost;
-    const budget = Math.max(1, Number(st.household.budget) || MW.markets.forCountry().defaultBudget);
+    const budget = MW.markets.normaliseBudget(st.household.country, st.household.budget);
+    const hasBudgetLimit = budget > 0;
     const pricesUnavailable = plannedCost == null;
-    const budgetPct = pricesUnavailable ? 0 : Math.min(100, Math.round((plannedCost / budget) * 100));
+    const budgetPct =
+      pricesUnavailable || !hasBudgetLimit ? 0 : Math.min(100, Math.round((plannedCost / budget) * 100));
     const savingResult = st.week && st.week.savingResult;
     const budgetWarning =
-      st.plan.priceMode && savingResult && savingResult.metBudget === false
+      hasBudgetLimit && st.plan.priceMode && savingResult && savingResult.metBudget === false
         ? '<section class="budget-over-note">' +
           icon('triangle-exclamation') +
           '<div><strong>' +
@@ -1973,7 +1989,7 @@ window.MW = window.MW || {};
         ' · ' +
         esc(st.household.retailer) +
         '</p></div><div class="budget-text"><strong>' +
-        MW.markets.money(Math.round(budget)) +
+        (hasBudgetLimit ? MW.markets.money(Math.round(budget)) : 'Flexible') +
         '</strong><span>budget</span></div></section>' +
         dayStrip +
         homeDeliveryNotice +
@@ -2011,7 +2027,7 @@ window.MW = window.MW || {};
             (orderedPlan ? '' : '<button class="text-action" id="changeLunch">Change lunch</button>') +
             '</div></section>'
           : '<section class="lunch-feature no-photo"><div class="lunch-body"><span class="eyebrow">LUNCH</span><h2>No lunches planned</h2><button class="text-action" id="editPlan">Add lunches</button></div></section>') +
-        (pricesUnavailable
+        (pricesUnavailable || !hasBudgetLimit
           ? ''
           : '<section class="budget-progress"><div><strong>' +
             money(plannedCost) +
@@ -5314,7 +5330,9 @@ window.MW = window.MW || {};
         '</span><input id="budget" type="number" inputmode="decimal" min="0" step="1" value="' +
         st.household.budget +
         '"></div></section>' +
-        '<section class="settings-section food-settings"><label>Eating style</label>' +
+        '<details class="settings-expand settings-section food-settings"><summary><span><strong>Food preferences</strong><small>Eating style, allergies and foods to avoid</small></span>' +
+        icon('chevron-down') +
+        '</summary><div class="settings-expand-content"><label>Eating style</label>' +
         foodChoice('settingsDiet', MW.food.patterns, foodProfile().diet) +
         '<label class="sub-label">Meal priorities</label>' +
         multiFoodChoice('settingsGoals', MW.food.goals, foodProfile().goals) +
@@ -5336,8 +5354,10 @@ window.MW = window.MW || {};
         icon('chevron-down') +
         '</summary>' +
         multiFoodChoice('settingsAllergens', MW.food.allergens, foodProfile().allergens) +
-        '<p class="allergen-warning">Excludes selected allergens and “may contain” warnings from the recipe source. Always check product labels and cross-contamination warnings. For disliked foods, use “Foods you do not want”.</p></details></section>' +
-        '<section class="settings-section equipment-settings"><div class="setting-title"><div><label>Kitchen equipment</label><small>Standard oven, hob, pans and utensils are assumed. Select specialist appliances you can use.</small></div></div><div class="equipment-grid" id="settingsEquipment">' +
+        '<p class="allergen-warning">Excludes selected allergens and “may contain” warnings from the recipe source. Always check product labels and cross-contamination warnings. For disliked foods, use “Foods you do not want”.</p></details></div></details>' +
+        '<details class="settings-expand settings-section equipment-settings"><summary><span><strong>Kitchen equipment</strong><small>Specialist appliances and cooking options</small></span>' +
+        icon('chevron-down') +
+        '</summary><div class="settings-expand-content"><div class="setting-title"><div><label>Kitchen equipment</label><small>Standard oven, hob, pans and utensils are assumed. Select specialist appliances you can use.</small></div></div><div class="equipment-grid" id="settingsEquipment">' +
         MW.equipment.items
           .map(
             (x) =>
@@ -5352,7 +5372,7 @@ window.MW = window.MW || {};
               '</span></button>',
           )
           .join('') +
-        '</div></section>' +
+        '</div></div></details>' +
         '<section class="settings-section cooking-display-setting">' +
         keepAwakeControl('settings') +
         '</section>' +
@@ -5728,6 +5748,9 @@ window.MW = window.MW || {};
     root
       .querySelectorAll('.settings-section input:not([data-keep-awake-toggle]),.settings-section select')
       .forEach((input) => {
+        // The food autocomplete commits on selection or blur. Saving partial
+        // keystrokes here would wrongly apply an unfinished exclusion.
+        if (input === avoidFoods) return;
         input.addEventListener(
           input.tagName === 'SELECT' || input.type === 'checkbox' ? 'change' : 'input',
           saveSettings,

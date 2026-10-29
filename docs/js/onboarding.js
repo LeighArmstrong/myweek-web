@@ -31,10 +31,8 @@ window.MW = window.MW || {};
     const st = MW.state.get();
     return {
       people: Number(st.household && st.household.people) || 2,
-      budget:
-        Number(st.household && st.household.budget) ||
-        MW.markets.forCountry(st.household && st.household.country).defaultBudget,
-      retailer: (st.household && st.household.retailer) || "Sainsbury's",
+      budget: MW.markets.normaliseBudget(st.household?.country, st.household?.budget),
+      retailer: MW.markets.normaliseRetailer(st.household?.country, st.household?.retailer),
       country: MW.markets.normalise(st.household && st.household.country),
       dinners: (st.plan && st.plan.dinnerDays && st.plan.dinnerDays.length) || 6,
       lunches: Array.isArray(st.plan && st.plan.lunchDays) ? st.plan.lunchDays.length : 5,
@@ -182,7 +180,10 @@ window.MW = window.MW || {};
     if (step === 1) {
       visual = '<img src="assets/onboarding/onboarding-hero.webp" alt="">';
       title = 'Dinner for ' + (draft.people === 1 ? 'one' : draft.people === 2 ? 'two' : draft.people);
-      detail = MW.markets.money(Math.round(draft.budget), draft.country) + ' weekly budget';
+      detail =
+        draft.budget === 0
+          ? 'Flexible weekly budget'
+          : MW.markets.money(Math.round(draft.budget), draft.country) + ' weekly budget';
     }
     if (step === 2) {
       visual =
@@ -321,7 +322,7 @@ window.MW = window.MW || {};
       '</label>' +
       '<div class="onboard-two"><label>Weekly food budget<div class="prefix-input"><span>' +
       MW.markets.forCountry(draft.country).currencySymbol +
-      '</span><input id="obBudget" type="number" min="20" step="5" value="' +
+      '</span><input id="obBudget" type="number" min="0" step="1" value="' +
       esc(draft.budget) +
       '"></div></label><label>Supermarket' +
       selectControl('obRetailer', MW.markets.availableRetailers(draft.country), draft.retailer) +
@@ -490,8 +491,10 @@ window.MW = window.MW || {};
       '<div><span>' +
       icon(MW.markets.forCountry(draft.country).currencyIcon) +
       '</span><strong>' +
-      MW.markets.money(Math.round(draft.budget), draft.country) +
-      ' target</strong><small>' +
+      (draft.budget === 0
+        ? 'Flexible budget'
+        : MW.markets.money(Math.round(draft.budget), draft.country) + ' target') +
+      '</strong><small>' +
       esc(draft.retailer) +
       '</small></div>' +
       '</section>' +
@@ -502,10 +505,7 @@ window.MW = window.MW || {};
   function persist() {
     const st = MW.state.get();
     st.household.people = Math.max(1, Number(draft.people) || 2);
-    st.household.budget = Math.max(
-      1,
-      Number(draft.budget) || MW.markets.forCountry(draft.country).defaultBudget,
-    );
+    st.household.budget = MW.markets.normaliseBudget(draft.country, draft.budget);
     st.household.country = MW.markets.normalise(draft.country);
     st.household.retailer = MW.markets.validRetailer(st.household.country, draft.retailer)
       ? draft.retailer
@@ -682,7 +682,7 @@ window.MW = window.MW || {};
 
   function captureInputs(root) {
     const budget = root.querySelector('#obBudget');
-    if (budget) draft.budget = Number(budget.value) || MW.markets.forCountry(draft.country).defaultBudget;
+    if (budget) draft.budget = MW.markets.normaliseBudget(draft.country, budget.value);
     const country = root.querySelector('#obCountry');
     if (country) draft.country = MW.markets.fromLabel(country.value);
     const retailer = root.querySelector('#obRetailer');
@@ -836,13 +836,19 @@ window.MW = window.MW || {};
     draft = null;
     step = 0;
   }
-  function intro(root, onStart, onSignIn) {
+  function intro(root, onStart, onSignIn, onGuest) {
     const content = hero({ intro: true });
     root.innerHTML = chrome(content)
       .replace('shell onboarding-shell', 'shell onboarding-shell intro-shell')
       .replace(progress(), '<button type="button" class="text-action" id="introSignIn">Sign in</button>');
+    const actions = root.querySelector('.intro-actions');
+    actions.insertAdjacentHTML(
+      'beforeend',
+      '<button type="button" class="btn secondary" id="introGuest">Continue as guest</button>',
+    );
     root.querySelector('#onboardNext').onclick = onStart;
     root.querySelector('#introSignIn').onclick = onSignIn;
+    root.querySelector('#introGuest').onclick = onGuest;
   }
   MW.onboarding = { render, intro, reset, startViewport, _finish: null };
 })();
