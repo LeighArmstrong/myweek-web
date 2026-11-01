@@ -95,6 +95,8 @@ window.MW = window.MW || {};
   }
 
   function allowed(recipe) {
+    // The same authoritative held-ID set governs every selectable recipe path.
+    if (sourceReviewHold(recipe)) return false;
     const s = MW.state.get();
     const avoid = [...(s.household.restrictions || [])].filter(Boolean);
     const basic = MW.avoidance
@@ -142,10 +144,9 @@ window.MW = window.MW || {};
     });
   }
   // These supplier-specific methods or pack quantities are unresolved in the
-  // contextual review ledger. Never suggest them without an explicit choice.
-  // Keep them viewable and selectable rather than silently deleting recipes.
+  // contextual review ledger. Preserve historical records for saved meals,
+  // but never suggest or add them to a new meal plan.
   const heldSourceRecipeIds = new Set([
-    'hf-6a8f1b5ff3876e995cfad434',
     'hf-6a85d790dc2773aa1a332117',
     'hf-6a735a31e4ad299a87820993',
     'hf-6a735a31e4ad299a87820991',
@@ -154,7 +155,6 @@ window.MW = window.MW || {};
     'hf-6a6a1e65640e6eb29c2b111c',
     'hf-6a7dc176ba6139d3db0352c9',
     'hf-6a6a1d6d2d6012a9c513762c',
-    'hf-6a6a1d5d640e6eb29c2b1018',
     'hf-6a4e7627746dd895cd0ba8ee',
     'hf-69dfbf554af8f3547a64806c',
     'hf-693adc1fdce6a2dc39a7eb94',
@@ -163,44 +163,21 @@ window.MW = window.MW || {};
     'hf-6a735b08ff4bdb2558537fb0',
     'hf-6a735b08ff4bdb2558537fae',
     'hf-6a735a51ebec54be3cd9d85b',
-    'hf-6a85d79d7a45bccee4d1cd93',
     'hf-6a85d7937a45bccee4d1cd6d',
     'hf-6a60f6c003796ab64929ec80',
     'hf-6a4538aa66926770e8cd4dcd',
     'hf-6a4538ad66926770e8cd4dd6',
     'hf-69e8e3acfe534c766c4598db',
     'hf-69e8e3ac4af8f3547a65cff1',
-    'hf-6a3c01c94e4b173945bdf8c3',
-    'hf-69f213d0d52e296f6a388071',
     'hf-69d7cde64604fa2f60f0f4b3',
     'hf-6669685b83f11ad6c3c65c29',
-    'hf-6a735a77e4ad299a878209ca',
-    'hf-6a7dc163ba6139d3db0352a1',
     'hf-6a60f75d20a15d56f3c81ab7',
-    'hf-6a60f7300e64e4eb8f9117e6',
-    'hf-6a6a1e1e640e6eb29c2b10d5',
-    'hf-6a6a1d5a640e6eb29c2b1016',
     'hf-6a6a1dd82d6012a9c5137686',
-    'hf-6a60f76b20a15d56f3c81ac5',
-    'hf-6a60f6cb20a15d56f3c81a40',
-    'hf-6a6a1e6d640e6eb29c2b1126',
-    'hf-6a6a1dac97f1e02209178d16',
     'hf-6a6a1e4397f1e02209178db9',
-    'hf-6a735b23e4ad299a87820a77',
-    'hf-6a735b15e4ad299a87820a66',
-    'hf-6a735ae4ebec54be3cd9d8fa',
-    'hf-6a735a7bebec54be3cd9d87b',
     'hf-6a60f6ef20a15d56f3c81a60',
-    'hf-6a6a1e602d6012a9c51376f6',
-    'hf-6a6a1e5297f1e02209178dce',
-    'hf-6a6a1e4f2d6012a9c51376eb',
     'hf-6a6a1de4640e6eb29c2b109b',
     'hf-6a6a1de42d6012a9c5137695',
-    'hf-6a60f7ce0e64e4eb8f911861',
     'hf-6a60f7c903796ab64929ed27',
-    'hf-6a60f7820e64e4eb8f91181e',
-    'hf-6a60f6ed20a15d56f3c81a5a',
-    'hf-6a60f6b320a15d56f3c81a26',
     'hf-6a85d77aad97f3b5c2ccd00c',
     'hf-6a85d76adc2773aa1a332087',
     'hf-6a7dc10689b1afe9072f7a62',
@@ -217,24 +194,19 @@ window.MW = window.MW || {};
     'hf-6a60e2480e64e4eb8f911165',
     'hf-6a60f6fd0e64e4eb8f9117af',
     'hf-6a60f6fd0e64e4eb8f9117b2',
-    'hf-6a58a367d4e23d8455073057',
-    'hf-6a4e7603746dd895cd0ba8b6',
     'hf-6a58a37b3cd318353e2a8960',
     'hf-6a58a3cb2c76eddc47d12e10',
-    'hf-6a3c01c84e4b173945bdf8c1',
     'hf-6a3c0258bcb653703ca89e44',
     'hf-6a45390fd3d3e0dadd374575',
     'hf-6a4e7689d3d0197c614e4c39',
     'hf-6a4e760bfc37702f5b7b565f',
     'hf-6a4538c4bcb653703ca9cb71',
-    'hf-6a45389766926770e8cd4dae',
     'hf-6a4e75fad3d0197c614e4b65',
     'hf-6a58a3cb2c76eddc47d12e0e',
     'hf-6a45389366926770e8cd4da6',
     'hf-6a4e762fd3d0197c614e4bb4',
     'hf-6a4e7650fc37702f5b7b56bd',
     'hf-6a58a35fd4e23d8455073050',
-    'hf-6a3c01be4e4b173945bdf8b1',
     'hf-6a4e760bfc37702f5b7b5661',
     'hf-6a58a3693cd318353e2a8952',
     'hf-6a58a373d4e23d845507306b',
@@ -242,27 +214,19 @@ window.MW = window.MW || {};
     'hf-6a4e7605746dd895cd0ba8b8',
     'hf-6a58a4312c76eddc47d12ea2',
     'hf-6a58a42b2c76eddc47d12e8f',
-    'hf-6a58a4273cd318353e2a8a2b',
-    'hf-6a58a3ed3cd318353e2a89e8',
-    'hf-6a4e7656fc37702f5b7b56cd',
     'hf-6a4e7636746dd895cd0ba8ff',
     'hf-6a4e760a746dd895cd0ba8c0',
     'hf-6a4e7608746dd895cd0ba8bd',
     'hf-6a4e75e9fc37702f5b7b562f',
     'hf-6a4e75e9d3d0197c614e4b4d',
-    'hf-6a4e75e0746dd895cd0ba88e',
-    'hf-6a3c0254bcb653703ca89e3f',
-    'hf-6a453899d3d3e0dadd3744a2',
     'hf-6a3c01aabcb653703ca89d72',
     'hf-6a3c01aabcb653703ca89d70',
     'hf-6a45391066926770e8cd4e86',
     'hf-6a4538ebd3d3e0dadd374532',
     'hf-6a4538eb66926770e8cd4e54',
-    'hf-6a45389d66926770e8cd4db5',
     'hf-6a453898bcb653703ca9cb0e',
     'hf-6a45388266926770e8cd4d8f',
     'hf-6a453882d3d3e0dadd37446d',
-    'hf-6a3c0254bcb653703ca89e41',
     'hf-6a3c0217bcb653703ca89de3',
     'hf-6a3c01a6f396cfc62f2ac89b',
     'hf-6a3c01a64e4b173945bdf88e',
@@ -276,37 +240,22 @@ window.MW = window.MW || {};
     'hf-6a2a938891ca82626cee691b',
     'hf-6a33d32527757fc0a25f4312',
     'hf-6a33d30d27757fc0a25f42e8',
-    'hf-6a33d2ee4e4b173945bbb8dd',
     'hf-6a1814293519564cfc17f0ec',
     'hf-6a2a93a91f9f329b3991d966',
-    'hf-6a2a93791f9f329b3991d928',
-    'hf-6a33d2f84e4b173945bbb8e6',
     'hf-6a203bceb0ca0134734ae185',
     'hf-6a33d2db4e4b173945bbb8b8',
     'hf-6a33d2db66e2e6a02a0c6a78',
-    'hf-6a203c3561807a4a5e8e709b',
     'hf-6a33d2e266e2e6a02a0c6a80',
-    'hf-6a33d36e27757fc0a25f4378',
-    'hf-6a33d36f66e2e6a02a0c6b92',
     'hf-6a33d33927757fc0a25f432a',
-    'hf-6a33d32766e2e6a02a0c6af2',
-    'hf-6a33d3184e4b173945bbb91d',
     'hf-6a33d2da66e2e6a02a0c6a75',
     'hf-6a0f104fa3fbb74cc4f06ecf',
     'hf-6a2a93911f9f329b3991d949',
     'hf-6a2a9391b2e241c4bdaf5f07',
-    'hf-6a2811483b1bef7575d889df',
     'hf-6a2a93f3b2e241c4bdaf5f9f',
-    'hf-6a2a93be91ca82626cee6959',
-    'hf-6a2a93beb2e241c4bdaf5f3d',
-    'hf-6a2a93ba1f9f329b3991d97f',
-    'hf-6a2a93bab2e241c4bdaf5f38',
     'hf-6a2a93ae1f9f329b3991d96f',
-    'hf-6a2a936e1f9f329b3991d91b',
     'hf-6a05bf0e204de353958f5829',
     'hf-6a181409cfb8ff102644d5a3',
     'hf-6a0f103ba3fbb74cc4f06eb1',
-    'hf-6a203bd7b0ca0134734ae192',
     'hf-6a203c2161807a4a5e8e7072',
     'hf-6a203bdeca82b4c04e08a359',
     'hf-6a203bdeb0ca0134734ae1a2',
@@ -326,18 +275,13 @@ window.MW = window.MW || {};
     'hf-6a0f103bbff716338a6d9d8c',
 
     'hf-69fb563c05492ed04f07189c',
-    'hf-6a19cd8156363d596eb63cef',
     'hf-6a18148ccfb8ff102644d67f',
     'hf-6a1814643519564cfc17f14a',
     'hf-6a181443cfb8ff102644d605',
-    'hf-6a1814227200e2f203e90711',
     'hf-6a1814223519564cfc17f0de',
     'hf-69f2138a3ace2ca2f08f06c1',
-    'hf-69f2138a4c854ae4e256e2bc',
-    'hf-6a05bf20b5c58db9dbcfba3e',
     'hf-69f213814c854ae4e256e2b4',
     'hf-69f213bbd52e296f6a38804e',
-    'hf-6a0f10b6ab504c4de2b52df9',
     'hf-6a0f1085ab504c4de2b52da7',
     'hf-6a0f1087a3fbb74cc4f06f23',
     'hf-6a0f1084ab504c4de2b52da4',
@@ -349,7 +293,6 @@ window.MW = window.MW || {};
     'hf-6a05bfe0204de353958f58ec',
     'hf-6a05becc204de353958f5807',
     'hf-69f213cad52e296f6a38806c',
-    'hf-69fb568ba2b8b1976402699e',
     'hf-69fb568aa2b8b1976402699b',
     'hf-69fb5672a2b8b19764026968',
     'hf-69fb567205492ed04f0718fc',
@@ -358,13 +301,11 @@ window.MW = window.MW || {};
     'hf-69f213814c854ae4e256e2b2',
     'hf-69f213a9d52e296f6a388029',
     'hf-69f213a93ace2ca2f08f06e6',
-    'hf-69f2138d4c854ae4e256e2c2',
     'hf-69f213743ace2ca2f08f069e',
     'hf-69e8e3a6fe534c766c4598d0',
     'hf-69de633f6bb16e39e1b86417',
     'hf-69e0c8f04af8f3547a64b1d2',
     'hf-69e0c8ad4af8f3547a64b19a',
-    'hf-69d7ce064604fa2f60f0f4d2',
     'hf-69e0c9336bb16e39e1b8d9df',
     'hf-69a86448540e60f740c54ecc',
     'hf-6996dcd4726255bc32796514',
@@ -380,7 +321,6 @@ window.MW = window.MW || {};
     'hf-6669685bbd13e7439ddc01e2',
     'hf-67b4a3e0381832d770715d09',
     'hf-66d7165e0eb51492a4c62fd3',
-    'hf-66e066e846f5f843647231ba',
     'hf-66ed7cbf58baf82d2a965442',
     'hf-67fe2ec8d2847d730ba08b84',
     'hf-67b4a3c7381832d770715cdf',
@@ -405,7 +345,6 @@ window.MW = window.MW || {};
     'hf-66bb681d11ecbd46e2d0089d',
     'hf-686296fbfa95d35ec972bfa3',
     'hf-6630fd8d587fa23beffd07f1',
-    'hf-686d20cc69ddbf20131a29bb',
     'hf-6810eaff5917498f8bf29708',
     'hf-67b4a3dd249223e3b08588b4',
     'hf-6745dd97fb7a3ff84744a8e2',
@@ -422,9 +361,7 @@ window.MW = window.MW || {};
     'gousto-4d648c49-d85c-4bf1-b6db-df75b4d33491',
     'gousto-78ed7211-8694-4309-b0ee-26b910c5e6e6',
     'gousto-887c14b0-9ecd-49c2-a4f7-9b0cb527f983',
-    'gousto-94e0f508-fa54-44cf-ae39-1c73400e1c21',
     'gousto-cb080d3d-3ace-44b4-aaaa-677e1f4b8208',
-    'gousto-d4c20592-847a-48fb-b459-504735e90290',
     'gousto-d7c168f4-cd6d-4ece-92e7-35bdff6b2f88',
     'gousto-f6dbfa28-7bc9-434f-8cf8-2d6267372b0f',
     'gousto-617d0ab5-d7ab-4838-8100-95af42f5de44',
@@ -434,14 +371,11 @@ window.MW = window.MW || {};
     'gousto-0c37611f-5d12-4a39-8089-13af8c93a8e3',
     'gousto-bf2eaf19-8fae-4ac7-b7e4-639dd71fa31c',
     'gousto-261f7661-0ddc-4d8f-bf07-ae46863ed4ff',
-    'gousto-763fe312-ca18-4f83-934a-a9c5e9cebfa5',
     'gousto-4d0f3f8f-3b1f-4350-81d6-5f8dc2a615e9',
-    'gousto-14c5fc6d-a293-406d-a768-9615cfdea5c7',
     'gousto-29405074-69fe-4d77-bef6-637941758c29',
     'gousto-5ec87ee9-cc71-4a62-906f-565800cdbd71',
     'gousto-752aba25-87e8-45aa-b277-01d6b2fddad5',
     'gousto-79aa013e-0e02-4684-b400-989adebd8ed0',
-    'gousto-52e093e7-003a-4b6b-94f7-2121857b653e',
     'gousto-912b8af8-0d69-4ede-8e10-039c9390608f',
     'gousto-ebf09a80-e68f-43e3-b05a-686b55f138f1',
     'gousto-11efae4d-cdf0-4f15-b9b3-b82d1d8942d7',
@@ -478,25 +412,19 @@ window.MW = window.MW || {};
     'gousto-b2f3aaf2-2112-46e0-9a71-31f618fc00a7',
     'gousto-fa6aebef-e4ab-480d-bc3e-adce84904501',
     'gousto-4d5b7e9a-1f32-42cf-854b-adc2138391f2',
-    'gousto-98ac9d45-7b0d-4ddc-b910-06afa1e4887b',
     'gousto-1d15f59c-2714-4569-b37c-0841906dc616',
-    'gousto-96bad066-aa14-4d7e-ad85-d2b1b9f74cbc',
     'gousto-cb3f476c-5061-429f-b0fa-dd3cc6a14480',
-    'gousto-14e03ca8-1751-456e-bda0-a9fa1b2d5b7d',
-    'gousto-aebd911f-bc3b-4f29-8ce0-44bb4deb12aa',
     'gousto-3534100e-2c03-4131-b4da-007adb24b096',
     'gousto-2e56a8ba-e579-4a6f-bc98-2043402f965b',
     'gousto-af16cf76-fa81-4a89-b75e-cf526b13eee8',
     'gousto-8af21a80-633a-48f6-b688-007ecdfcd462',
     'gousto-f3dd500e-d8c9-40a7-bfdd-5d739517f7af',
     'gousto-3e329d5f-8ea6-46dd-90c6-b3bc3848ed07',
-    'gousto-af739782-8bab-4c53-a46c-b31c34d13bd2',
     'gousto-c293637b-5bd6-4442-8acb-1fa0458ff45d',
     'gousto-6a882eed-918c-4b9b-a992-fd3993fbc489',
     'gousto-1d7e0374-58d4-4cb1-803f-f2e1d61a57bd',
     'gousto-3e5ddd4b-d3e0-4d6d-8e45-bc154bd3a26b',
     'gousto-cb70d850-a518-4c0e-b2e0-fe35745b234c',
-    'gousto-45864b23-5309-4840-bfc3-a7c90d966740',
     'gousto-b3e726f8-aad1-42d5-9477-b652ee5ce612',
     'gousto-6342420a-cb0d-4243-aa93-6dd11529a47e',
     'gousto-4e64c8b2-fb9b-4ab1-83b0-8915034240f9',
@@ -514,7 +442,6 @@ window.MW = window.MW || {};
     'gousto-3408b842-77a3-4731-a92c-d9d1442d9664',
     'hf-69de633f68ee73d4d30058fa',
     'hf-69d7ce174604fa2f60f0f4e1',
-    'hf-69e0c9314af8f3547a64b213',
     'hf-69e0c8f76bb16e39e1b8d9b5',
     'hf-69cd4096b90c4b9b5c509574',
     'hf-69cd4099b90c4b9b5c50957a',
@@ -597,7 +524,6 @@ window.MW = window.MW || {};
     'gousto-66c03a5f-0203-4c36-a402-5dc9fd80e4fb',
     'gousto-b94d8ddb-7fd9-459a-a021-8f000f40390a',
     'gousto-dc1d4d2a-9774-444b-8562-8042a96807f8',
-    'gousto-4a4964d7-504c-49a6-bcf5-2d73ff38493d',
     'gousto-ef67c35c-31a9-4a93-8028-757189d204a8',
     'gousto-6e4a118c-de86-451b-b2ac-1456db9c55ca',
     'gousto-bd0c1f7e-52ca-4f7b-888b-6006b875366c',
@@ -617,11 +543,9 @@ window.MW = window.MW || {};
     'gousto-032967ca-a3a5-4f3b-93ad-3cb12877fa1b',
     'gousto-c777ca56-d175-4f0f-a9bc-11b7a7b78d79',
     'hf-6a735abdebec54be3cd9d8c5',
-    'hf-6a7dc08cba6139d3db0351f8',
     'hf-695ea1d2c15b9f4be4dabaed',
     'hf-695ea2002a2e2effad18aaa2',
     'hf-694beeab39d4849fb457caf6',
-    'hf-693ada26c92924105eca70c9',
     'hf-6930734b9351d52b5c263d10',
     'hf-691df1ef71644dd339c43028',
   ]);
@@ -1174,7 +1098,7 @@ window.MW = window.MW || {};
     return lunchAllowed(recipe) && !sourceLunchReviewHold(recipe);
   }
 
-  function alternatives(currentId, count) {
+  function alternatives(currentId, count, options = {}) {
     const s = MW.state.get();
     const usedIds = new Set(
       ((s.week && s.week.meals) || []).map((x) => x.recipeId).filter((x) => x !== currentId),
@@ -1184,7 +1108,11 @@ window.MW = window.MW || {};
       .filter((x) => x && x.id !== currentId);
     const usedImages = new Set(chosen.map((x) => visualKey(x)).filter(Boolean));
     const context = scoringContext(chosen);
-    return MW.RECIPES.filter((r) => r.id !== currentId && !usedIds.has(r.id) && autoDinnerAllowed(r))
+    const eligible = MW.RECIPES.filter(
+      (r) => r.id !== currentId && !usedIds.has(r.id) && autoDinnerAllowed(r),
+    );
+    const byCategory = options.category ? eligible.filter((r) => categoryFor(r) === options.category) : [];
+    return (byCategory.length ? byCategory : eligible)
       .map((r) => ({
         recipe: r,
         repeatsImage: usedImages.has(visualKey(r)),
@@ -1329,7 +1257,9 @@ window.MW = window.MW || {};
 
   function unfinishedMeals(week) {
     const cooked = new Set(week?.completedRecipes || []);
-    return (week?.meals || []).filter((meal) => meal?.recipeId && !cooked.has(meal.recipeId));
+    return (week?.meals || []).filter(
+      (meal) => meal?.recipeId && !cooked.has(meal.recipeId) && !sourceReviewHold(getRecipe(meal.recipeId)),
+    );
   }
 
   function keepUnfinishedForDays(week, days) {
@@ -1510,6 +1440,7 @@ window.MW = window.MW || {};
       !next ||
       next.isLunch ||
       !allowed(next) ||
+      sourceReviewHold(next) ||
       currentPlanLocked(st)
     )
       return false;
@@ -1723,7 +1654,7 @@ window.MW = window.MW || {};
         const r = getRecipe(m.recipeId);
         return (
           sum +
-          (r
+          (r && !sourceReviewHold(r)
             ? MW.pricing
               ? MW.pricing.recipeCost(r, MW.weeks.currentPlanning(s).people)
               : Number(r.cost || 0)

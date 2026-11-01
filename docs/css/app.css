@@ -11979,7 +11979,7 @@ body #app main.shell.onboarding-account > .onboard-content {
 /* Shopping layout: a single compact overview and uniform, easy-to-scan rows. */
 .shop-overview {
   grid-column: 1 / -1;
-  padding: 15px 16px 14px;
+  padding: 15px 16px;
   margin: 0 0 12px;
   background: #fff;
   border: 1px solid #e0e9e4;
@@ -11991,6 +11991,9 @@ body #app main.shell.onboarding-account > .onboard-content {
   gap: 10px;
   align-items: start;
   min-width: 0;
+}
+/* Override generic page heading margins at every responsive width. */
+.shop-overview .page-head.shop-head {
   margin: 0;
 }
 .shop-overview .shop-summary {
@@ -12253,10 +12256,7 @@ body #app main.shell.onboarding-account > .onboard-content {
     grid-column: 1;
     grid-row: 2;
   }
-  /* The generic page-heading bottom margin was leaving 22px of empty space
-     below the price and progress in wide layouts. Match the 12px gap above. */
   .shop-overview .page-head.shop-head {
-    margin: 0 0 11px;
     align-items: center;
   }
 }

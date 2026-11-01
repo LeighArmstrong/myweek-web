@@ -172,6 +172,8 @@ window.MW = window.MW || {};
         unresolved++;
         return;
       }
+      // Held source records stay available for repair, never for shopping.
+      if (MW.planner?.sourceReviewHold?.(r)) return;
       const factor =
         r.scaleSafe === false
           ? 1

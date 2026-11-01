@@ -17,6 +17,9 @@ window.MW = window.MW || {};
         delete favourites[id];
         return false;
       }
+      // Keep any existing favourite flag, but never add an unavailable source.
+      if (MW.planner?.sourceReviewHold?.({ id }))
+        throw new Error('This recipe is unavailable while its instructions are reviewed.');
       if (Object.keys(favourites).length >= MAX_FAVOURITES)
         throw new Error('You can save up to 500 favourites.');
       favourites[id] = true;

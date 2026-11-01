@@ -86,7 +86,25 @@ window.MW = window.MW || {};
     const n = Number(m[1] || 0) * 1440 + Number(m[2] || 0) * 60 + Number(m[3] || 0) + Number(m[4] || 0) / 60;
     return n > 0 ? Math.ceil(n) : null;
   }
-  function sourceRecipe(value, url) {
+  // Use only images declared by the linked recipe or its social-preview metadata.
+  // These remain original remote sources; no invented or unrelated food photo.
+  function declaredImageUrls(html, baseUrl) {
+    const urls = [];
+    for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
+      const attributes = {};
+      for (const match of tag.matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g)) {
+        attributes[match[1].toLowerCase()] = text(match[2] ?? match[3] ?? match[4]);
+      }
+      const label = String(attributes.property || attributes.name || '').toLowerCase();
+      if (!['og:image:secure_url', 'og:image', 'twitter:image', 'twitter:image:src'].includes(label))
+        continue;
+      try {
+        urls.push(publicUrl(attributes.content, baseUrl));
+      } catch {}
+    }
+    return [...new Set(urls)];
+  }
+  function sourceRecipe(value, url, imageAlternatives = []) {
     const lines = Array.isArray(value.recipeIngredient)
       ? value.recipeIngredient.map(text).filter(Boolean)
       : [];
@@ -97,14 +115,19 @@ window.MW = window.MW || {};
         yieldText.match(/(?:^|\b)(\d+)\s*(?:servings?|portions?|people|persons?)\b/i) ||
         yieldText.match(/^\d+$/);
     const servings = match ? Number(match[1] || match[0]) : null;
-    const image = []
-      .concat(value.image || [])
-      .map((x) => (typeof x === 'string' ? x : (x && x.url) || (x && x.contentUrl)))
-      .find(Boolean);
-    let imageUrl = '';
-    try {
-      if (image) imageUrl = publicUrl(image, url);
-    } catch {}
+    const images = [];
+    for (const image of [
+      ...[]
+        .concat(value.image || [])
+        .map((x) => (typeof x === 'string' ? x : x && (x.url || x.contentUrl || x.thumbnailUrl))),
+      ...imageAlternatives,
+    ]) {
+      if (!image) continue;
+      try {
+        images.push(publicUrl(image, url));
+      } catch {}
+    }
+    const imageUrls = [...new Set(images)];
     return validateRecipe({
       title: text(value.name),
       ingredients: lines.map(splitIngredient),
@@ -116,7 +139,8 @@ window.MW = window.MW || {};
         minutes(value.totalTime) || (minutes(value.prepTime) || 0) + (minutes(value.cookTime) || 0) || null,
       sourceUrl: url,
       source: new URL(url).hostname.replace(/^www\./, ''),
-      sourceImageUrl: imageUrl,
+      sourceImageUrl: imageUrls[0] || '',
+      sourceImageOriginalUrl: imageUrls[1] || '',
       sourceYield: yieldText,
     });
   }
@@ -125,7 +149,8 @@ window.MW = window.MW || {};
     if (typeof html !== 'string' || html.length > 3 * 1024 * 1024)
       throw new Error('This page is too large to import.');
     const found = [],
-      seen = new Set();
+      seen = new Set(),
+      imageAlternatives = declaredImageUrls(html, url);
     function walk(value, depth) {
       if (!value || depth > 15) return;
       if (Array.isArray(value)) {
@@ -136,7 +161,7 @@ window.MW = window.MW || {};
       if (
         [].concat(value['@type'] || []).some((x) => String(x).split(/[\/#]/).pop().toLowerCase() === 'recipe')
       ) {
-        const r = sourceRecipe(value, url);
+        const r = sourceRecipe(value, url, imageAlternatives);
         if (r && !seen.has(r.title)) {
           seen.add(r.title);
           found.push(r);
@@ -184,9 +209,11 @@ window.MW = window.MW || {};
       return s;
     });
     let sourceUrl = '',
-      sourceImageUrl = '';
+      sourceImageUrl = '',
+      sourceImageOriginalUrl = '';
     if (input.sourceUrl) sourceUrl = publicUrl(input.sourceUrl);
     if (input.sourceImageUrl) sourceImageUrl = publicUrl(input.sourceImageUrl);
+    if (input.sourceImageOriginalUrl) sourceImageOriginalUrl = publicUrl(input.sourceImageOriginalUrl);
     const id = String(input.id || '');
     if (id && !/^personal-[a-z0-9-]{8,80}$/.test(id)) throw new Error('Invalid personal recipe ID.');
     const n = Number(input.servings),
@@ -207,6 +234,7 @@ window.MW = window.MW || {};
       source: sourceUrl ? new URL(sourceUrl).hostname.replace(/^www\./, '') : 'My recipe',
       sourceUrl,
       sourceImageUrl,
+      sourceImageOriginalUrl,
       sourceYield: text(input.sourceYield).slice(0, 160),
       allergenVerification: 'unverified',
       createdAt: String(input.createdAt || new Date().toISOString()),

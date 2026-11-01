@@ -901,7 +901,7 @@ window.MW = window.MW || {};
   };
   const sourceImageCandidates = (r) => {
     if (!r || (r.imageQa && r.imageQa.status !== 'verified')) return [];
-    if (r.personal) return r.sourceImageUrl ? [r.sourceImageUrl] : [];
+    if (r.personal) return [...new Set([r.sourceImageUrl, r.sourceImageOriginalUrl].filter(Boolean))];
     if (!r.sourcedCatalogue) return [fallbackRecipeImage(r)].filter(Boolean);
     const remote = String(r.sourceImageUrl || '');
     const original = String(r.sourceImageOriginalUrl || '');
@@ -1827,7 +1827,7 @@ window.MW = window.MW || {};
     // change must never move, regenerate or replace unfinished meals.
     const meals = (st.week.meals || [])
       .map((m) => ({ ...m, recipe: recipe(m.recipeId) }))
-      .filter((x) => x.recipe);
+      .filter((x) => x.recipe && !MW.planner.sourceReviewHold(x.recipe));
     const todayMeta = currentDayMeta();
     const currentCalendarWeek = st.week.weekKey === MW.planner.currentWeekKey();
     const cooked = new Set(st.week.completedRecipes || []);
@@ -1904,15 +1904,18 @@ window.MW = window.MW || {};
     const dayStrip =
       '<div class="day-strip">' +
       MW.DAYS.map((d) => {
-        const meal = meals.find((x) => x.day === d.key);
+        const meal = (st.week.meals || []).find((x) => x.day === d.key);
+        const unavailable = meal && MW.planner.sourceReviewHold(recipe(meal.recipeId));
         const hasLunch = (MW.weeks.currentPlanning(st).lunchDays || []).includes(d.key);
         return (
           '<button class="day-pill day-open ' +
           (meal ? 'has-dinner' : '') +
+          (unavailable ? ' unavailable' : '') +
           '" data-day="' +
           d.key +
           '" aria-label="Edit ' +
           esc(d.label) +
+          (unavailable ? ', recipe unavailable' : '') +
           '"><span>' +
           esc(d.short) +
           '</span><div class="day-dots">' +
@@ -2005,7 +2008,7 @@ window.MW = window.MW || {};
           : '')
       : '<div class="home-empty-plan"><span class="empty-state-icon">' +
         icon('calendar-plus') +
-        '</span><div><strong>No dinners planned</strong></div></div>';
+        '</span><div><strong>No dinners to show</strong></div></div>';
     const deliveryBlocking = Boolean(
       st.week?.delivery && (st.week.weekKey === MW.planner.currentWeekKey() || !st.week.delivery.confirmed),
     );
@@ -3323,6 +3326,7 @@ window.MW = window.MW || {};
     const d = day(dayKey);
     const slot = st.week && st.week.meals.find((x) => x.day === dayKey);
     const r = slot ? recipe(slot.recipeId) : null;
+    const unavailableDinner = Boolean(r && MW.planner.sourceReviewHold(r));
     const dinnerOn = Boolean(slot);
     const lunchOn = (MW.weeks.currentPlanning(st).lunchDays || []).includes(dayKey);
     const lunch = MW.LUNCHES.find((x) => x.id === st.week.lunchId);
@@ -3334,7 +3338,13 @@ window.MW = window.MW || {};
         '</h1></div></section>' +
         '<section class="day-editor">' +
         '<div class="day-setting"><div><strong>Dinner</strong><small>' +
-        (dinnerOn ? (r ? esc(r.title) : 'Planned') : 'No dinner planned') +
+        (dinnerOn
+          ? unavailableDinner
+            ? 'Recipe unavailable'
+            : r
+              ? esc(r.title)
+              : 'Planned'
+          : 'No dinner planned') +
         '</small></div><label class="toggle"><input id="dinnerToggle" type="checkbox" ' +
         (dinnerOn ? 'checked' : '') +
         (orderedPlan ? ' disabled' : '') +
@@ -3346,7 +3356,7 @@ window.MW = window.MW || {};
             icon('chevron-right') +
             '</button>'
           : '') +
-        (dinnerOn && r
+        (dinnerOn && r && !unavailableDinner
           ? '<div class="favourite-card-shell day-favourite-shell"><button class="day-meal-card" id="dayViewRecipe" aria-label="Open ' +
             esc(r.title) +
             '">' +
@@ -3365,7 +3375,14 @@ window.MW = window.MW || {};
                 '<span><strong>Choose one for me</strong><small>Swap ' +
                 esc(d.label) +
                 ' for another suitable dinner</small></span></button></div>')
-          : '') +
+          : unavailableDinner
+            ? '<section class="source-note source-review-note" role="note">' +
+              icon('circle-exclamation') +
+              '<span>This dinner is unavailable while the recipe is reviewed. Your original choice is saved.</span></section>' +
+              (orderedPlan
+                ? ''
+                : '<button type="button" class="btn secondary" id="changeDinner">Choose another dinner</button>')
+            : '') +
         '<div class="day-setting"><div><strong>Lunch</strong><small>' +
         (lunchOn && lunch ? esc(lunch.title) : 'No planned lunch') +
         '</small></div><label class="toggle"><input id="lunchToggle" type="checkbox" ' +
@@ -3442,7 +3459,8 @@ window.MW = window.MW || {};
     libraryFilterEvents = new AbortController();
     const st = s(),
       target = st.ui.libraryTargetDay || '',
-      local = [...MW.RECIPES, ...(target ? [] : MW.LUNCHES)],
+      dinners = MW.RECIPES.filter((r) => !MW.planner.sourceReviewHold(r)),
+      local = [...dinners, ...(target ? [] : MW.LUNCHES)],
       profile = foodProfile();
     const filters = [
       ['all', 'All'],
@@ -3485,7 +3503,7 @@ window.MW = window.MW || {};
       : '';
     const grouped = new Map(categoryOptions.map((c) => [c.id, []]));
     const coverRecipes = new Map();
-    MW.RECIPES.forEach((r) => {
+    dinners.forEach((r) => {
       if (!MW.planner.allowed(r)) return;
       const category = MW.planner.categoryFor(r);
       grouped.get(category)?.push(r);
@@ -3508,7 +3526,7 @@ window.MW = window.MW || {};
         // Keep deliberately selected photographs even when equipment settings
         // exclude the photographed recipe from selectable results.
         const curatedCover = c.coverRecipeId
-          ? MW.RECIPES.find(
+          ? dinners.find(
               (r) => r.id === c.coverRecipeId && MW.planner.categoryFor(r) === c.id && displayRecipeImage(r),
             )
           : null;
@@ -3890,7 +3908,7 @@ window.MW = window.MW || {};
             .ids()
             .filter((id) => !ownIds.has(id))
             .map((id) => recipe(id))
-            .filter(Boolean),
+            .filter((r) => r && !MW.planner.sourceReviewHold(r)),
           query = search.value.trim().toLowerCase(),
           entries = [
             ...own.map((r) => ({ recipe: r, editable: true })),
@@ -4156,27 +4174,32 @@ window.MW = window.MW || {};
               .join('') +
             '</select>' +
             icon('chevron-down') +
-            '</span></div><p class="setting-help">Open a recipe to cook anything you missed.</p><div class="recipe-grid history-recipes">' +
+            '</span></div><p class="setting-help">Open an available recipe from your saved weeks.</p><div class="recipe-grid history-recipes">' +
             items
-              .map(
-                (m) =>
-                  '<article class="favourite-card-shell"><button class="recipe-card history-recipe" data-id="' +
-                  esc(m.recipeId) +
-                  '">' +
-                  recipePhoto(m.recipe, 'recipe-card-photo', m.recipe.title) +
-                  '<div><span class="meal-day">' +
-                  esc(m.kind) +
-                  '</span><h2>' +
-                  esc(m.recipe.title) +
-                  '</h2><small>' +
-                  esc(timeText(m.recipe)) +
-                  '</small>' +
-                  ((chosen.completedRecipes || []).includes(m.recipeId)
-                    ? '<em class="history-cooked">' + icon('check') + ' Cooked</em>'
-                    : '') +
-                  '</div></button>' +
-                  favouriteButton(m.recipe) +
-                  '</article>',
+              .map((m) =>
+                MW.planner.sourceReviewHold(m.recipe)
+                  ? '<article class="source-note source-review-note history-unavailable" role="note">' +
+                    icon('circle-exclamation') +
+                    '<span><strong>' +
+                    esc(m.recipe.title) +
+                    '</strong><small>Unavailable while this recipe is reviewed. Your saved week is preserved.</small></span></article>'
+                  : '<article class="favourite-card-shell"><button class="recipe-card history-recipe" data-id="' +
+                    esc(m.recipeId) +
+                    '">' +
+                    recipePhoto(m.recipe, 'recipe-card-photo', m.recipe.title) +
+                    '<div><span class="meal-day">' +
+                    esc(m.kind) +
+                    '</span><h2>' +
+                    esc(m.recipe.title) +
+                    '</h2><small>' +
+                    esc(timeText(m.recipe)) +
+                    '</small>' +
+                    ((chosen.completedRecipes || []).includes(m.recipeId)
+                      ? '<em class="history-cooked">' + icon('check') + ' Cooked</em>'
+                      : '') +
+                    '</div></button>' +
+                    favouriteButton(m.recipe) +
+                    '</article>',
               )
               .join('') +
             '</div>'
@@ -4228,9 +4251,35 @@ window.MW = window.MW || {};
     }
     return false;
   }
+  function unavailableSourceRecipe(r) {
+    const st = s();
+    const scheduled = (st.week?.meals || []).find((m) => m.recipeId === r.id);
+    root.innerHTML = shell(
+      '<section class="empty-state recipe-unavailable"><span class="empty-state-icon">' +
+        icon('circle-exclamation') +
+        '</span><h1>Recipe unavailable</h1><p>This recipe is temporarily unavailable while its instructions are reviewed. Your saved reference remains available for a future corrected release.</p>' +
+        '<div class="empty-state-actions"><button type="button" class="btn primary" id="blockedBrowse">Browse available recipes</button>' +
+        '<button type="button" class="btn secondary" id="blockedBack">Back to my week</button></div></section>',
+      'cook',
+    );
+    document.getElementById('blockedBrowse').onclick = () => {
+      st.ui.libraryTargetDay = MW.planner.orderedPlanLocked(st)
+        ? ''
+        : scheduled?.day || st.ui.libraryTargetDay || '';
+      st.ui.libraryCategory = MW.planner.categoryFor(r);
+      st.ui.libraryQuery = '';
+      st.ui.libraryFilters = [];
+      MW.state.save();
+      go('library');
+    };
+    document.getElementById('blockedBack').onclick = () => go('week');
+    bindNav();
+  }
   function recipeView(id) {
     const r = recipe(id);
     if (!r) return go('recipes');
+    // A held source is never opened, even by a saved link or previous meal.
+    if (MW.planner.sourceReviewHold(r)) return unavailableSourceRecipe(r);
     if (recipeBlocked(r)) return;
     const st = s();
     const people = MW.preparation.portions(r);
@@ -4257,6 +4306,7 @@ window.MW = window.MW || {};
     const toolsNeeded = cookingEquipment(r);
     const gathered = gatheredIngredients(r);
     const targetDay = st.ui.libraryTargetDay || '';
+    const canAddToWeek = MW.planner.allowed(r) && !MW.planner.orderedPlanLocked(st);
     const selectedAllergens = (st.foodProfile && st.foodProfile.allergens) || [];
     const personalWarning =
       r.personal && !MW.planner.allowed(r)
@@ -4322,13 +4372,13 @@ window.MW = window.MW || {};
           : '') +
         (targetDay
           ? '<section class="recipe-plan-choice"><button class="btn primary" id="chooseRecipeForDay" ' +
-            (!MW.planner.allowed(r) || MW.planner.orderedPlanLocked(st) ? 'disabled' : '') +
+            (!canAddToWeek ? 'disabled' : '') +
             '>Use for ' +
             esc(day(targetDay).label) +
             '</button><p class="recipe-add-feedback" id="recipeAddFeedback" role="status"></p></section>'
           : !r.isLunch
             ? '<section class="recipe-plan-choice"><button type="button" class="btn primary" id="addRecipeToWeek" ' +
-              (!MW.planner.allowed(r) || MW.planner.orderedPlanLocked(st) ? 'disabled' : '') +
+              (!canAddToWeek ? 'disabled' : '') +
               '>' +
               icon('calendar-plus') +
               ' Add to my week</button>' +
@@ -4361,11 +4411,6 @@ window.MW = window.MW || {};
           ? '<div class="source-note double-portion-note">' +
             icon('circle-info') +
             '<span>Double portion recipe: this published protein quantity is larger than usual. Choose another recipe for a lighter serving.</span></div>'
-          : '') +
-        (MW.planner.sourceReviewHold(r)
-          ? '<div class="source-note source-review-note" role="note">' +
-            icon('circle-exclamation') +
-            '<span>This published method or pack quantity needs checking. Confirm the ingredient packaging and supplier cooking instructions before making this recipe.</span></div>'
           : '') +
         (r.online
           ? '<div class="source-note">' +
@@ -4537,6 +4582,7 @@ window.MW = window.MW || {};
         }),
     );
     document.getElementById('startCooking').onclick = () => {
+      if (MW.planner.sourceReviewHold(r)) return;
       MW.preparation.begin(r, people);
       // Ingredients, equipment and gathering ticks already appear above.
       // Begin with the first real cooking instruction, not a second checklist.
@@ -4560,6 +4606,7 @@ window.MW = window.MW || {};
     const r = recipe(id);
     if (!r) return go('recipes');
     if (recipeBlocked(r)) return;
+    if (MW.planner.sourceReviewHold(r)) return go('recipe:' + id);
     if (!MW.preparation.portions(r)) return go('recipe:' + id);
     MW.preparation.begin(r, MW.preparation.portions(r));
     const st = s();
@@ -4883,6 +4930,7 @@ window.MW = window.MW || {};
     const r = recipe(id);
     if (!r) return go('recipes');
     if (recipeBlocked(r)) return;
+    if (MW.planner.sourceReviewHold(r)) return go('recipe:' + id);
     const st = s();
     const active = MW.weeks.cookingWeek(st) && MW.weeks.cookingWeek(st).preparation;
     // An expired deep link must reopen the recipe instead of presenting a

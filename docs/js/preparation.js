@@ -71,6 +71,8 @@ window.MW = window.MW || {};
     return n + ' ' + label;
   }
   function begin(recipe, count) {
+    if (MW.planner?.sourceReviewHold?.(recipe))
+      throw new Error('This recipe is unavailable while its instructions are reviewed.');
     const q = quantities(recipe);
     count = recipe.isLunch ? q.remaining : Number(count);
     if (!Number.isInteger(count) || count < 1 || count > q.remaining)
@@ -113,6 +115,8 @@ window.MW = window.MW || {};
     return { ...a.gatheredIngredients };
   }
   function setGathered(recipe, index, checked) {
+    if (MW.planner?.sourceReviewHold?.(recipe))
+      throw new Error('This recipe is unavailable while its instructions are reviewed.');
     if (!Number.isInteger(index) || index < 0 || index >= (recipe.ingredients || []).length)
       throw new Error('Choose a valid ingredient.');
     return MW.state.transaction((st) => {
@@ -137,6 +141,9 @@ window.MW = window.MW || {};
     });
   }
   function finish(recipe) {
+    // A session saved before the hold must not consume stock or finish cooking.
+    if (MW.planner?.sourceReviewHold?.(recipe))
+      throw new Error('This recipe is unavailable while its instructions are reviewed.');
     return MW.state.transaction((st) => {
       const a = MW.weeks.cookingWeek(st) && MW.weeks.cookingWeek(st).preparation;
       if (!a || a.recipeId !== recipe.id)

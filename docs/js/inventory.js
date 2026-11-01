@@ -261,7 +261,7 @@ window.MW = window.MW || {};
         MW.catalog && MW.catalog.get
           ? MW.catalog.get(m.recipeId)
           : MW.RECIPES.find((x) => x.id === m.recipeId);
-      if (r) (r.ingredients || []).forEach((x) => names.push(x[1]));
+      if (r && !MW.planner?.sourceReviewHold?.(r)) (r.ingredients || []).forEach((x) => names.push(x[1]));
     });
     const lunch = MW.LUNCHES.find((x) => x.id === s.week.lunchId);
     if (lunch && (s.plan.lunchDays || []).length) (lunch.ingredients || []).forEach((x) => names.push(x[1]));
@@ -329,7 +329,8 @@ window.MW = window.MW || {};
         MW.catalog && MW.catalog.get
           ? MW.catalog.get(meal.recipeId)
           : MW.RECIPES.find((x) => x.id === meal.recipeId);
-      if (!recipe || !(recipe.ingredients || []).some(rowMatches)) return;
+      if (!recipe || MW.planner?.sourceReviewHold?.(recipe) || !(recipe.ingredients || []).some(rowMatches))
+        return;
       const key = 'dinner:' + recipe.id;
       if (seen.has(key)) return;
       seen.add(key);
@@ -389,6 +390,8 @@ window.MW = window.MW || {};
 
   function consumeRecipe(recipe, people) {
     if (!recipe) return;
+    if (MW.planner?.sourceReviewHold?.(recipe))
+      throw new Error('This recipe is unavailable while its instructions are reviewed.');
     const factor = recipe.scaleSafe === false ? 1 : (Number(people) || 2) / (recipe.servings || 2);
     const rows =
         MW.pricing && MW.pricing.rowsForRecipe ? MW.pricing.rowsForRecipe(recipe) : recipe.ingredients || [],

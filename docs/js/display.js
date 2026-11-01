@@ -349,12 +349,26 @@ window.MW = window.MW || {};
     if (last) result.push(last);
     return result;
   }
+  // Some imported supplier guides claim that exterior browning alone proves
+  // a steak or lamb cut is safe. That depends on the actual cut and handling.
+  // Omit the unsupported blanket assurance from every cooking view while
+  // retaining the original supplier source, cooking steps and source indexes.
+  function removeBlanketMeatSafetyAssurance(value) {
+    return plain(value)
+      .replace(
+        /\bThe (?:steak|lamb) is safe to eat when (?:browned on the outside|the outside is browned)\.\s*/gi,
+        '',
+      )
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+  }
+
   // Present source methods without changing their records or source-image indexes.
   function method(recipe) {
     const preparation = [],
       steps = [];
     for (const [sourceIndex, value] of (recipe.steps || []).entries()) {
-      const source = plain(value);
+      const source = removeBlanketMeatSafetyAssurance(value);
       const readiness =
         sourceIndex === 0 &&
         /before you begin/i.test(source) &&
@@ -395,7 +409,7 @@ window.MW = window.MW || {};
     return { preparation, steps };
   }
   function instruction(value, context) {
-    let text = plainIngredientNames(plain(value)),
+    let text = plainIngredientNames(removeBlanketMeatSafetyAssurance(value)),
       factor = Number(context && context.factor);
     if (!Number.isFinite(factor) || factor <= 0) factor = 1;
     text = text.replace(
@@ -403,6 +417,18 @@ window.MW = window.MW || {};
       function (_, base, baseUnit, alt, altUnit) {
         if (Math.abs(factor - 2) < 0.01) return alt + (altUnit || baseUnit || '');
         return scaledNumber(base, factor) + (baseUnit || altUnit || '');
+      },
+    );
+    // Supplier quantity placeholders can also govern the following verb.
+    // Keep the source unchanged so the same guide reads correctly when people
+    // change the number eating, including "patty[ies] is" -> "patties are".
+    text = text.replace(
+      /\b([A-Za-z]+)\[\s*(s|es|ves|ies)\s*\]\s+(is|was|has|does)\b/gi,
+      function (_, word, suffix, verb) {
+        const plural = shouldPluralise(word, suffix, context);
+        const noun = plural ? pluralWord(word, suffix) : word;
+        const pluralVerb = { is: 'are', was: 'were', has: 'have', does: 'do' };
+        return noun + ' ' + (plural ? pluralVerb[verb.toLowerCase()] : verb.toLowerCase());
       },
     );
     text = text.replace(/\b([A-Za-z]+)\[\s*(s|es|ves|ies)\s*\]/g, function (_, word, suffix) {
