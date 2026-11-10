@@ -4460,23 +4460,10 @@ window.MW = window.MW || {};
               esc(r.imageLicense) +
               '</a> · cropped and resized</span>'
             : '<span class="photo-credit">Original MyWeek recipe and illustrations</span>'
-          : r.source === 'UniTools World Recipes' &&
-              r.imageQa?.medium === 'photograph' &&
-              r.imageSource &&
-              r.imageLicenceUrl
-            ? '<span class="photo-credit">Recipe adapted from <a href="' +
+          : r.source === 'UniTools World Recipes' && r.sourceUrl
+            ? '<a class="photo-credit" href="' +
               esc(r.sourceUrl) +
-              '" target="_blank" rel="noopener">UniTools World Recipes</a> under <a href="' +
-              esc(r.recipeLicenceUrl) +
-              '" target="_blank" rel="noopener license">CC BY-SA 4.0</a>. Photograph by <a href="' +
-              esc(r.imageSource) +
-              '" target="_blank" rel="noopener">' +
-              esc(r.imageCredit) +
-              '</a> under <a href="' +
-              esc(r.imageLicenceUrl) +
-              '" target="_blank" rel="noopener license">' +
-              esc(r.imageLicense) +
-              '</a>, cropped and resized.</span>'
+              '" target="_blank" rel="noopener">Recipe source · UniTools World Recipes</a>'
             : !r.online && r.sourcedCatalogue && r.sourceUrl
               ? '<a class="photo-credit" href="' +
                 esc(r.sourceUrl) +
@@ -5445,6 +5432,43 @@ window.MW = window.MW || {};
     } else if (a.status !== 'conflict') conflict.innerHTML = '';
   }
 
+  // Keep the legal source records available without turning the recipe
+  // detail into a licensing notice. This is the sole owner of their UI.
+  function replacementRecipeCredits() {
+    const records = (MW.VERIFIED_REPLACEMENT_RECIPES || []).filter(
+      (r) => r.source === 'UniTools World Recipes',
+    );
+    if (!records.length) return '';
+    return (
+      '<details class="settings-expand settings-section recipe-credits-settings"><summary><span><strong>Recipe and photo credits</strong><small>Photographers, original recipes and licences</small></span>' +
+      icon('chevron-down') +
+      '</summary><div class="settings-expand-content">' +
+      records
+        .map(
+          (r) =>
+            '<div class="recipe-credit-entry"><strong>' +
+            esc(r.title) +
+            '</strong><span>Recipe adapted from <a href="' +
+            esc(r.sourceUrl) +
+            '" target="_blank" rel="noopener">UniTools World Recipes</a> · <a href="' +
+            esc(r.recipeLicenceUrl) +
+            '" target="_blank" rel="noopener license">' +
+            esc(r.recipeLicence) +
+            '</a></span><span>Photograph by <a href="' +
+            esc(r.imageSource) +
+            '" target="_blank" rel="noopener">' +
+            esc(r.imageCredit) +
+            '</a> · <a href="' +
+            esc(r.imageLicenceUrl) +
+            '" target="_blank" rel="noopener license">' +
+            esc(r.imageLicense) +
+            '</a> · cropped and resized</span></div>',
+        )
+        .join('') +
+      '</div></details>'
+    );
+  }
+
   function settings() {
     const st = s();
     const avoidValue = [...(st.household.restrictions || []), ...(st.household.dislikes || [])].join(', ');
@@ -5559,6 +5583,7 @@ window.MW = window.MW || {};
             (MW.updates.isNativeAndroid() ? 'Checking installed version…' : 'Web app updates automatically') +
             '</small></span><i class="fa-solid fa-chevron-right"></i></button><div class="update-release" id="updateRelease" hidden></div></section>'
           : '') +
+        replacementRecipeCredits() +
         '<section class="settings-section" id="priceModeSection" ' +
         (MW.markets.canPlanWithPrices() ? '' : 'hidden ') +
         '><div class="switch-row"><span><strong>Lower-cost planning</strong><small id="priceModeHelp">' +

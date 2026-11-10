@@ -3494,6 +3494,30 @@ p {
 a.photo-credit:after {
   content: ' ↗';
 }
+.recipe-credits-settings .settings-expand-content {
+  max-height: 380px;
+  overflow-y: auto;
+}
+.recipe-credit-entry {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.recipe-credit-entry:last-child {
+  border-bottom: 0;
+}
+.recipe-credit-entry strong,
+.recipe-credit-entry span {
+  display: block;
+}
+.recipe-credit-entry span {
+  margin-top: 3px;
+}
+.recipe-credit-entry a {
+  color: inherit;
+  text-underline-offset: 2px;
+}
 .cook-visual {
   position: relative;
   min-height: 230px;

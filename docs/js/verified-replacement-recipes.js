@@ -14,7 +14,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Chinese Style Chicken and Vegetable Stir Fry with Peanuts',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with a Sticky Soy Glaze and Fresh Spring Onions',
     time: 45,
     servings: 2,
     scaleSafe: true,
@@ -325,7 +325,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Georgian Style Chicken and Tomato Herb Stew',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Fresh Basil, Garlic and Coriander',
     time: 60,
     servings: 2,
     scaleSafe: true,
@@ -594,7 +594,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Chilean Style Pastel de Choclo with Beef and Chicken',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with a Golden Sweetcorn Topping, Olives and Raisins',
     time: 105,
     servings: 2,
     scaleSafe: true,
@@ -877,7 +877,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'South African Style Bobotie with Golden Custard and Rice',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Fruity Curry Spices, Apricots and Rice',
     time: 95,
     servings: 2,
     scaleSafe: true,
@@ -1264,7 +1264,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Fragrant Chicken Biryani with Golden Rice and Yoghurt',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Warming Garam Masala and Ginger',
     time: 135,
     servings: 2,
     scaleSafe: true,
@@ -1576,7 +1576,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Moroccan Inspired Lemon, Olive and Herb Chicken Tagine',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Fragrant Cinnamon, Ginger and Garlic',
     time: 105,
     servings: 2,
     scaleSafe: true,
@@ -1855,7 +1855,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Hainanese Inspired Poached Chicken Rice with Soy Eggs',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Cucumber and a Chilli Lime Dressing',
     time: 65,
     servings: 2,
     scaleSafe: true,
@@ -2141,7 +2141,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Indonesian Style Chicken Satay with Peanut Sauce and Rice',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Sticky Peanut Sauce and Fresh Lime',
     time: 70,
     servings: 2,
     scaleSafe: true,
@@ -2427,7 +2427,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Cuban Inspired Golden Chicken and Rice with Peppers',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Sweet Peppers, Tomatoes and Cumin',
     time: 95,
     servings: 2,
     scaleSafe: true,
@@ -2748,7 +2748,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Creamy Peruvian Chicken with Chilli, Rice and Potatoes',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with a Creamy Walnut Sauce and Boiled Eggs',
     time: 65,
     servings: 2,
     scaleSafe: true,
@@ -3046,7 +3046,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Japanese Style Beef and Onion Rice Bowls',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Tender Onions and a Gingery Soy Broth',
     time: 40,
     servings: 2,
     scaleSafe: true,
@@ -3276,7 +3276,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Peruvian Style Lomo Saltado with Crispy Chips and Rice',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Tangy Soy Tomatoes and Fresh Coriander',
     time: 60,
     servings: 2,
     scaleSafe: true,
@@ -3508,7 +3508,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Creamy Beef Stroganoff with Golden Potatoes and Pickles',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Mushrooms, Mustard and Soured Cream',
     time: 70,
     servings: 2,
     scaleSafe: true,
@@ -3817,7 +3817,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Pakistani Inspired Spiced Beef Chapli Patties with Yoghurt',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Warm Pitta, Lemon and Cooling Yoghurt',
     time: 65,
     servings: 2,
     scaleSafe: true,
@@ -4088,7 +4088,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Uruguayan Chivito Steak Sandwiches with Crispy Chips',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Bacon, Mozzarella and Fried Egg',
     time: 55,
     servings: 2,
     scaleSafe: true,
@@ -4371,7 +4371,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Bolivian Inspired Crispy Beef Silpancho with Fried Eggs',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Golden Potatoes and Fresh Tomato Salad',
     time: 75,
     servings: 2,
     scaleSafe: true,
@@ -4637,7 +4637,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Cambodian Beef Lok Lak with Pepper Lime Dip and Rice',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Crisp Salad and Black Pepper Lime Dressing',
     time: 50,
     servings: 2,
     scaleSafe: true,
@@ -4930,7 +4930,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Bolivian Inspired Beef and Smoky Sausage Pique Macho',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Golden Chips, Peppers and a Fried Egg',
     time: 75,
     servings: 2,
     scaleSafe: true,
@@ -5223,7 +5223,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Norwegian Style Beef Kjøttkaker with Rich Gravy and Mash',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Buttery Mash, Peas and Rich Brown Gravy',
     time: 90,
     servings: 2,
     scaleSafe: true,
@@ -5505,7 +5505,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Swedish Style Beef and Pork Meatballs with Creamy Gravy',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Creamy Mash, Sweet Onions and Peas',
     time: 75,
     servings: 2,
     scaleSafe: true,
@@ -5801,7 +5801,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Thai Style Pork and Basil Stir Fry with Rice and Fried Eggs',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Hot Chillies, Garlic and Jasmine Rice',
     time: 40,
     servings: 2,
     scaleSafe: true,
@@ -6035,7 +6035,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Greek Inspired Pork Souvlaki Skewers with Lemon Tzatziki',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Warm Pitta, Cucumber and Oregano',
     time: 65,
     servings: 2,
     scaleSafe: true,
@@ -6260,7 +6260,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Danish Style Frikadeller with Creamed Cabbage and Potatoes',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Allspice, Sweet Onions and Buttered Potatoes',
     time: 75,
     servings: 2,
     scaleSafe: true,
@@ -6539,7 +6539,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Japanese Style Crispy Pork Katsudon Rice Bowls',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Silky Egg, Sweet Onions and Soy Broth',
     time: 55,
     servings: 2,
     scaleSafe: true,
@@ -6813,7 +6813,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Japanese Style Pork Nikujaga with Potatoes and Noodles',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Carrots, Soy Broth and Tender Noodles',
     time: 70,
     servings: 2,
     scaleSafe: true,
@@ -7073,7 +7073,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Cambodian Fish Amok with Coconut and Rice',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Ginger, Lemongrass and Lime Leaves',
     time: 80,
     servings: 2,
     scaleSafe: true,
@@ -7369,7 +7369,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Moqueca Inspired Coconut Fish and Prawn Stew with Rice',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Sweet Peppers, Lime and Fresh Coriander',
     time: 65,
     servings: 2,
     scaleSafe: true,
@@ -7660,7 +7660,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Yangzhou Style Prawn, Ham and Egg Fried Rice',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Spring Onions, Carrots and Garden Peas',
     time: 55,
     servings: 2,
     scaleSafe: true,
@@ -7917,7 +7917,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Danish Style Crispy Pork Belly with Parsley Sauce',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Buttery Potatoes and Fresh Herbs',
     time: 65,
     servings: 2,
     scaleSafe: true,
@@ -8174,7 +8174,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'French Inspired Moules Marinières with Oven Chips',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Garlic, Shallots and Fresh Parsley',
     time: 55,
     servings: 2,
     scaleSafe: true,
@@ -8449,7 +8449,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Layered Provençal Ratatouille Vegetable Bake',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Basil, Thyme and Slow-Roasted Tomatoes',
     time: 80,
     servings: 2,
     scaleSafe: true,
@@ -8702,7 +8702,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Golden Lentil Dal Tadka with Rice and Sizzling Spices',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Garlic, Cumin and Crispy Chilli',
     time: 55,
     servings: 2,
     scaleSafe: true,
@@ -8954,7 +8954,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Individual Lamb Shepherd’s Pies with Golden Mashed Potato',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Tender Carrots, Peas and Thyme',
     time: 90,
     servings: 2,
     scaleSafe: true,
@@ -9250,7 +9250,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Crispy Belarusian Potato Pancakes with Soured Cream and Dill',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Fresh Dill and Cool Soured Cream',
     time: 45,
     servings: 2,
     scaleSafe: true,
@@ -9430,7 +9430,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Albanian Style Baked Tomato, Pepper and Feta Fërgesë',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Creamy Ricotta, Roasted Peppers and Warm Pitta',
     time: 75,
     servings: 2,
     scaleSafe: true,
@@ -9686,7 +9686,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Cheesy Homemade Spätzle with Caramelised Onions and Chives',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Silky Melted Cheese and Fresh Chives',
     time: 55,
     servings: 2,
     scaleSafe: true,
@@ -9891,7 +9891,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Egyptian Koshari with Crispy Onions and Tomato Chilli Sauce',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Lentils, Chickpeas and Tangy Tomato Sauce',
     time: 90,
     servings: 2,
     scaleSafe: true,
@@ -10135,7 +10135,7 @@ MW.VERIFIED_REPLACEMENT_RECIPES = [
     recipeAttribution:
       'Adapted from UniTools World Recipes 2.0.0 (https://theunitools.com/en/data). Changes: two-person ingredient measurements, British English, retailer-compatible substitutions, food safety and cooking steps; adaptations also CC BY-SA 4.0.',
     title: 'Slovak Inspired Creamy Potato Halušky with Crispy Bacon',
-    subtitle: 'An adapted photographed dinner for two',
+    subtitle: 'with Creamy Cheese and Fresh Parsley',
     time: 55,
     servings: 2,
     scaleSafe: true,
