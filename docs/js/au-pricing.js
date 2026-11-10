@@ -49,6 +49,21 @@ window.MW = window.MW || {};
     const input = String(amount || '')
       .trim()
       .toLowerCase();
+    // Gousto packs sometimes state their physical contents, such as
+    // "1 pack (6 pcs)". The Australian country book prices comparable
+    // retailer products by different units. Do not treat that as six packs.
+    const sourcePack = input.match(/^([0-9]+(?:\.[0-9]+)?)\s+packs?\s*\(\s*([1-9][0-9]*)\s+pcs\s*\)$/);
+    if (sourcePack) {
+      const packs = Number(sourcePack[1]);
+      const pieces = Number(sourcePack[2]);
+      if (!(packs > 0) || !(pieces > 0)) return null;
+      if (entry.unit === 'each') return packs * pieces;
+      // Without a verified weight per piece, one supplier retail pack is
+      // benchmarked as one comparable local retail pack (estimated, not exact).
+      if ((entry.unit === 'g' || entry.unit === 'ml') && Number(entry.packQty) > 0)
+        return packs * Number(entry.packQty);
+      return null;
+    }
     const pinch = input.match(/^([0-9]+(?:\.[0-9]+)?)\s+pinch(?:es)?$/);
     if (pinch && entry.unit === 'g' && Number(entry.pinchWeight) > 0)
       return Number(pinch[1]) * Number(entry.pinchWeight);

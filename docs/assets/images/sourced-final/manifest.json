@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "count": 3240,
+  "count": 3202,
   "visualVerified": false,
   "files": {
     "hf-6a8f1b6224b9d7fd9be4bdc0": {
@@ -178,18 +178,6 @@
       "role": "declared-final",
       "sha256": "3311e26f00650d4f5f6b59acda9884d0a39d29f963b60fff99bd6c696a355500",
       "bytes": 62374,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a85d790dc2773aa1a332117": {
-      "src": "assets/images/sourced-final/hf-6a85d790dc2773aa1a332117.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y24_R20_W37_UK_V21522-4_Main_F1_V21522-AP-1-16_var_high-d1026b4d.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y24_R20_W37_UK_V21522-4_Main_F1_V21522-AP-1-16_var_high-d1026b4d.jpg",
-      "role": "declared-final",
-      "sha256": "60b845555bfd77b378639beb9edcbbeed7d7650381e958da590329996d0eb7b5",
-      "bytes": 43970,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -639,18 +627,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a735a31e4ad299a87820993": {
-      "src": "assets/images/sourced-final/hf-6a735a31e4ad299a87820993.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R25_W09_UK_QR52078-5_edit_prawns_Ran_TD__Main_high-72060a98.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R25_W09_UK_QR52078-5_edit_prawns_Ran_TD__Main_high-72060a98.jpg",
-      "role": "declared-final",
-      "sha256": "b3141245896bfaeba592a89be6a8276ba5f19844c8753e81344d2efe9ac21921",
-      "bytes": 45552,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a735a2eebec54be3cd9d828": {
       "src": "assets/images/sourced-final/hf-6a735a2eebec54be3cd9d828.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R22_W05_UK_L50127-4_Main_high-3b0cd996.jpg",
@@ -658,18 +634,6 @@
       "role": "declared-final",
       "sha256": "7f2a55cfd527bf8b90e1136e94bcc52108a300ca2e6722c4509be14705c8b43b",
       "bytes": 40812,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a735a31e4ad299a87820991": {
-      "src": "assets/images/sourced-final/hf-6a735a31e4ad299a87820991.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R25_W09_UK_QR52078-5_Ran_TD__Main_high-47f505ac.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R25_W09_UK_QR52078-5_Ran_TD__Main_high-47f505ac.jpg",
-      "role": "declared-final",
-      "sha256": "bb1fc343ec7985a9e14d6e1de231e148835ba4d344acf4ccfe54611227e84192",
-      "bytes": 48004,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -1095,18 +1059,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a85d7aedc2773aa1a33216b": {
-      "src": "assets/images/sourced-final/hf-6a85d7aedc2773aa1a33216b.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R99_W43_UK_SPR23489-6_main_high-79626b42.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R99_W43_UK_SPR23489-6_main_high-79626b42.jpg",
-      "role": "declared-final",
-      "sha256": "01b2cc728bfcf692fa30b7fe48c0325faeecd2af72677a9419f44802260fdfb1",
-      "bytes": 43662,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a85d7a0dc2773aa1a332159": {
       "src": "assets/images/sourced-final/hf-6a85d7a0dc2773aa1a332159.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R95_W31_UK_SPR58311-3main_high-53a83a68.jpg",
@@ -1114,18 +1066,6 @@
       "role": "declared-final",
       "sha256": "e4a181741f676b9307491e177659feef04100716e1fb542ed273601c7d831a1c",
       "bytes": 41102,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a6a1e65640e6eb29c2b111c": {
-      "src": "assets/images/sourced-final/hf-6a6a1e65640e6eb29c2b111c.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R94_W40_UK_SS45070-5_main_high-d4b5cc64.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R94_W40_UK_SS45070-5_main_high-d4b5cc64.jpg",
-      "role": "declared-final",
-      "sha256": "58884b438768bc25f02a3c77abda6708e5992dbc5459fdaa5ca9381b295d9f8e",
-      "bytes": 40020,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -1354,18 +1294,6 @@
       "role": "declared-final",
       "sha256": "e8274a34e3c59238818ecfb5d4083b29e466a417c8e6e6f43f6c97aeef2a90fd",
       "bytes": 59104,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a6a1d6d2d6012a9c513762c": {
-      "src": "assets/images/sourced-final/hf-6a6a1d6d2d6012a9c513762c.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R14_W40_UK_QR59741-3_main_high-e42742f2.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R14_W40_UK_QR59741-3_main_high-e42742f2.jpg",
-      "role": "declared-final",
-      "sha256": "1b297af8bd479117fa24685750d961fd5a1b1536d769f5cb482d1f3659b1e3ed",
-      "bytes": 33052,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -1683,18 +1611,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a735a51ebec54be3cd9d85b": {
-      "src": "assets/images/sourced-final/hf-6a735a51ebec54be3cd9d85b.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R08_W41_UK_F53365-10_main___variant__high-8482dc67.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R08_W41_UK_F53365-10_main___variant__high-8482dc67.jpg",
-      "role": "declared-final",
-      "sha256": "e5f9ba6ed6037717102f7f8bdde08f97154b28e43f74cf2f110824a533c8031b",
-      "bytes": 38530,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a6a1dfc640e6eb29c2b10b6": {
       "src": "assets/images/sourced-final/hf-6a6a1dfc640e6eb29c2b10b6.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R58_W40_UK_QR59076-3_main_high-817ef00a.jpg",
@@ -1918,18 +1834,6 @@
       "role": "declared-final",
       "sha256": "d1df3a96999b7b1849142f7c8c59da70584fae8096bf11057365ded9103e2ae7",
       "bytes": 43946,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a85d7937a45bccee4d1cd6d": {
-      "src": "assets/images/sourced-final/hf-6a85d7937a45bccee4d1cd6d.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y24_R47_W47_UK_HVV26498-3_Main_high-ea9e0b7b.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y24_R47_W47_UK_HVV26498-3_Main_high-ea9e0b7b.jpg",
-      "role": "declared-final",
-      "sha256": "53d7e5e7ed58df720793c68fedd68e408548e89314d67a24fae692cc97f79942",
-      "bytes": 32618,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -2679,18 +2583,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a60f75d20a15d56f3c81ab7": {
-      "src": "assets/images/sourced-final/hf-6a60f75d20a15d56f3c81ab7.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R55_W39_UK_V59610-3_main_V59610-AP-1-3_var_high-37f00b38.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R55_W39_UK_V59610-3_main_V59610-AP-1-3_var_high-37f00b38.jpg",
-      "role": "declared-final",
-      "sha256": "8b3d401950a023bb3ddf67bbb9c2d0c9e8651ea30761efbddd13d1c6d4c21ca9",
-      "bytes": 48146,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a60f7070e64e4eb8f9117c0": {
       "src": "assets/images/sourced-final/hf-6a60f7070e64e4eb8f9117c0.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y25_R44_W07_UK_UQ17517-18_Main_high-38415f33.jpg",
@@ -2986,18 +2878,6 @@
       "role": "declared-final",
       "sha256": "fb9946a637456a08c8016885edb2b5049d33ca204cd1aa28a8a6dcf41749a370",
       "bytes": 36368,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a6a1dd82d6012a9c5137686": {
-      "src": "assets/images/sourced-final/hf-6a6a1dd82d6012a9c5137686.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R44_W30_UK_QR58081-3main_TD__Main_high-1aae0c94.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R44_W30_UK_QR58081-3main_TD__Main_high-1aae0c94.jpg",
-      "role": "declared-final",
-      "sha256": "fe52f1fdb40a27203b90f8fbde005900eadee378e33b51ac0065ec1859a2e32d",
-      "bytes": 51608,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -4078,18 +3958,6 @@
       "role": "declared-final",
       "sha256": "85a8dfae8731d1251b1063e82227045307abe8805d15d1164d5e4c47bd781de3",
       "bytes": 36440,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a60f6ef20a15d56f3c81a60": {
-      "src": "assets/images/sourced-final/hf-6a60f6ef20a15d56f3c81a60.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R63_W06_UK_HVP53587-3_Main_high-c6814ede.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R63_W06_UK_HVP53587-3_Main_high-c6814ede.jpg",
-      "role": "declared-final",
-      "sha256": "5a287e4c2db420d6d9356ca34ac1d5bf4699f2ab92d3692b4bf3c843fbb48b48",
-      "bytes": 39760,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -6171,18 +6039,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a4e7627746dd895cd0ba8ee": {
-      "src": "assets/images/sourced-final/hf-6a4e7627746dd895cd0ba8ee.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R44_W29_UK_QR58078-3main_high-f787a8fd.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R44_W29_UK_QR58078-3main_high-f787a8fd.jpg",
-      "role": "declared-final",
-      "sha256": "5470694ccddfc72a7376d30aca8e5196b45638e63e1fe6fb617136c7d0c72fd3",
-      "bytes": 44096,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a3c01f4bcb653703ca89dc0": {
       "src": "assets/images/sourced-final/hf-6a3c01f4bcb653703ca89dc0.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R49_W06_UK_QV51383-3_Main_3_high-2c1b1151.jpg",
@@ -6759,18 +6615,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a4e7650fc37702f5b7b56bd": {
-      "src": "assets/images/sourced-final/hf-6a4e7650fc37702f5b7b56bd.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R64_W37_UK_G-27590-52213-10_edit_salmon_main_high-f09ef8d4.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R64_W37_UK_G-27590-52213-10_edit_salmon_main_high-f09ef8d4.jpg",
-      "role": "declared-final",
-      "sha256": "08eb10483d19eca7238a178b07c9429a1e32f0462b89b853568fb0f86bd09457",
-      "bytes": 33920,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a4538ce66926770e8cd4e19": {
       "src": "assets/images/sourced-final/hf-6a4538ce66926770e8cd4e19.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R42_W19_UK_V16039-21_main_high-c9473075.jpg",
@@ -7239,18 +7083,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a3c01b0f396cfc62f2ac8a9": {
-      "src": "assets/images/sourced-final/hf-6a3c01b0f396cfc62f2ac8a9.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R09_W35_UK_F58274-3main_high-f256cebd.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R09_W35_UK_F58274-3main_high-f256cebd.jpg",
-      "role": "declared-final",
-      "sha256": "25e83ddc8fc82176dabe87138bca7eaa1449de398e60d7fbcbfda577f76b0146",
-      "bytes": 48126,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a3c01aef396cfc62f2ac8a5": {
       "src": "assets/images/sourced-final/hf-6a3c01aef396cfc62f2ac8a5.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R08_W35_UK_F57356-3main_apple_cucumber_edit_high-8dd4cb3f.jpg",
@@ -7383,30 +7215,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a58a373d4e23d845507306b": {
-      "src": "assets/images/sourced-final/hf-6a58a373d4e23d845507306b.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R23_W03_UK_R52252-4_prawns_edit_RAN_HA_Main__1_Main_high-a5c05663.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R23_W03_UK_R52252-4_prawns_edit_RAN_HA_Main__1_Main_high-a5c05663.jpg",
-      "role": "declared-final",
-      "sha256": "7dc26e942e196ee9a01a7720ba0346267a2145f8079e07aeed271ec8be7e4661",
-      "bytes": 37046,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a58a3733cd318353e2a895a": {
-      "src": "assets/images/sourced-final/hf-6a58a3733cd318353e2a895a.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R23_W03_UK_R52252-3_RAN_HA_Main_-1_Main_high-fa97e088.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R23_W03_UK_R52252-3_RAN_HA_Main_-1_Main_high-fa97e088.jpg",
-      "role": "declared-final",
-      "sha256": "b0ce4f64fafc7bf78c039d093a9f1539abd7bc151bd9a087122e100a11b1c38e",
-      "bytes": 37198,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a58a3572c76eddc47d12dc5": {
       "src": "assets/images/sourced-final/hf-6a58a3572c76eddc47d12dc5.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R15_W38_UK_V59553-3_main_V59553-AP-1-3_var_high-94f309b4.jpg",
@@ -7479,18 +7287,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a4e7605746dd895cd0ba8b8": {
-      "src": "assets/images/sourced-final/hf-6a4e7605746dd895cd0ba8b8.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R23_W37_UK_L59219-3main_high-5157f582.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R23_W37_UK_L59219-3main_high-5157f582.jpg",
-      "role": "declared-final",
-      "sha256": "888606046d9f660c9d140fbc6fc980f4ac2a1eb847ad658fc1c44fb1c2a99218",
-      "bytes": 52072,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a453905bcb653703ca9cbf4": {
       "src": "assets/images/sourced-final/hf-6a453905bcb653703ca9cbf4.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R87_W25_UK_R1304-18_edit_beef_main_high-223919e6.jpg",
@@ -7539,18 +7335,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a58a4312c76eddc47d12ea2": {
-      "src": "assets/images/sourced-final/hf-6a58a4312c76eddc47d12ea2.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R99_W38_UK_SPR3816-17_main_high-58b92d49.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R99_W38_UK_SPR3816-17_main_high-58b92d49.jpg",
-      "role": "declared-final",
-      "sha256": "f82b9d57c657097096030d1b1b9455c4df7962f37fab65b2f684e2156cf038b2",
-      "bytes": 36884,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a58a42f3cd318353e2a8a30": {
       "src": "assets/images/sourced-final/hf-6a58a42f3cd318353e2a8a30.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y25_R43_W33_UK_SCSL24429-10_Main_F2_prawns_edit_high-523b34f2.jpg",
@@ -7570,18 +7354,6 @@
       "role": "declared-final",
       "sha256": "da5c59e4f50e2efa0f0b830eb9a506365b188bbe3648be22d779b245400d8447",
       "bytes": 48876,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a58a42b2c76eddc47d12e8f": {
-      "src": "assets/images/sourced-final/hf-6a58a42b2c76eddc47d12e8f.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R63_W26_UK_SQPR29220-22main_high-69c65c80.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R63_W26_UK_SQPR29220-22main_high-69c65c80.jpg",
-      "role": "declared-final",
-      "sha256": "bdeffbf9dac581c3d0fdf90ea825b7964fe14a7ce6075dc83d74e534bbec17c7",
-      "bytes": 40004,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -8568,18 +8340,6 @@
       "bytes": 29110,
       "width": 700,
       "height": 467,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a4e7608746dd895cd0ba8bd": {
-      "src": "assets/images/sourced-final/hf-6a4e7608746dd895cd0ba8bd.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y25_R06_W13_UK_R3897-13_Main_high-f8b88068.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y25_R06_W13_UK_R3897-13_Main_high-f8b88068.jpg",
-      "role": "declared-final",
-      "sha256": "e8929b365b20a7b18f52baaaa9518b60b66b9cec1c079d86684c1536d35906fd",
-      "bytes": 36914,
-      "width": 700,
-      "height": 466,
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
@@ -10270,18 +10030,6 @@
       "role": "declared-final",
       "sha256": "e8b2af18b8ac5310885979abeeeef49c11c2f34449830549a0a453020b553d66",
       "bytes": 57614,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a2a93cab2e241c4bdaf5f56": {
-      "src": "assets/images/sourced-final/hf-6a2a93cab2e241c4bdaf5f56.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R69_W33_UK_R57315-3_edit_beef_main_high-c256cb1b.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R69_W33_UK_R57315-3_edit_beef_main_high-c256cb1b.jpg",
-      "role": "declared-final",
-      "sha256": "b66b7aabcb81f126bf373d3145a229b8a28773ac61ddb29ae2dc62a6c846f870",
-      "bytes": 63550,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -12075,18 +11823,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-6a2a93911f9f329b3991d949": {
-      "src": "assets/images/sourced-final/hf-6a2a93911f9f329b3991d949.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R23_W21_UK_UQ56454-3_edit_salmon_main_high-52c6fa0b.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R23_W21_UK_UQ56454-3_edit_salmon_main_high-52c6fa0b.jpg",
-      "role": "declared-final",
-      "sha256": "8d16b8d4ab03a27ad1831d5afddd06e77b92df406e587235e5849abf76de71c4",
-      "bytes": 54894,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6a2a9391b2e241c4bdaf5f07": {
       "src": "assets/images/sourced-final/hf-6a2a9391b2e241c4bdaf5f07.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R23_W21_UK_UQ56454-3_main_high-f60f0384.jpg",
@@ -13078,30 +12814,6 @@
       "role": "declared-final",
       "sha256": "2374238f1508eb6ca529ac122e5791d99fae3996d8869d1bf9a957b2ae05732a",
       "bytes": 50358,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a203bdeca82b4c04e08a359": {
-      "src": "assets/images/sourced-final/hf-6a203bdeca82b4c04e08a359.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R23_W08_UK_R40724-5_Main_high-b7c8a795.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R23_W08_UK_R40724-5_Main_high-b7c8a795.jpg",
-      "role": "declared-final",
-      "sha256": "ad0fa341051bca12ee504e7452d86bc94eff213803f57c878e6023a2d403dcf4",
-      "bytes": 45860,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6a203bdeb0ca0134734ae1a2": {
-      "src": "assets/images/sourced-final/hf-6a203bdeb0ca0134734ae1a2.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R23_W08_UK_R40724-5_edit_chorizo_Main_high-551c67b6.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R23_W08_UK_R40724-5_edit_chorizo_Main_high-551c67b6.jpg",
-      "role": "declared-final",
-      "sha256": "0a24f17f4a6bae5bc3a612e28b04c577cf8fffb64de12d7fbdf4c0c42bd95145",
-      "bytes": 46598,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -14559,18 +14271,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-69fb563c05492ed04f07189c": {
-      "src": "assets/images/sourced-final/hf-69fb563c05492ed04f07189c.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R10_W28_UK_R21022-8main_high-f697de79.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R10_W28_UK_R21022-8main_high-f697de79.jpg",
-      "role": "declared-final",
-      "sha256": "a48e122dcf59e2076a5e370e68807fa2b23593e0030f8b8126da1429155bbbf6",
-      "bytes": 52566,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-69fb567605492ed04f071911": {
       "src": "assets/images/sourced-final/hf-69fb567605492ed04f071911.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R46_W28_UK_V55869-5_edit_2x_main_high-029f14cf.jpg",
@@ -15795,18 +15495,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-69eb7043b2918f341e7b6cf0": {
-      "src": "assets/images/sourced-final/hf-69eb7043b2918f341e7b6cf0.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R27_W26_UK_L56151-5main_HA__Main_high-5d59332f.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R27_W26_UK_L56151-5main_HA__Main_high-5d59332f.jpg",
-      "role": "declared-final",
-      "sha256": "3dda2efcd659f1c3bf18dab48832067ac706ebe60c7cfbb274ce1457c46cd418",
-      "bytes": 34286,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-69e8e39dfe534c766c4598c1": {
       "src": "assets/images/sourced-final/hf-69e8e39dfe534c766c4598c1.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R18_W26_UK_F17285-7main_high-596aa1bc.jpg",
@@ -16690,18 +16378,6 @@
       "role": "declared-final",
       "sha256": "25602463861c364096dd7b6c04c6c375dd3050c23d582b93214496b9845851f3",
       "bytes": 36250,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-69eb7043fe534c766c461155": {
-      "src": "assets/images/sourced-final/hf-69eb7043fe534c766c461155.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R27_W26_UK_L56151-5_edit_chicken_main_HA__Main_high-2da3cb32.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R27_W26_UK_L56151-5_edit_chicken_main_HA__Main_high-2da3cb32.jpg",
-      "role": "declared-final",
-      "sha256": "a3b1f9e857bcea7ad7af8c441fe31f60d2373adcc622af07a5f856fa4b5c73fb",
-      "bytes": 34606,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -17643,18 +17319,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-69dfbf554af8f3547a64806c": {
-      "src": "assets/images/sourced-final/hf-69dfbf554af8f3547a64806c.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R17_W24_UK_R55076-3_main_high-ac8f865f.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R17_W24_UK_R55076-3_main_high-ac8f865f.jpg",
-      "role": "declared-final",
-      "sha256": "13c76b2d63f570317b4310cba051b3c058296e1f0ac60a8e6c9afc93a7c789a7",
-      "bytes": 50568,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-69d7ce486bb16e39e1b77637": {
       "src": "assets/images/sourced-final/hf-69d7ce486bb16e39e1b77637.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R65_W04_UK_HVP52517-3_Main_HVP52517-SP-1-7_var_high-3ef7191c.jpg",
@@ -17854,18 +17518,6 @@
       "role": "declared-final",
       "sha256": "456ec93177b02bb91727081a2ec840584ac6e7fc2c24f53fd233d3ff7d765667",
       "bytes": 41690,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-69e0c8f76bb16e39e1b8d9b5": {
-      "src": "assets/images/sourced-final/hf-69e0c8f76bb16e39e1b8d9b5.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF220914_R17_W43_UK_L3113-22_MB_Main_3_high-db1e9ef1.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF220914_R17_W43_UK_L3113-22_MB_Main_3_high-db1e9ef1.jpg",
-      "role": "declared-final",
-      "sha256": "dc81915caccbd5ff1b8db95145d3eb5090556a2913c0c7c7d031ca7414704aea",
-      "bytes": 48028,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -18298,18 +17950,6 @@
       "role": "declared-final",
       "sha256": "42347be6cb3e1cd82f8af4bde0829a31fa65ba6ce9a0d41c107befd2e4c170b0",
       "bytes": 49806,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-69d7cde64604fa2f60f0f4b3": {
-      "src": "assets/images/sourced-final/hf-69d7cde64604fa2f60f0f4b3.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R22_W24_UK_G-0955-52215-4_main_high-d8ba5cd0.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R22_W24_UK_G-0955-52215-4_main_high-d8ba5cd0.jpg",
-      "role": "declared-final",
-      "sha256": "2acfe640ac1a8b113b33a81857c95f225e6d92ebb1555352551d5d0c464b75d4",
-      "bytes": 49232,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -18766,18 +18406,6 @@
       "role": "declared-final",
       "sha256": "6ef676bc48d5c839a547a7eae0edcdeff6b887c021b8198c1ce65fdbad05b59e",
       "bytes": 38942,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-69bae028d378378da7abd64b": {
-      "src": "assets/images/sourced-final/hf-69bae028d378378da7abd64b.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R09_W19_UK_R55880-4_main_R55880-DP-2-4_var_high-314dc964.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R09_W19_UK_R55880-4_main_R55880-DP-2-4_var_high-314dc964.jpg",
-      "role": "declared-final",
-      "sha256": "7a77e6dbcf29a36d832198bc391eca2ffe08057d0b642d87eeb33711d4e93e29",
-      "bytes": 47072,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -22767,18 +22395,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "gousto-4dbc753a-911d-4f8a-941c-7351c113f01c": {
-      "src": "assets/images/sourced-final/gousto-4dbc753a-911d-4f8a-941c-7351c113f01c.webp",
-      "source": "https://production-media.gousto.co.uk/cms/mood-image/R-3943-2-3943-Spiced-Hasselback-Aubergine-With-Greek-Cheese--Spinach-Pilaf-0388-1676298359526-x1500.jpg",
-      "downloadUrl": "https://production-media.gousto.co.uk/cms/mood-image/R-3943-2-3943-Spiced-Hasselback-Aubergine-With-Greek-Cheese--Spinach-Pilaf-0388-1676298359526-x1500.jpg",
-      "role": "declared-final",
-      "sha256": "49e87d1ab65ec582090138cda2973ef28757bde89ff5f3675c913bc80a3bb4c3",
-      "bytes": 86652,
-      "width": 700,
-      "height": 700,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "gousto-484264f3-0c5d-4f41-befc-b90ff1793eba": {
       "src": "assets/images/sourced-final/gousto-484264f3-0c5d-4f41-befc-b90ff1793eba.webp",
       "source": "https://production-media.gousto.co.uk/cms/mood-image/3902_Tomatoey-King-Prawn--Courgette-Orzotto-With-Feta-7245-1638790850426-x1500.jpg",
@@ -25179,18 +24795,6 @@
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
-    "hf-693adc1fdce6a2dc39a7eb94": {
-      "src": "assets/images/sourced-final/hf-693adc1fdce6a2dc39a7eb94.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R08_W09_UK_V53366-3_Main_15_high-63564689.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y26_R08_W09_UK_V53366-3_Main_15_high-63564689.jpg",
-      "role": "declared-final",
-      "sha256": "a3a7f929fb13c8ceed061ed01c2b72b58ac36b6441439deaced94418482a4cae",
-      "bytes": 40324,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
     "hf-6931b0b48bfa40b62c02a441": {
       "src": "assets/images/sourced-final/hf-6931b0b48bfa40b62c02a441.webp",
       "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y26_R19_W07_UK_V51396-3_Main_high-470d1808.jpg",
@@ -25474,18 +25078,6 @@
       "role": "declared-final",
       "sha256": "4c4678a74a1f3a5e5c5f27d6df17b023168c99debca57274c7c613f075744339",
       "bytes": 42398,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-691df1ef71644dd339c43028": {
-      "src": "assets/images/sourced-final/hf-691df1ef71644dd339c43028.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y24_R21_W45_UK_V27108-5_Main_high-3ebae2b8.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y24_R21_W45_UK_V27108-5_Main_high-3ebae2b8.jpg",
-      "role": "declared-final",
-      "sha256": "7c68883e2970447a0a30410cffdd73e37a80bf4c88ff815b1ade8bae104cc0c8",
-      "bytes": 40386,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -25920,18 +25512,6 @@
       "bytes": 43824,
       "width": 700,
       "height": 467,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-6669685a16b67b5e09052705": {
-      "src": "assets/images/sourced-final/hf-6669685a16b67b5e09052705.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF230103_R26_W06_UK_L12453-5_Main_Plant_Based_Burger_edit_high-8dd57c88.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF230103_R26_W06_UK_L12453-5_Main_Plant_Based_Burger_edit_high-8dd57c88.jpg",
-      "role": "declared-final",
-      "sha256": "11bf90eebf1bf63863f6d53f5295d0eb542aa898114037380242974bc3f87200",
-      "bytes": 63536,
-      "width": 700,
-      "height": 466,
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
@@ -27012,18 +26592,6 @@
       "bytes": 49952,
       "width": 700,
       "height": 467,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-68fa03c329be8924040bd270": {
-      "src": "assets/images/sourced-final/hf-68fa03c329be8924040bd270.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y24_RA_R46_W52_UK_XMAS2024-28046-2_Main_high-b293386d.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y24_RA_R46_W52_UK_XMAS2024-28046-2_Main_high-b293386d.jpg",
-      "role": "declared-final",
-      "sha256": "e4bcc5a339cb940059d820239dd1d02ac21a8a92d218cc3d4c3d9dde2105e188",
-      "bytes": 38826,
-      "width": 700,
-      "height": 466,
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },
@@ -28786,18 +28354,6 @@
       "role": "declared-final",
       "sha256": "c5cc65f2e45fededfe8ac9e598fba2a3562b9484845da67571197781f2d76c2c",
       "bytes": 36116,
-      "width": 700,
-      "height": 466,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "hf-68b87a70880cce1802b93910": {
-      "src": "assets/images/sourced-final/hf-68b87a70880cce1802b93910.webp",
-      "source": "https://d3hvwccx09j84u.cloudfront.net/0,0/image/HF_Y25_R42_W04_UK_V32413-3_Main_high-1fb53b37.jpg",
-      "downloadUrl": "https://img.hellofresh.com/f_auto,fl_lossy,q_auto,w_900/hellofresh_s3/image/HF_Y25_R42_W04_UK_V32413-3_Main_high-1fb53b37.jpg",
-      "role": "declared-final",
-      "sha256": "be615f88c3e36f4425d200bd0035b1f63e19bb195b1412a4b7a7dcb65c8ddfc9",
-      "bytes": 45108,
       "width": 700,
       "height": 466,
       "visualVerified": false,
@@ -33000,18 +32556,6 @@
       "bytes": 76250,
       "width": 700,
       "height": 700,
-      "visualVerified": false,
-      "encodingVersion": "qa31-webp700-q72"
-    },
-    "gousto-ea4adc29-eeb5-40f1-b67b-2965a1fc808a": {
-      "src": "assets/images/sourced-final/gousto-ea4adc29-eeb5-40f1-b67b-2965a1fc808a.webp",
-      "source": "https://production-media.gousto.co.uk/cms/range-main-image/R-8604-2_AUBERGINE-PARM_BATCH-COOK_CAROUSEL-01-1754921297992-x1500.jpg",
-      "downloadUrl": "https://production-media.gousto.co.uk/cms/range-main-image/R-8604-2_AUBERGINE-PARM_BATCH-COOK_CAROUSEL-01-1754921297992-x1500.jpg",
-      "role": "declared-final",
-      "sha256": "b447c0a608d09dbfb6635cc7593faed7f7cced0b35336d56bf028df224639b38",
-      "bytes": 140770,
-      "width": 700,
-      "height": 794,
       "visualVerified": false,
       "encodingVersion": "qa31-webp700-q72"
     },

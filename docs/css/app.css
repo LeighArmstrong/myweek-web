@@ -3481,7 +3481,7 @@ p {
   font-weight: 750;
   text-decoration: none;
 }
-.photo-credit:after {
+a.photo-credit:after {
   content: ' ↗';
 }
 .cook-visual {

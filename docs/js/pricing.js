@@ -3194,6 +3194,13 @@ window.MW = window.MW || {};
     // Convert cookbook measures only when explicit product-specific yield data
     // is available. Fractions of whole produce are rounded to packs in the
     // basket engine, not in this conversion.
+    // Supplier multi-piece pack labels are one retail pack, not N separate packs.
+    // Validate against the canonical product unit; unknown packaging stays unresolved.
+    const supplierPack = raw.match(/^([0-9]+(?:\.[0-9]+)?)\s+packs?\s*\(\s*([1-9][0-9]*)\s+pcs\s*\)$/);
+    if (supplierPack) {
+      const count = Number(supplierPack[1]);
+      return entry.unit === 'pack' && Number.isFinite(count) && count > 0 ? count : null;
+    }
     const practicalMeasure = raw.match(/^([0-9]+(?:\.[0-9]+)?)\s+(small\s+)?(slices?|leaves?|handfuls?)$/);
     if (practicalMeasure) {
       const count = Number(practicalMeasure[1]);

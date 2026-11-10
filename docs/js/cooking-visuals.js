@@ -358,12 +358,20 @@ window.MW = window.MW || {};
             (typeof sourceStep === 'object' && sourceStep.caption) ||
             'Reference recipe step ' + (Number(index) + 1),
           cue:
-            (typeof sourceStep === 'object' && sourceStep.caption) ||
-            'Use this exact source photograph as a visual check for the current step.',
+            recipe?.source === 'MyWeek Kitchen Originals'
+              ? 'Original illustration. Follow the written method for exact cooking details.'
+              : (typeof sourceStep === 'object' && sourceStep.caption) ||
+                'Use this exact source photograph as a visual check for the current step.',
           src,
           source: recipe.sourceUrl || recipe.recipeSourceUrl || '',
-          imageLicense: 'Reference source image',
-          imageProvenance: 'Exact step photograph from the published recipe source',
+          imageLicense:
+            recipe?.source === 'MyWeek Kitchen Originals'
+              ? 'Original MyWeek illustration'
+              : 'Reference source image',
+          imageProvenance:
+            recipe?.source === 'MyWeek Kitchen Originals'
+              ? 'Original MyWeek step illustration, not a photograph'
+              : 'Exact step photograph from the published recipe source',
         };
     }
     const exact = recipe && MW.referenceMedia && MW.referenceMedia[recipe.id];

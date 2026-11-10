@@ -891,7 +891,8 @@ window.MW = window.MW || {};
     const item = r && MW.sourcedFinalCache && MW.sourcedFinalCache[r.id];
     if (!item || item.role !== 'declared-final' || item.source !== r.sourceImageUrl) return '';
     const extension =
-      item.encodingVersion === 'qa31-webp700-q72'
+      item.encodingVersion === 'qa31-webp700-q72' ||
+      item.encodingVersion === 'qa517-myweek-owned-illustration-webp900'
         ? '.webp'
         : item.encodingVersion === 'qa31-original-jpeg-perceptual-preservation' ||
             ((MW.PRACTICAL_LUNCHES || []).some((meal) => meal.id === r.id) && !item.encodingVersion)
@@ -4419,19 +4420,21 @@ window.MW = window.MW || {};
             esc(r.source || 'online source') +
             '. Ingredient quantities are kept as published.</span></div>'
           : '') +
-        (!r.online && r.sourcedCatalogue && r.sourceUrl
-          ? '<a class="photo-credit" href="' +
-            esc(r.sourceUrl) +
-            '" target="_blank" rel="noopener">Recipe source · ' +
-            esc(r.source || 'Published recipe') +
-            '</a>'
-          : !r.online && r.imageSource && displayRecipeImage(r)
+        (r.source === 'MyWeek Kitchen Originals'
+          ? '<span class="photo-credit">Original MyWeek recipe and illustrations</span>'
+          : !r.online && r.sourcedCatalogue && r.sourceUrl
             ? '<a class="photo-credit" href="' +
-              esc(r.imageSource) +
-              '" target="_blank" rel="noopener">Photo source · ' +
-              esc(r.imageLicense || 'Source') +
+              esc(r.sourceUrl) +
+              '" target="_blank" rel="noopener">Recipe source · ' +
+              esc(r.source || 'Published recipe') +
               '</a>'
-            : '') +
+            : !r.online && r.imageSource && displayRecipeImage(r)
+              ? '<a class="photo-credit" href="' +
+                esc(r.imageSource) +
+                '" target="_blank" rel="noopener">Photo source · ' +
+                esc(r.imageLicense || 'Source') +
+                '</a>'
+              : '') +
         (MW.equipment && MW.equipment.requirements(r).length
           ? '<div class="equipment-note">' +
             icon('utensils') +

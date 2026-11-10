@@ -660,6 +660,16 @@ window.MW = window.MW || {};
     return false;
   }
   function splitMultiplier(recipe, ingredientIndex, step, stepIndex) {
+    // Exact measured splits from owned recipe documents take precedence over
+    // lexical guesses. Historical supplier records remain unchanged.
+    const originalFractions =
+      recipe?.source === 'MyWeek Kitchen Originals'
+        ? recipe.sourceStepQuantityFractions?.[ingredientIndex]
+        : null;
+    if (Array.isArray(originalFractions)) {
+      const fraction = Number(originalFractions[stepIndex]);
+      if (Number.isFinite(fraction) && fraction > 0 && fraction <= 1) return fraction;
+    }
     const row = (recipe.ingredients || [])[ingredientIndex];
     if (!row || openEndedAmount(row[0])) return 1;
     const root = rootToken(recipe, ingredientIndex, step);
@@ -903,6 +913,11 @@ window.MW = window.MW || {};
               /\btomato(?:es)?\b/i.test(name) &&
               !/\b(?:passata|paste|puree|concentrate|sauce|stock|ketchup|dressing)\b/i.test(name),
           );
+        const firstPartyExact =
+          recipe?.source === 'MyWeek Kitchen Originals'
+            ? recipe.sourceStepQuantityFractions?.[ingredientIndex]
+            : null;
+        if (Array.isArray(firstPartyExact) && !(firstPartyExact[stepIndex] > 0)) continue;
         if ((ev.matched || usage) && !falsePassataSalsa)
           hits.push({
             stepIndex,

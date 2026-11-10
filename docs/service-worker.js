@@ -1,5 +1,5 @@
 const CACHE_PREFIX='myweek-shell-v';
-const CACHE=CACHE_PREFIX+'35054';
+const CACHE=CACHE_PREFIX+'35055';
 const MEDIA_CACHE='myweek-media-v1';
 const FIXED_SHELL=[
   './manifest.webmanifest',

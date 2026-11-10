@@ -103,11 +103,14 @@ window.MW = window.MW || {};
       w = s.week || {},
       plan = MW.weeks.currentPlanning(s);
     const unavailableIds = (w.meals || [])
-      .filter((x) => MW.planner?.sourceReviewHold?.(getRecipe(x.recipeId)))
+      .filter((x) => {
+        const recipe = x?.recipeId ? getRecipe(x.recipeId) : null;
+        return x?.recipeId && (!recipe || MW.planner?.sourceReviewHold?.(recipe));
+      })
       .map((x) => x.recipeId);
     return JSON.stringify({
       meals: (w.meals || []).map((x) => [x.day, x.recipeId]),
-      // Invalidate an older basket once a previously saved recipe is held.
+      // Invalidate an older basket once a saved recipe becomes unavailable.
       unavailableIds: unavailableIds.length ? unavailableIds : undefined,
       lunch: w.lunchId || '',
       lunchDays: (plan.lunchDays || []).slice(),
