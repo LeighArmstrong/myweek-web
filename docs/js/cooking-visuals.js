@@ -374,6 +374,13 @@ window.MW = window.MW || {};
               : 'Exact step photograph from the published recipe source',
         };
     }
+    // When an original method has no verified process photograph, show the
+    // complete instructions without any artwork or unrelated stock image.
+    if (
+      (recipe?.source === 'MyWeek Kitchen Originals' || recipe?.source === 'UniTools World Recipes') &&
+      recipe.sourceStepImageCoverage === 'text-only'
+    )
+      return null;
     const exact = recipe && MW.referenceMedia && MW.referenceMedia[recipe.id];
     if (exact && Array.isArray(exact.steps) && exact.steps[index]) {
       return {

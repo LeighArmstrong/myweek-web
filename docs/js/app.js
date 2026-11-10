@@ -344,10 +344,17 @@ window.MW = window.MW || {};
     button.classList.add('is-loading');
     button.disabled = true;
     button.setAttribute('aria-busy', 'true');
-    button.insertAdjacentHTML(
-      'afterbegin',
-      '<i class="fa-solid fa-circle-notch mw-loading-icon" aria-hidden="true"></i>',
-    );
+    // Reuse the button's existing icon rather than inserting a second grid child.
+    // The fixed icon frame stays still while only the loading glyph rotates.
+    const glyph = button.querySelector('i.fa-solid, i.fa-regular');
+    if (glyph) glyph.className = 'fa-solid fa-circle-notch mw-loading-icon';
+    else
+      button.insertAdjacentHTML(
+        'afterbegin',
+        '<i class="fa-solid fa-circle-notch mw-loading-icon" aria-hidden="true"></i>',
+      );
+    const actionGroup = button.id === 'regenerateWeek' ? button.closest('.home-quick-actions') : null;
+    if (actionGroup) actionGroup.classList.add('is-generating');
     requestAnimationFrame(() =>
       setTimeout(async () => {
         try {
@@ -365,6 +372,7 @@ window.MW = window.MW || {};
             button.disabled = false;
             button.classList.remove('is-loading');
             button.removeAttribute('aria-busy');
+            if (actionGroup) actionGroup.classList.remove('is-generating');
           }
         }
       }, 120),
@@ -892,7 +900,13 @@ window.MW = window.MW || {};
     if (!item || item.role !== 'declared-final' || item.source !== r.sourceImageUrl) return '';
     const extension =
       item.encodingVersion === 'qa31-webp700-q72' ||
-      item.encodingVersion === 'qa517-myweek-owned-illustration-webp900'
+      item.encodingVersion === 'qa517-myweek-owned-illustration-webp900' ||
+      item.encodingVersion === 'qa56-attributed-food-photograph-webp900' ||
+      (item.encodingVersion === 'qa56-licensed-source-paired-food-photograph-webp900' &&
+        r.source === 'UniTools World Recipes' &&
+        r.imageQa?.medium === 'photograph' &&
+        r.imageQa.verifiedAssetSha256 === item.sha256 &&
+        /^https:\/\/commons\.wikimedia\.org\/wiki\//.test(r.imageSource))
         ? '.webp'
         : item.encodingVersion === 'qa31-original-jpeg-perceptual-preservation' ||
             ((MW.PRACTICAL_LUNCHES || []).some((meal) => meal.id === r.id) && !item.encodingVersion)
@@ -904,6 +918,9 @@ window.MW = window.MW || {};
     if (!r || (r.imageQa && r.imageQa.status !== 'verified')) return [];
     if (r.personal) return [...new Set([r.sourceImageUrl, r.sourceImageOriginalUrl].filter(Boolean))];
     if (!r.sourcedCatalogue) return [fallbackRecipeImage(r)].filter(Boolean);
+    // The licensed QA56 source pairs must use only their verified local food
+    // photograph. Never fall back to an unchecked remote or unrelated image.
+    if (r.source === 'UniTools World Recipes') return [cachedFinal(r)].filter(Boolean);
     const remote = String(r.sourceImageUrl || '');
     const original = String(r.sourceImageOriginalUrl || '');
     return [
@@ -1018,7 +1035,14 @@ window.MW = window.MW || {};
       );
     if (text.includes('wrap') || text.includes('taco') || text.includes('flatbread'))
       tips.push('Warm the bread briefly just before serving so it stays flexible rather than cracking.');
-    if (text.includes('salmon') || text.includes('cod') || text.includes('fish'))
+    const rawFish = (r.ingredients || []).some((row) => {
+      const ingredient = String(row[1] || '').toLowerCase();
+      return (
+        /\b(salmon|cod|haddock|trout|sea bass|pollock|tuna steak|fish fillet)\b/.test(ingredient) &&
+        !/\b(tinned|canned|smoked|pre-cooked|cooked)\b/.test(ingredient)
+      );
+    });
+    if (rawFish)
       tips.push('Stop cooking once the centre is opaque and flakes easily so the fish stays moist.');
     if (text.includes('slow'))
       tips.push(
@@ -2018,8 +2042,9 @@ window.MW = window.MW || {};
       '<button class="home-action" id="regenerateWeek" ' +
       (deliveryBlocking ? 'disabled title="Complete the delivery first" ' : '') +
       '>' +
+      '<span class="mw-action-icon-frame">' +
       icon('arrows-rotate') +
-      '<span><strong>' +
+      '</span><span><strong>' +
       (meals.length ? 'Generate new meals' : 'Generate my meals') +
       '</strong></span></button>' +
       '<button class="home-action" id="customWeekStart" ' +
@@ -2250,8 +2275,9 @@ window.MW = window.MW || {};
         esc(day(dayKey).label.toUpperCase()) +
         '</span><h1>Choose another dinner</h1></div></section>' +
         '<button class="planner-utility random-pick" id="randomPick">' +
+        '<span class="mw-action-icon-frame">' +
         icon('shuffle') +
-        '<span><strong>Choose one for me</strong><small>Randomly pick from all ' +
+        '</span><span><strong>Choose one for me</strong><small>Randomly pick from all ' +
         randomPool.length +
         ' dinners that match your current settings</small></span><i class="fa-solid fa-chevron-right"></i></button>' +
         '<div class="choice-divider"><span>' +
@@ -2376,8 +2402,9 @@ window.MW = window.MW || {};
         (planned === 1 ? 'lunch' : 'lunches') +
         ' this week</p></div></section>' +
         '<button class="planner-utility random-pick lunch-random" id="randomLunch">' +
+        '<span class="mw-action-icon-frame">' +
         icon('shuffle') +
-        '<span><strong>Choose one for me</strong><small>Pick from ' +
+        '</span><span><strong>Choose one for me</strong><small>Pick from ' +
         randomLunchPool.length +
         ' suitable lunches</small></span><i class="fa-solid fa-chevron-right"></i></button>' +
         '<section class="lunch-swap-filters"><span class="eyebrow">LUNCH STYLE</span>' +
@@ -3372,8 +3399,9 @@ window.MW = window.MW || {};
             (orderedPlan
               ? ''
               : '<div class="day-meal-actions"><button class="btn secondary" id="changeDinner">Change meal</button><button class="day-random" id="randomDinner">' +
+                '<span class="mw-action-icon-frame">' +
                 icon('dice') +
-                '<span><strong>Choose one for me</strong><small>Swap ' +
+                '</span><span><strong>Choose one for me</strong><small>Swap ' +
                 esc(d.label) +
                 ' for another suitable dinner</small></span></button></div>')
           : unavailableDinner
@@ -4421,20 +4449,47 @@ window.MW = window.MW || {};
             '. Ingredient quantities are kept as published.</span></div>'
           : '') +
         (r.source === 'MyWeek Kitchen Originals'
-          ? '<span class="photo-credit">Original MyWeek recipe and illustrations</span>'
-          : !r.online && r.sourcedCatalogue && r.sourceUrl
-            ? '<a class="photo-credit" href="' +
+          ? r.imageQa?.medium === 'photograph'
+            ? '<span class="photo-credit">Original MyWeek recipe · Photograph by <a href="' +
+              esc(r.imageSource) +
+              '" target="_blank" rel="noopener">' +
+              esc(r.imageCredit || 'Photographer') +
+              '</a> · <a href="' +
+              esc(r.imageLicenceUrl) +
+              '" target="_blank" rel="noopener license">' +
+              esc(r.imageLicense) +
+              '</a> · cropped and resized</span>'
+            : '<span class="photo-credit">Original MyWeek recipe and illustrations</span>'
+          : r.source === 'UniTools World Recipes' &&
+              r.imageQa?.medium === 'photograph' &&
+              r.imageSource &&
+              r.imageLicenceUrl
+            ? '<span class="photo-credit">Recipe adapted from <a href="' +
               esc(r.sourceUrl) +
-              '" target="_blank" rel="noopener">Recipe source · ' +
-              esc(r.source || 'Published recipe') +
-              '</a>'
-            : !r.online && r.imageSource && displayRecipeImage(r)
+              '" target="_blank" rel="noopener">UniTools World Recipes</a> under <a href="' +
+              esc(r.recipeLicenceUrl) +
+              '" target="_blank" rel="noopener license">CC BY-SA 4.0</a>. Photograph by <a href="' +
+              esc(r.imageSource) +
+              '" target="_blank" rel="noopener">' +
+              esc(r.imageCredit) +
+              '</a> under <a href="' +
+              esc(r.imageLicenceUrl) +
+              '" target="_blank" rel="noopener license">' +
+              esc(r.imageLicense) +
+              '</a>, cropped and resized.</span>'
+            : !r.online && r.sourcedCatalogue && r.sourceUrl
               ? '<a class="photo-credit" href="' +
-                esc(r.imageSource) +
-                '" target="_blank" rel="noopener">Photo source · ' +
-                esc(r.imageLicense || 'Source') +
+                esc(r.sourceUrl) +
+                '" target="_blank" rel="noopener">Recipe source · ' +
+                esc(r.source || 'Published recipe') +
                 '</a>'
-              : '') +
+              : !r.online && r.imageSource && displayRecipeImage(r)
+                ? '<a class="photo-credit" href="' +
+                  esc(r.imageSource) +
+                  '" target="_blank" rel="noopener">Photo source · ' +
+                  esc(r.imageLicense || 'Source') +
+                  '</a>'
+                : '') +
         (MW.equipment && MW.equipment.requirements(r).length
           ? '<div class="equipment-note">' +
             icon('utensils') +

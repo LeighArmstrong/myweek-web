@@ -51,7 +51,6 @@ window.MW = window.MW || {};
     'originalTwoPersonIngredientsVerified',
     'allergenAndDietVerified',
     'allUKAndAUMarketsVerified',
-    'originalDishAndStepImagesVerified',
     'safetyReviewed',
     'noNearDuplicateVerified',
     'sourceContentReuseAuthorised',
@@ -103,11 +102,27 @@ window.MW = window.MW || {};
       review?.originalImageAuthor &&
       typeof review.originalImageAuthor === 'string' &&
       review.originalImageAuthor.trim().length >= 3;
-    // MyWeek owns its newly authored recipe text and original illustrations.
-    // These are not third-party photographs or unlicensed supplier copies.
+    // MyWeek owns the original recipe text. Dish media must independently
+    // prove either first-party artwork or an individually licensed photograph.
     const ownedSource = String(recipe.sourceUrl || '').match(
       /^https:\/\/github\.com\/LeighArmstrong\/myweek-app\/blob\/([a-f0-9]{40})\/docs\/recipes\/(mw-original-2026-[0-9]{3})\.md$/,
     );
+    const illustrationOwned =
+      review?.firstPartyOriginalMedia === true &&
+      review?.originalMediaOwnershipVerified === true &&
+      review?.firstPartyMediaType === 'illustration' &&
+      recipe.imageQa?.medium === 'illustration';
+    const licensedPhotoOwned =
+      review?.firstPartyOriginalMedia === false &&
+      review?.originalMediaOwnershipVerified === false &&
+      review?.licensedFoodPhotoUseVerified === true &&
+      review?.firstPartyMediaType === 'licensed-photograph' &&
+      recipe.imageQa?.medium === 'photograph' &&
+      ['CC BY 2.0', 'CC BY-SA 2.0', 'CC0 1.0'].includes(recipe.imageLicense) &&
+      recipe.imageSource?.startsWith('https://www.flickr.com/photos/') &&
+      recipe.imageCredit?.length > 2 &&
+      recipe.imageLicenceUrl?.startsWith('https://creativecommons.org/') &&
+      review?.photoRightsEvidence?.includes(recipe.imageSource) === true;
     const firstPartyOriginal =
       recipe.source === 'MyWeek Kitchen Originals' &&
       /^mw-original-2026-[0-9]{3}$/.test(String(recipe.id)) &&
@@ -116,11 +131,40 @@ window.MW = window.MW || {};
       ownedSource[2] === recipe.id &&
       recipe.sourceImageUrl === 'assets/images/sourced-final/' + recipe.id + '.webp' &&
       review?.firstPartyOriginalRecipe === true &&
-      review?.firstPartyOriginalMedia === true &&
-      review?.originalMediaOwnershipVerified === true &&
-      review?.firstPartyMediaType === 'illustration' &&
+      (illustrationOwned || licensedPhotoOwned) &&
       review?.firstPartySourceCommit === ownedSource[1] &&
       /^[a-f0-9]{64}$/.test(String(review?.sourceTextSha256 || ''));
+
+    // A complete source and its real Commons photograph require separate
+    // licences, original author proof and the exact pinned source recipe.
+    const curatedPairedSource =
+      recipe.source === 'UniTools World Recipes' &&
+      /^ut-[a-z0-9-]+$/.test(String(recipe.id)) &&
+      recipe.id === 'ut-' + recipe.sourceId &&
+      recipe.sourceUrl === 'https://theunitools.com/data/unitools-recipes-v1.json#' + recipe.sourceId &&
+      recipe.sourceImageUrl === 'assets/images/sourced-final/' + recipe.id + '.webp' &&
+      recipe.recipeLicence === 'CC BY-SA 4.0' &&
+      recipe.recipeLicenceUrl === 'https://creativecommons.org/licenses/by-sa/4.0/' &&
+      recipe.sourceDatasetSha256 === '41fdc0572b7272ca557d2df22a0fac1cc1f18146e97ebd2c8258c395daf87d8a' &&
+      recipe.sourceDatasetSha256 === review?.sourceDatasetSha256 &&
+      /^[a-f0-9]{64}$/.test(String(recipe.sourceRecipeHash || '')) &&
+      recipe.sourceRecipeHash === review?.sourceRecipeSha256 &&
+      review?.independentSourceLicensed === true &&
+      review?.originalImageRightsIndependentlyConfirmed === true &&
+      review?.originalPhotoAuthorVerified === true &&
+      review?.photoExactDishVerified === true &&
+      review?.photoRightsVerified === true &&
+      review?.photoCreditPresented === true &&
+      review?.verifiedCookingStepsTextOnly === true &&
+      /^https:\/\/commons\.wikimedia\.org\/wiki\/File%3A/.test(String(recipe.imageSource || '')) &&
+      recipe.imageSource === review?.originalImageURL &&
+      recipe.imageLicense === review?.photoLicence &&
+      recipe.imageLicenceUrl === review?.photoLicenceURL &&
+      recipe.imageLicenceUrl?.startsWith('https://creativecommons.org/') &&
+      recipe.imageCredit === review?.originalPhotoAuthor &&
+      recipe.imageCredit?.trim().length >= 2 &&
+      recipe.imageQa?.medium === 'photograph' &&
+      review?.photoRightsEvidence?.includes(recipe.imageSource) === true;
     const imageFile = 'assets/images/sourced-final/' + recipe.id + '.webp';
     const imageValid =
       cache &&
@@ -148,7 +192,12 @@ window.MW = window.MW || {};
             /^[a-f0-9]{64}$/.test(item.originalSourceLineSHA256) &&
             Number.isInteger(item.originalSourceLineNumber) &&
             item.originalSourceLineNumber > 0) ||
-            (!independentOpenSource &&
+            (curatedPairedSource &&
+              Number.isInteger(item.sourceRecipeIngredientIndex) &&
+              item.sourceRecipeIngredientIndex >= 0 &&
+              /^[a-f0-9]{64}$/.test(String(item.sourceItemSHA256 || ''))) ||
+            (!curatedPairedSource &&
+              !independentOpenSource &&
               !firstPartyOriginal &&
               typeof item.originalSourceSku === 'string' &&
               item.originalSourceSku.length > 10 &&
@@ -161,6 +210,10 @@ window.MW = window.MW || {};
       review.id === recipe.id &&
       review.status === 'verified' &&
       required.every((field) => review[field] === true) &&
+      (review.originalDishAndStepImagesVerified === true ||
+        ((firstPartyOriginal || curatedPairedSource) &&
+          recipe.sourceStepImageCoverage === 'text-only' &&
+          review.verifiedCookingStepsTextOnly === true)) &&
       typeof review.contentRightsEvidence === 'string' &&
       review.contentRightsEvidence.trim().length >= 12 &&
       typeof review.photoRightsEvidence === 'string' &&
@@ -168,8 +221,8 @@ window.MW = window.MW || {};
       review.imageCacheSha256 === cache?.sha256 &&
       review.sourceUrl === recipe.sourceUrl &&
       review.sourceUid === recipe.sourceId &&
-      (exactSupplier || independentOpenRights || firstPartyOriginal) &&
-      (firstPartyOriginal || review.supplierPhotoRedistributionAuthorised === true) &&
+      (exactSupplier || independentOpenRights || firstPartyOriginal || curatedPairedSource) &&
+      (firstPartyOriginal || curatedPairedSource || review.supplierPhotoRedistributionAuthorised === true) &&
       imageValid &&
       exactRows &&
       recipe.sourcedCatalogue === true &&
@@ -194,8 +247,8 @@ window.MW = window.MW || {};
       recipe.sourceStepImages.every(
         (step, i) =>
           step &&
-          (firstPartyOriginal
-            ? step.src === 'assets/images/myweek-original-steps/' + recipe.id + '-step-' + (i + 1) + '.webp'
+          ((firstPartyOriginal || curatedPairedSource) && recipe.sourceStepImageCoverage === 'text-only'
+            ? step.src === '' && step.imageProvenance === 'text-only'
             : /^https:\/\//.test(String(step.src))),
       ) &&
       Array.isArray(recipe.sourceEquipment) &&
