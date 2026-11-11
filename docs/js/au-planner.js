@@ -85,7 +85,7 @@ window.MW = window.MW || {};
   };
   // An existing alias must never bypass the country completeness guard.
   planner.rebuildForSavings = (...args) => planner.rebuildForPriceMode(true, ...args);
-  planner.enforceGeneratedBudget = (context) => {
+  planner.enforceGeneratedBudget = (context, options) => {
     if (blocked()) {
       const s = MW.state.get(),
         result = guardedStatus();
@@ -157,6 +157,6 @@ window.MW = window.MW || {};
         return result;
       }
     }
-    return original.enforceGeneratedBudget(context);
+    return original.enforceGeneratedBudget(context, options);
   };
 })();

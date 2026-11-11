@@ -148,6 +148,23 @@ window.MW = window.MW || {};
         return out;
       }
     }
+    // Generated-meal history is an ordered set of recipe identifiers. Two
+    // devices may generate different plans before syncing, so merge their
+    // unique IDs instead of flagging an unkeyed-array conflict. Ordinary
+    // arrays such as chosen dinner days retain their explicit conflict rules.
+    const generatedHistoryLimit =
+      path === 'state.preferences.recentGeneratedDinners'
+        ? 60
+        : path === 'state.preferences.recentGeneratedLunches'
+          ? 16
+          : 0;
+    if (generatedHistoryLimit && Array.isArray(local) && Array.isArray(remote)) {
+      return [
+        ...new Set(
+          [...local, ...remote].filter((id) => typeof id === 'string' && id.length > 0 && id.length <= 200),
+        ),
+      ].slice(0, generatedHistoryLimit);
+    }
     conflicts.push(path || 'data');
     return local === undefined ? undefined : clone(local);
   }

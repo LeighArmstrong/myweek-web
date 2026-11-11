@@ -22,20 +22,29 @@ window.MW = window.MW || {};
     const match = src.match(/_UK_([^_/?#]+)_/i);
     return match ? match[1].toLowerCase() : '';
   };
-  const titleTokens = (r) =>
-    String((r && r.title) || '')
-      .toLowerCase()
-      .match(/[a-z0-9]+/g) || [];
+  const titleStopWords = new Set(['with', 'and', 'the', 'a', 'an', 'style', 'of', 'in', 'on', 'your', 'our']);
+  const titleWordCache = new WeakMap();
+  const titleInfo = (r) => {
+    const title = String((r && r.title) || '');
+    if (r && typeof r === 'object') {
+      const cached = titleWordCache.get(r);
+      if (cached && cached.title === title) return cached;
+    }
+    const tokens = title.toLowerCase().match(/[a-z0-9]+/g) || [];
+    const info = { title, tokens, significant: new Set(tokens.filter((x) => !titleStopWords.has(x))) };
+    if (r && typeof r === 'object') titleWordCache.set(r, info);
+    return info;
+  };
+  const titleTokens = (r) => titleInfo(r).tokens;
   const titleSimilarity = (a, b) => {
-    const stop = new Set(['with', 'and', 'the', 'a', 'an', 'style', 'of', 'in', 'on', 'your', 'our']);
-    const aa = new Set(titleTokens(a).filter((x) => !stop.has(x)));
-    const bb = new Set(titleTokens(b).filter((x) => !stop.has(x)));
+    const aa = titleInfo(a).significant;
+    const bb = titleInfo(b).significant;
     if (!aa.size || !bb.size) return 0;
     let shared = 0;
     aa.forEach((x) => {
       if (bb.has(x)) shared++;
     });
-    const union = new Set([...aa, ...bb]).size;
+    const union = aa.size + bb.size - shared;
     return union ? shared / union : 0;
   };
   const isNearClone = (recipe, chosen) =>
@@ -583,18 +592,20 @@ window.MW = window.MW || {};
     return { profiles, families, formats, primaries, images, usedIngredients };
   }
 
-  function candidateScore(recipe, chosen, priceMode, context) {
+  function candidateScore(recipe, chosen, priceMode, context, prepared) {
     const s = MW.state.get();
     const { profiles, families, formats, primaries, images, usedIngredients } =
       context || scoringContext(chosen);
-    const p = flavourProfile(recipe),
-      family = flavourFamily(recipe),
-      fmt = formatKey(recipe),
-      main = mainKey(recipe),
-      img = visualKey(recipe);
-    const overlap = (recipe.ingredients || []).filter((x) => usedIngredients.has(norm(x[1]))).length;
+    const p = prepared ? prepared.profile : flavourProfile(recipe),
+      family = prepared ? prepared.family : flavourFamily(recipe),
+      fmt = prepared ? prepared.format : formatKey(recipe),
+      main = prepared ? prepared.protein : mainKey(recipe),
+      img = prepared ? prepared.image : visualKey(recipe);
+    const overlap = prepared
+      ? prepared.ingredients.filter((x) => usedIngredients.has(x)).length
+      : (recipe.ingredients || []).filter((x) => usedIngredients.has(norm(x[1]))).length;
     const overlapBonus = (priceMode ? 0.25 : 0.06) * Math.min(overlap, 4);
-    const estimatedRecipeCost = priceOf(recipe);
+    const estimatedRecipeCost = prepared ? prepared.estimatedCost : priceOf(recipe);
     // Unknown AU ingredients must never masquerade as a free, cheap dinner.
     const incompleteAU = priceMode && MW.markets?.current() === 'AU' && !Number.isFinite(estimatedRecipeCost);
     const costPenalty = incompleteAU ? 1000 : (Number(estimatedRecipeCost) || 0) * (priceMode ? 0.16 : 0.018);
@@ -603,9 +614,9 @@ window.MW = window.MW || {};
     const formatPenalty = fmt ? (formats[fmt] || 0) * 0.75 : 0;
     const primaryPenalty = Math.max(0, (primaries[main] || 0) - 1) * 1.4;
     const imagePenalty = img ? (images[img] || 0) * 3.2 : 0;
-    const foodScore = MW.food ? MW.food.score(recipe, s.foodProfile) : 0;
+    const foodScore = prepared ? prepared.foodScore : MW.food ? MW.food.score(recipe, s.foodProfile) : 0;
     return (
-      MW.learning.score(recipe) +
+      (prepared ? prepared.learningScore : MW.learning.score(recipe)) +
       foodScore +
       overlapBonus -
       costPenalty -
@@ -643,20 +654,43 @@ window.MW = window.MW || {};
     // 'Anything' means a mixture rather than mostly meat substitutes.
     // A vegetarian or pescatarian preference is always honoured instead.
     const profile = MW.state.get().foodProfile || {};
+    // Per-generation facts do not change when another dinner is selected.
+    // Calculate them once instead of scoring all 3,000 dishes again for each
+    // planned day. The map is discarded at the end of this generation.
+    const prepared = new Map(
+      pool.map((r) => [
+        r,
+        {
+          profile: flavourProfile(r),
+          family: flavourFamily(r),
+          format: formatKey(r),
+          protein: mainKey(r),
+          image: visualKey(r),
+          category: categoryFor(r),
+          vibe: vibeKey(r),
+          hasMeatOrFish: meaty(r),
+          ingredients: (r.ingredients || []).map((x) => norm(x[1])),
+          estimatedCost: priceOf(r),
+          foodScore: MW.food ? MW.food.score(r, profile) : 0,
+          learningScore: MW.learning.score(r),
+        },
+      ]),
+    );
     const plantFriendly =
       ['vegetarian', 'vegan', 'pescatarian'].includes(profile.diet) ||
       (profile.goals || []).includes('more-veg');
     const limitPlant =
       profile.diet === 'omnivore' &&
       !plantFriendly &&
-      pool.filter(meaty).length + fixed.filter(meaty).length >= (opts.totalCount || count);
+      pool.filter((r) => prepared.get(r).hasMeatOrFish).length + fixed.filter(meaty).length >=
+        (opts.totalCount || count);
     const plantLimit = Math.max(1, Math.ceil((opts.totalCount || count) / 3));
     // If pasta is allowed and several dinners are needed, include a pasta dish
     // instead of letting a few high-scoring recipe families crowd it out.
     const pastaSlot =
       (opts.totalCount || count) >= 4 &&
       !fixed.some((r) => categoryFor(r) === 'pasta') &&
-      pool.some((r) => categoryFor(r) === 'pasta')
+      pool.some((r) => prepared.get(r).category === 'pasta')
         ? Math.floor(Math.random() * Math.min(3, count))
         : -1;
     while (chosen.length < count && chosen.length < pool.length) {
@@ -675,19 +709,19 @@ window.MW = window.MW || {};
       }, {});
       for (const r of pool) {
         if (chosen.includes(r)) continue;
-        const image = visualKey(r);
+        const facts = prepared.get(r);
         ranked.push({
           recipe: r,
-          score: candidateScore(r, contextRecipes, priceMode, context),
-          repeatsImage: Boolean(image && usedImages.has(image)),
-          repeatsProtein: Boolean(proteinCounts[mainKey(r)]),
-          overusedProtein: (proteinCounts[mainKey(r)] || 0) >= 2,
+          score: candidateScore(r, contextRecipes, priceMode, context, facts),
+          repeatsImage: Boolean(facts.image && usedImages.has(facts.image)),
+          repeatsProtein: Boolean(proteinCounts[facts.protein]),
+          overusedProtein: (proteinCounts[facts.protein] || 0) >= 2,
           nearClone: isNearClone(r, contextRecipes),
-          repeatsCategory: usedCategories.has(categoryFor(r)),
-          repeatsVibe: chosenVibes.has(vibeKey(r)),
-          repeatsPriorVibe: priorVibes.has(vibeKey(r)),
-          exceedsPlantPreference: limitPlant && plantsChosen >= plantLimit && !meaty(r),
-          adjacentPlant: !plantFriendly && lastWasPlant && !meaty(r),
+          repeatsCategory: usedCategories.has(facts.category),
+          repeatsVibe: chosenVibes.has(facts.vibe),
+          repeatsPriorVibe: priorVibes.has(facts.vibe),
+          exceedsPlantPreference: limitPlant && plantsChosen >= plantLimit && !facts.hasMeatOrFish,
+          adjacentPlant: !plantFriendly && lastWasPlant && !facts.hasMeatOrFish,
         });
       }
       ranked.sort((a, b) => {
@@ -842,8 +876,13 @@ window.MW = window.MW || {};
     return shortlist.length ? shortlist : ranked.slice(0, 12);
   }
 
-  function randomLunchAlternative(currentId) {
-    const pool = randomLunchPool(currentId);
+  function randomLunchAlternative(currentId, excludedIds = []) {
+    const available = randomLunchPool(currentId);
+    // Recent lunches should not recur simply because the same practical
+    // shortlist wins again; relax this preference only if nothing remains.
+    const excluded = new Set(excludedIds);
+    const fresh = available.filter((recipe) => !excluded.has(recipe.id));
+    const pool = fresh.length ? fresh : available;
     if (!pool.length) return null;
     const groups = new Map();
     for (const lunch of pool) {
@@ -878,9 +917,9 @@ window.MW = window.MW || {};
     MW.state.save();
   }
 
-  function enforceGeneratedBudget(context) {
+  function enforceGeneratedBudget(context, options) {
     const enforce = MW.planner && MW.planner.enforceGeneratedBudget;
-    return typeof enforce === 'function' ? enforce(context) : null;
+    return typeof enforce === 'function' ? enforce(context, options) : null;
   }
 
   function constraintSummary() {
@@ -966,6 +1005,9 @@ window.MW = window.MW || {};
         throw new Error('Complete the current delivery before generating another week.');
       if (previous.weekKey && !sameWeek) MW.weeks.archive(s, previous);
       const previousIds = (previous.meals || []).map((x) => x.recipeId).filter(Boolean);
+      const recentDinners = s.preferences?.recentGeneratedDinners || [];
+      const recentLunches = s.preferences?.recentGeneratedLunches || [];
+      const generationExclusions = [...new Set([...previousIds, ...recentDinners])];
       const carriedByDay =
         opts.keepUnfinished && !sameWeek ? keepUnfinishedForDays(previous, dinnerDays) : new Map();
       const fixedRecipes = [...carriedByDay.values()].map(getRecipe);
@@ -975,7 +1017,7 @@ window.MW = window.MW || {};
         );
       const freshCount = dinnerDays.length - fixedRecipes.length;
       const chosen = choose(freshCount, Boolean(s.plan.priceMode), {
-        excludeIds: previousIds,
+        excludeIds: generationExclusions,
         excludeVibes: (previous.meals || [])
           .map((m) => getRecipe(m.recipeId))
           .filter(Boolean)
@@ -995,7 +1037,9 @@ window.MW = window.MW || {};
         Number(previous.preparedLunchPortions?.[previous.lunchId] || 0) < lunchGoal;
       const priorLunch = pendingLunch && getRecipe(previous.lunchId);
       const lunch =
-        priorLunch && lunchAllowed(priorLunch) ? priorLunch : randomLunchAlternative(previous.lunchId);
+        priorLunch && lunchAllowed(priorLunch)
+          ? priorLunch
+          : randomLunchAlternative(previous.lunchId, recentLunches);
       if ((s.plan.lunchDays || []).length && !lunch) throw new Error(lunchEligibilityFailureMessage());
       const hadShop = Boolean(previous.shop);
 
@@ -1023,17 +1067,15 @@ window.MW = window.MW || {};
         shopProgress: sameWeek ? previous.shopProgress || null : null,
       };
       if (!sameWeek) s.ui.shopChecks = {};
-      MW.state.log('week_regenerated', {
-        previousRecipeIds: previousIds,
-        recipeIds: s.week.meals.map((x) => x.recipeId),
-        previousLunchId: previous.lunchId || '',
-        lunchId: s.week.lunchId || '',
+      // The budget rescue must see the same history as the ordinary picker.
+      // Pass exclusions explicitly rather than saving a temporary field in
+      // the user's week while the optimiser is running.
+      enforceGeneratedBudget('regenerate', {
+        excludeIds: generationExclusions,
+        mustExcludeIds: previousIds,
+        excludeLunchIds: recentLunches,
+        keepLunch: Boolean(priorLunch && lunch === priorLunch),
       });
-      MW.state.save();
-      s.week.regenerationExcludedIds = previousIds;
-      enforceGeneratedBudget('regenerate');
-      delete s.week.regenerationExcludedIds;
-      MW.state.save();
       if (
         carriedByDay.size &&
         [...carriedByDay].some(([day, id]) => !s.week.meals.some((m) => m.day === day && m.recipeId === id))
@@ -1051,6 +1093,22 @@ window.MW = window.MW || {};
         );
       if (hadShop && opts.rebuildShop !== false && MW.shopping)
         MW.shopping.build({ savingMode: Boolean(s.plan.priceMode), preserveChecks: true });
+      // Record only the final, budget-verified meals. A failed generation
+      // leaves this history untouched and the previous week is restored.
+      const finalIds = s.week.meals.map((meal) => meal.recipeId);
+      s.preferences.recentGeneratedDinners = [
+        ...new Set([...finalIds, ...previousIds, ...recentDinners]),
+      ].slice(0, 60);
+      s.preferences.recentGeneratedLunches = [
+        ...new Set([s.week.lunchId, previous.lunchId, ...recentLunches].filter(Boolean)),
+      ].slice(0, 16);
+      MW.state.log('week_regenerated', {
+        previousRecipeIds: previousIds,
+        recipeIds: finalIds,
+        previousLunchId: previous.lunchId || '',
+        lunchId: s.week.lunchId || '',
+      });
+      MW.state.save();
       return s.week;
     } catch (error) {
       restorePlanningState(s, snapshot);
@@ -1620,32 +1678,77 @@ window.MW = window.MW || {};
     // Rank broadly with the lightweight recipe cost model, then use exact basket
     // pricing only for complete candidate weeks. Exact totals still decide success.
     const excludedIds = new Set(options.excludeIds || MW.state.get().week?.regenerationExcludedIds || []);
-    const priced = MW.RECIPES.filter((r) => planner.autoDinnerAllowed(r) && !excludedIds.has(r.id))
-      .map((r) => ({
-        r,
-        cost: valueCost(r),
-        premium: premiumPenalty(r),
-      }))
-      .sort((a, b) => a.cost + a.premium * 1.15 - (b.cost + b.premium * 1.15))
-      .slice(0, Math.min(220, MW.RECIPES.length));
+    // Each lunch budget candidate uses the same dinner eligibility, costs and
+    // variety search. Share that search only within this single plan attempt;
+    // the actual basket price is still recalculated for each lunch choice.
+    const searchKey = [days.length, savingMode, [...excludedIds].sort().join('|')].join(':');
+    const searchCache = options.searchCache;
+    let search = searchCache?.get(searchKey);
+    if (!search) {
+      const priced = MW.RECIPES.filter((r) => planner.autoDinnerAllowed(r) && !excludedIds.has(r.id))
+        .map((r) => ({
+          r,
+          cost: valueCost(r),
+          premium: premiumPenalty(r),
+        }))
+        .sort((a, b) => a.cost + a.premium * 1.15 - (b.cost + b.premium * 1.15))
+        .slice(0, 700);
+      // The cheapest 220 dinners repeatedly produce the same handful of
+      // budget weeks. Adjacent price bands contain other fully affordable
+      // combinations, so search several 220-recipe windows rather than
+      // repeatedly ranking the same small set or scoring all 3,000 at once.
+      const offsets = [0, 75, 150, 225, 300, 450].filter((start) => start + days.length <= priced.length);
+      if (options.randomise && !savingMode) {
+        // Only ordinary regeneration shuffles price bands. Lower-cost
+        // planning still checks the cheapest window first.
+        for (let i = offsets.length - 1; i > 1; i--) {
+          const j = 1 + Math.floor(Math.random() * i);
+          [offsets[i], offsets[j]] = [offsets[j], offsets[i]];
+        }
+        if (offsets.length > 1) offsets.push(offsets.shift());
+      }
+      search = {
+        windows: offsets.map((offset) => ({ priced: priced.slice(offset, offset + 220), plans: [] })),
+        firstSeed: options.randomise ? Math.floor(Math.random() * 1000000000) : 1000,
+      };
+      searchCache?.set(searchKey, search);
+    }
 
-    let best = null;
-    const consider = (recipes) => {
-      if (recipes.length !== days.length || !relaxedBudgetVariety(recipes)) return;
-      const estimate = basketEstimate(
-        days.map((d, i) => ({ day: d, recipeId: recipes[i].id })),
-        { savingMode, lunchId },
-      );
-      if (estimate.unresolved > maxUnresolved) return;
-      if (!best || estimate.total < best.estimate.total)
-        best = { recipes: recipes.slice(), estimate, lunchId };
-    };
-
-    for (let seed = 0; seed < 18; seed++) consider(candidateSet(priced, days.length, 1000 + seed, seed < 12));
-    if (!best) consider(priced.slice(0, days.length).map((x) => x.r));
+    let best = options.initial || null;
+    if (!best) {
+      const consider = (recipes, window) => {
+        if (recipes.length !== days.length || !relaxedBudgetVariety(recipes)) return;
+        const estimate = basketEstimate(
+          days.map((d, i) => ({ day: d, recipeId: recipes[i].id })),
+          { savingMode, lunchId },
+        );
+        if (estimate.unresolved > maxUnresolved) return;
+        if (!best || estimate.total < best.estimate.total)
+          best = { recipes: recipes.slice(), estimate, lunchId, window };
+      };
+      // Reuse the same shortlist across lunches. Search before refining:
+      // refining an unaffordable week for every lunch is unnecessarily slow.
+      for (const window of search.windows) {
+        for (let seed = 0; seed < (savingMode ? 18 : 12); seed++) {
+          if (!window.plans[seed])
+            window.plans[seed] = candidateSet(window.priced, days.length, search.firstSeed + seed, seed < 9);
+          consider(window.plans[seed], window);
+          if (!savingMode && seed >= 2 && best && best.estimate.total <= budget + 0.001) break;
+        }
+        if (best && best.estimate.total <= budget + 0.001) break;
+      }
+      if (!best && search.windows.length) {
+        const window = search.windows[0];
+        consider(
+          window.priced.slice(0, days.length).map((x) => x.r),
+          window,
+        );
+      }
+    }
+    if (options.probeOnly) return best;
     if (!best) return null;
 
-    const pool = priced.slice(0, 110).map((x) => x.r);
+    const pool = best.window.priced.slice(0, 110).map((x) => x.r);
     let working = best.recipes.slice(),
       workingEstimate = best.estimate;
     for (
@@ -1675,7 +1778,7 @@ window.MW = window.MW || {};
       workingEstimate = swap.estimate;
     }
     if (workingEstimate.total < best.estimate.total)
-      best = { recipes: working, estimate: workingEstimate, lunchId };
+      best = { recipes: working, estimate: workingEstimate, lunchId, window: best.window };
     return best.estimate.total <= budget + 0.001 ? best : null;
   }
 
@@ -1736,27 +1839,75 @@ window.MW = window.MW || {};
     const maxUnresolved = baseline.unresolved;
     const lunchDays = (s.plan.lunchDays || []).length;
     let lunchIds = lunchDays ? [currentLunchId] : [null];
-    if (lunchDays) {
+    if (lunchDays && !options.keepLunch) {
       const ranked = MW.LUNCHES.filter((l) => planner.autoLunchAllowed(l))
         .map((l) => ({
           id: l.id,
           estimate: basketEstimate([], { savingMode, lunchId: l.id }),
         }))
         .filter((x) => x.estimate.unresolved <= maxUnresolved)
-        .sort((a, b) => a.estimate.total - b.estimate.total)
-        .slice(0, 12)
-        .map((x) => x.id);
-      lunchIds = [...new Set([currentLunchId, ...ranked].filter(Boolean))];
+        .sort((a, b) => a.estimate.total - b.estimate.total);
+      const recent = new Set(options.excludeLunchIds || []);
+      const fresh = ranked.filter((x) => !recent.has(x.id)).slice(0, 10);
+      const previouslyOffered = ranked.filter((x) => recent.has(x.id)).slice(0, 8);
+      const currentFloor = ranked.find((x) => x.id === currentLunchId)?.estimate.total ?? Infinity;
+      // When an expensive random lunch makes every fresh dinner set exceed the
+      // budget, test genuinely new affordable lunches before exhausting the
+      // dinner search against that unnecessarily expensive lunch.
+      const preferCurrent = !options.randomise || currentFloor <= (fresh[0]?.estimate.total ?? Infinity) + 2;
+      lunchIds = [
+        ...new Set(
+          [
+            ...(preferCurrent ? [currentLunchId] : []),
+            ...fresh.map((x) => x.id),
+            ...(!preferCurrent ? [currentLunchId] : []),
+            ...previouslyOffered.map((x) => x.id),
+          ].filter(Boolean),
+        ),
+      ];
     }
-    let best = null;
-    for (const lunchId of lunchIds) {
-      const rescue = budgetRescue(days, budget, maxUnresolved, { savingMode, lunchId });
-      if (!rescue) continue;
-      if (lunchId === currentLunchId) {
-        best = rescue;
-        break;
+    const searchCache = new Map();
+    const rescueWithExclusions = (excludeIds) => {
+      const common = {
+        savingMode,
+        excludeIds,
+        randomise: Boolean(options.randomise),
+        searchCache,
+      };
+      const overBudget = [];
+      for (const lunchId of lunchIds) {
+        const probe = budgetRescue(days, budget, maxUnresolved, {
+          ...common,
+          lunchId,
+          probeOnly: true,
+        });
+        if (!probe) continue;
+        // A fully priced affordable week needs no expensive greedy swaps.
+        if (probe.estimate.total <= budget + 0.001) return probe;
+        overBudget.push(probe);
       }
-      if (!best || rescue.estimate.total < best.estimate.total) best = rescue;
+      // Only refine the nearest affordable candidates first; formerly every
+      // unsuccessful lunch triggered a complete nested basket swap search.
+      overBudget.sort((a, b) => a.estimate.total - b.estimate.total);
+      for (const candidate of overBudget.slice(0, options.randomise ? 3 : overBudget.length)) {
+        const rescue = budgetRescue(days, budget, maxUnresolved, {
+          ...common,
+          lunchId: candidate.lunchId,
+          initial: candidate,
+        });
+        if (rescue) return rescue;
+      }
+      return null;
+    };
+    let best = rescueWithExclusions(options.excludeIds);
+    // A restrictive allergy, equipment or budget combination may exhaust the
+    // recent-history pool. Relax the oldest history before allowing a failed
+    // generation, always excluding the current week's original dinners.
+    if (!best && Array.isArray(options.excludeIds) && options.excludeIds.length) {
+      const essential = options.mustExcludeIds || [];
+      const recent = [...new Set([...essential, ...options.excludeIds.slice(0, 25)])];
+      if (recent.length < options.excludeIds.length) best = rescueWithExclusions(recent);
+      if (!best && recent.length > essential.length) best = rescueWithExclusions(essential);
     }
     if (!best) {
       return {
@@ -2097,7 +2248,7 @@ window.MW = window.MW || {};
   };
   planner.rebuildForSavings = planner.rebuildForPriceMode.bind(planner, true);
 
-  function enforceGeneratedBudget(context) {
+  function enforceGeneratedBudget(context, options = {}) {
     const s = MW.state.get();
     if (!basketEngineAvailable())
       return {
@@ -2109,7 +2260,14 @@ window.MW = window.MW || {};
         overBudgetBy: 0,
         reason: 'basket-engine-unavailable',
       };
-    const result = hardBudgetPlan({ savingMode: Boolean(s.plan.priceMode) });
+    const result = hardBudgetPlan({
+      savingMode: Boolean(s.plan.priceMode),
+      excludeIds: options.excludeIds,
+      mustExcludeIds: options.mustExcludeIds,
+      excludeLunchIds: options.excludeLunchIds,
+      keepLunch: options.keepLunch,
+      randomise: context === 'regenerate',
+    });
     if (!result.metBudget) {
       MW.state.log('hard_budget_failed', {
         context,

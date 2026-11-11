@@ -36,7 +36,13 @@ window.MW = window.MW || {};
         lunchStyle: 'any',
         lunchStyles: ['any'],
       },
-      preferences: { scores: {}, recentMeals: [], favourites: {} },
+      preferences: {
+        scores: {},
+        recentMeals: [],
+        recentGeneratedDinners: [],
+        recentGeneratedLunches: [],
+        favourites: {},
+      },
       // Never assume a new household has starter stock that it has not confirmed.
       inventory: {},
       pantry: {},
@@ -124,6 +130,16 @@ window.MW = window.MW || {};
     x.preferences = x.preferences || { scores: {}, recentMeals: [] };
     x.preferences.scores = x.preferences.scores || {};
     x.preferences.recentMeals = Array.isArray(x.preferences.recentMeals) ? x.preferences.recentMeals : [];
+    // Keep recent offered meals distinct across repeated regenerations, with a
+    // bounded history that remains valid when upgrading older saved accounts.
+    const recentGenerated = (value, limit) =>
+      Array.isArray(value)
+        ? [
+            ...new Set(value.filter((id) => typeof id === 'string' && id.length > 0 && id.length <= 200)),
+          ].slice(0, limit)
+        : [];
+    x.preferences.recentGeneratedDinners = recentGenerated(x.preferences.recentGeneratedDinners, 60);
+    x.preferences.recentGeneratedLunches = recentGenerated(x.preferences.recentGeneratedLunches, 16);
     if (!isObject(x.preferences.favourites)) x.preferences.favourites = {};
     x.preferences.favourites = Object.fromEntries(
       Object.entries(x.preferences.favourites)
@@ -306,7 +322,7 @@ window.MW = window.MW || {};
       ['household', ['restrictions', 'dislikes', 'equipment']],
       ['plan', ['dinnerDays', 'lunchDays']],
       ['foodProfile', ['goals', 'allergens']],
-      ['preferences', ['recentMeals']],
+      ['preferences', ['recentMeals', 'recentGeneratedDinners', 'recentGeneratedLunches']],
       ['week', ['meals', 'extras', 'forceBuy', 'completedRecipes']],
     ]) {
       for (const key of keys) {
