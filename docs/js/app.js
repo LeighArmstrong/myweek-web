@@ -11,6 +11,8 @@ window.MW = window.MW || {};
   let libraryFilterEvents = null;
   MW.onboarding.startViewport();
   const navStack = [];
+  // UI-only category folds, retained when shopping ticks redraw the current screen.
+  const collapsedShopCategories = new Set();
   // The last main tab remains the directional reference while a header shortcut
   // (Favourites, Account or Settings) is open.
   let lastMainTabIndex = null;
@@ -2686,9 +2688,11 @@ window.MW = window.MW || {};
       );
     };
     const groupHtml = (g) =>
-      '<section class="retail-group" data-retail-section="' +
+      '<details class="retail-group" data-retail-section="' +
       esc(g) +
-      '"><header><span class="retail-icon">' +
+      '"' +
+      (collapsedShopCategories.has(g) ? '' : ' open') +
+      '><summary class="retail-toggle"><span class="retail-icon">' +
       icon(
         g === 'Additions'
           ? 'plus'
@@ -2710,12 +2714,12 @@ window.MW = window.MW || {};
       esc(g) +
       '</strong></span><small>' +
       allItems.filter((x) => x.group === g).length +
-      '</small></header><div class="retail-items">' +
+      '</small></summary><div class="retail-items">' +
       allItems
         .filter((x) => x.group === g)
         .map(itemHtml)
         .join('') +
-      '</div></section>';
+      '</div></details>';
     const groupedHtml = retailGroups.map(groupHtml).join('');
     const missingCount = delivery && Array.isArray(delivery.missingKeys) ? delivery.missingKeys.length : 0;
     const issueCount = delivery
@@ -2775,7 +2779,8 @@ window.MW = window.MW || {};
         icon('check-circle') +
         ' ' +
         inventoryCovered.length +
-        ' ingredients automatically covered by your cupboard ' +
+        (inventoryCovered.length === 1 ? ' ingredient' : ' ingredients') +
+        ' automatically covered by your cupboard ' +
         icon('chevron-down') +
         '</summary><div class="shop-stock-covered-list">' +
         inventoryCovered
@@ -2840,6 +2845,14 @@ window.MW = window.MW || {};
       { title: 'Shopping list' },
     );
 
+    root.querySelectorAll('.shop-surface details.retail-group').forEach((group) => {
+      group.addEventListener('toggle', () => {
+        if (!group.isConnected) return;
+        const category = group.dataset.retailSection;
+        if (group.open) collapsedShopCategories.delete(category);
+        else collapsedShopCategories.add(category);
+      });
+    });
     const addForm = document.getElementById('shopExtraForm');
     if (addForm)
       addForm.onsubmit = (event) => {
