@@ -11778,12 +11778,12 @@ body #app main.shell.onboarding-account > .onboard-content {
   font-size: 12px;
 }
 .shop-edit-cupboard {
-  min-height: 44px;
-  padding: 9px 12px;
-  color: var(--green-deep);
-  background: transparent;
-  font-weight: 800;
-  cursor: pointer;
+  width: calc(100% - 24px);
+  min-height: 46px;
+  margin: 0 12px 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  font-size: 13px;
 }
 .shop-edit-cupboard:focus-visible {
   outline: 2px solid var(--green);
@@ -11905,7 +11905,7 @@ body #app main.shell.onboarding-account > .onboard-content {
   border: 1px solid #d7e8db;
   border-radius: 14px;
   background: #f7fbf8;
-  margin: 0 0 12px;
+  margin: 18px 0 12px;
 }
 .shop-stock-covered summary {
   cursor: pointer;

@@ -2791,7 +2791,7 @@ window.MW = window.MW || {};
               '</small></span></div>',
           )
           .join('') +
-        '</div><button type="button" class="shop-edit-cupboard" id="shopEditCupboard">' +
+        '</div><button type="button" class="btn secondary shop-edit-cupboard" id="shopEditCupboard">' +
         'Edit cupboard</button></details>'
       : '';
 
