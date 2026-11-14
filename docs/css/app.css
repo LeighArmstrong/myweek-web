@@ -11442,6 +11442,17 @@ body #app main.shell.onboarding-account > .onboard-actions .btn {
   min-height: 50px;
   flex: 1;
 }
+/* Only the illustrated welcome screen has a single, centred call to action. */
+body #app main.shell.onboarding-shell > .onboard-actions.hero-actions:not(.intro-actions) {
+  justify-content: center;
+}
+body #app main.shell.onboarding-shell > .onboard-actions.hero-actions:not(.intro-actions) #onboardNext {
+  flex: 0 1 288px;
+  max-width: 100%;
+  min-height: 48px;
+  border-radius: 18px;
+  font-size: 16px;
+}
 body #app .onboarding-shell .onboard-content .onboard-welcome {
   min-height: 0;
   padding: 0;
