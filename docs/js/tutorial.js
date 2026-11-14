@@ -152,6 +152,20 @@ window.MW = window.MW || {};
   const prefersReducedMotion = () =>
     Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  // Let a smooth scroll finish naturally instead of always waiting a fixed 470 ms.
+  function waitForScrollEnd() {
+    if (prefersReducedMotion()) return pause(40);
+    if (!('onscrollend' in window)) return pause(470);
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timeout);
+        window.removeEventListener('scrollend', done);
+        resolve();
+      };
+      const timeout = setTimeout(done, 470);
+      window.addEventListener('scrollend', done, { once: true });
+    });
+  }
 
   function clearLayer() {
     root
@@ -284,7 +298,9 @@ window.MW = window.MW || {};
   }
 
   async function findTarget(step, generation) {
-    for (let attempt = 0; attempt < 75; attempt++) {
+    // Optional features can be absent entirely; do not stall a tutorial for five seconds.
+    const maxAttempts = step.optional ? 3 : 75;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (!active || active.generation !== generation) return null;
       const target =
         MW.state.get().ui.screen === step.screen ? root.querySelector('.shell ' + step.selector) : null;
@@ -300,8 +316,9 @@ window.MW = window.MW || {};
     if (target.closest('.bottom-nav')) return;
     if (target.closest('.appbar')) {
       if (window.scrollY > 12) {
+        const scrolled = waitForScrollEnd();
         window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
-        await pause(prefersReducedMotion() ? 40 : 470);
+        await scrolled;
       }
       return;
     }
@@ -314,8 +331,9 @@ window.MW = window.MW || {};
     const destination = Math.max(0, before + bounds.top - desiredTop);
     if (Math.abs(destination - before) < 14) return;
     // No mask or highlight is shown while the screen moves: users can follow the scroll.
+    const scrolled = waitForScrollEnd();
     window.scrollTo({ top: destination, behavior: prefersReducedMotion() ? 'instant' : 'smooth' });
-    await pause(prefersReducedMotion() ? 40 : 470);
+    await scrolled;
     if (!active || active.generation !== generation) return;
   }
 
@@ -489,11 +507,12 @@ window.MW = window.MW || {};
     const requiredTop = first.limitBottom - first.cardRect.height - TOUR_GAP - TOUR_PAD - rect.height;
     if (rect.top > requiredTop + 2 && window.scrollY > 0) {
       const distance = Math.min(window.scrollY, Math.ceil(rect.top - requiredTop));
+      const scrolled = waitForScrollEnd();
       window.scrollTo({
         top: window.scrollY + distance,
         behavior: prefersReducedMotion() ? 'instant' : 'smooth',
       });
-      await pause(prefersReducedMotion() ? 35 : 470);
+      await scrolled;
       if (!active || active.generation !== generation) return;
     }
     const second = cardPlacementCandidates(card, target);
